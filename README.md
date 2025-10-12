@@ -34,6 +34,10 @@ remember that it accepts .mid files only. it works best with piano-only .mid, bu
 # Dependencies
 you might need to install a few python libraries though. You will see that main.py imports various libraries.
 
-    import mido, time, headpq, threading, random, copy, numpy, sys, dataclasses, import, typing, collections, os, PyQt6  
+    import mido, time, headpq, threading, random, copy, numpy, sys, dataclasses, import, collections, os, PyQt6  
 
 and it may differ between the .py files. Please check if you have these installed.
+
+if you get some warning about pyinstaller not being compatible with some module, like `typing`, then just uninstall it with 
+
+    python -m pip uninstall <MODULE NAME>
