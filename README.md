@@ -1,7 +1,9 @@
-# Ultimate-Humanised-MIDI-Player-for-ROBLOX, MIDI2Key
-MIDI2Key is a Python-based tool that converts MIDI files into keystrokes for ROBLOX piano simulations. It includes humanization effects, automated pedal support, and multiple playback modes for realistic virtual performances. Easy to run via executable or source code, with GUI support included.
+# Midi2Key
 
-<img width="326" height="396" alt="MIDI2Key GUI for ROBLOX Piano" src="https://github.com/user-attachments/assets/b43864f5-80b0-4b6b-8a52-ab943c622029"/>
+MIDI2Key includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
+
+
+<img width="326" height="396" alt="MIDI2Key application screenshot" src="https://github.com/user-attachments/assets/1217313a-13fb-4ea8-b753-2d70ea486af9" />
 
 
 main.py will play the notes with duration, which will hold notes.
@@ -32,6 +34,10 @@ remember that it accepts .mid files only. it works best with piano-only .mid, bu
 # Dependencies
 you might need to install a few python libraries though. You will see that main.py imports various libraries.
 
-    import mido, time, headpq, threading, random, copy, numpy, sys, dataclasses, import, typing, collections, os, PyQt6  
+    import mido, time, headpq, threading, random, copy, numpy, sys, dataclasses, import, collections, os, PyQt6  
 
 and it may differ between the .py files. Please check if you have these installed.
+
+if you get some warning about pyinstaller not being compatible with some module, like `typing`, then just uninstall it with 
+
+    python -m pip uninstall <MODULE NAME>
