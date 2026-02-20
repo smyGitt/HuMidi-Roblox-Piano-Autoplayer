@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QTableWidgetItem, QHeaderView, QAbstractItemView, QDialogButtonBox,
                              QSizePolicy, QScrollArea, QRadioButton)
 from PyQt6.QtCore import QObject, QThread, pyqtSignal as Signal, Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon
 import mido
 
 from models import Note, MidiTrack
@@ -140,11 +140,12 @@ class MainWindow(QMainWindow):
         }
         self.pedal_mapping_inv = {v: k for k, v in self.pedal_mapping.items()}
 
-        self._setup_ui()
-        self._load_config()
         self.live_keyboard = keyboard.Controller()
         self._live_pressed_keys = set()
         self._live_pedal_down = False
+
+        self._setup_ui()
+        self._load_config()
         self._live_mapper = KeyMapper(use_88_key_layout=self.use_88_key_check.isChecked())
         self.use_88_key_check.toggled.connect(self._rebuild_live_mapper)
 
@@ -981,7 +982,14 @@ class MainWindow(QMainWindow):
         event.accept()
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("midi2key.piano.autoplayer")
+
     app = QApplication(sys.argv)
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
