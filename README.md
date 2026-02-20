@@ -23,11 +23,13 @@ git pull
 
 # Screenshots
 
-![PLayback1](Playback1.png)
-![Playback2](Playback2.png)
-![Visualizer](Visualizer.png)
-![Settings](Settings.png)
-![Output](Output.png)
+![PLayback1](images/Playback1.png)
+![Playback2](images/Playback2.png)
+![Visualizer](images/Visualizer.png)
+![Settings](images/Settings.png)
+![Output](images/Output.png)
+
+
 
 
 
