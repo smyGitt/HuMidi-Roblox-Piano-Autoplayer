@@ -7,6 +7,7 @@ import re
 import json
 import copy
 import threading
+from datetime import datetime
 from pathlib import Path
 from pynput import keyboard
 from pynput.keyboard import Key, KeyCode
@@ -837,13 +838,15 @@ class MainWindow(QMainWindow):
 
     def add_log_message(self, message):
         """Append to log widget; optionally append plain text to log.txt in config dir."""
-        self.log_output.append(message)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        stamped = f"[{timestamp}] {message}"
+        self.log_output.append(stamped)
         if self.log_save_to_file_check.isChecked():
             path = self._get_log_file_path()
             try:
                 self.config_dir.mkdir(parents=True, exist_ok=True)
                 with open(path, "a", encoding="utf-8") as f:
-                    f.write(self._log_message_to_plain(message) + "\n")
+                    f.write(self._log_message_to_plain(stamped) + "\n")
             except Exception:
                 pass
 
