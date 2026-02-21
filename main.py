@@ -231,7 +231,8 @@ class MainWindow(QMainWindow):
         self.hotkey_manager.bound_updated.connect(self._on_hotkey_bound)
         
         self.pedal_mapping = {
-            "Automatic (Default)": "hybrid",
+            "Original (from MIDI)": "original",
+            "Automatic": "hybrid",
             "Always Sustain": "legato",
             "Rhythmic Only": "rhythmic",
             "No Pedal": "none"
@@ -687,10 +688,11 @@ class MainWindow(QMainWindow):
         pedal_label = QLabel("Pedal Style")
         self.pedal_style_combo = QComboBox()
         self.pedal_style_combo.addItems(list(self.pedal_mapping.keys()))
-        self.pedal_style_combo.setItemData(0, "Analyzes song sections to switch between Rhythmic and Sustain.", Qt.ItemDataRole.ToolTipRole)
-        self.pedal_style_combo.setItemData(1, "Ignores note length. Holds pedal until harmony changes.", Qt.ItemDataRole.ToolTipRole)
-        self.pedal_style_combo.setItemData(2, "Presses pedal only while keys are held down.", Qt.ItemDataRole.ToolTipRole)
-        self.pedal_style_combo.setItemData(3, "Disables auto-pedal entirely.", Qt.ItemDataRole.ToolTipRole)
+        self.pedal_style_combo.setItemData(0, "Uses sustain pedal data from the MIDI file. Falls back to Automatic if none found.", Qt.ItemDataRole.ToolTipRole)
+        self.pedal_style_combo.setItemData(1, "Analyzes song sections to switch between Rhythmic and Sustain.", Qt.ItemDataRole.ToolTipRole)
+        self.pedal_style_combo.setItemData(2, "Ignores note length. Holds pedal until harmony changes.", Qt.ItemDataRole.ToolTipRole)
+        self.pedal_style_combo.setItemData(3, "Presses pedal only while keys are held down.", Qt.ItemDataRole.ToolTipRole)
+        self.pedal_style_combo.setItemData(4, "Disables auto-pedal entirely.", Qt.ItemDataRole.ToolTipRole)
 
         grid.addWidget(pedal_label, 2, 0)
         grid.addWidget(self.pedal_style_combo, 2, 2, 1, 2)
@@ -762,7 +764,7 @@ class MainWindow(QMainWindow):
 
     def _reset_playback_group_to_default(self):
         self.tempo_spinbox.setValue(100)
-        self.pedal_style_combo.setCurrentText("Automatic (Default)")
+        self.pedal_style_combo.setCurrentText("Original (from MIDI)")
         self.use_88_key_check.setChecked(False)
         self.countdown_check.setChecked(True)
         self.debug_check.setChecked(False)
@@ -880,7 +882,7 @@ class MainWindow(QMainWindow):
                     self.output_mode_combo.setCurrentIndex(i)
                     break
             internal_style = config.get('pedal_style', 'hybrid')
-            display_text = self.pedal_mapping_inv.get(internal_style, "Automatic (Default)")
+            display_text = self.pedal_mapping_inv.get(internal_style, "Original (from MIDI)")
             self.pedal_style_combo.setCurrentText(display_text)
             self.use_88_key_check.setChecked(config.get('use_88_key_layout', False))
             self.countdown_check.setChecked(config.get('countdown', True))
@@ -1012,8 +1014,10 @@ class MainWindow(QMainWindow):
              selected_indices = [t.index for t, _ in self.selected_tracks_info]
              role_map = {t.index: r for t, r in self.selected_tracks_info}
              final_notes = []
+             raw_pedal_events = []
              if config.get('debug_mode'): self.add_log_message("\n=== RAW MIDI DATA (Selected Tracks) ===")
              for track in tracks:
+                 raw_pedal_events.extend(track.pedal_events)
                  if track.index in selected_indices:
                      role = role_map[track.index]
                      if config.get('debug_mode'): self.add_log_message(f"Track {track.index} ({track.name}): {len(track.notes)} Notes | Role: {role}")
@@ -1022,6 +1026,8 @@ class MainWindow(QMainWindow):
                          if role == "Left Hand": new_note.hand = 'left'
                          elif role == "Right Hand": new_note.hand = 'right'
                          final_notes.append(new_note)
+             raw_pedal_events.sort(key=lambda pe: pe[0])
+             config['raw_pedal_events'] = raw_pedal_events
         except Exception as e:
              self.add_log_message(f"Error preparing playback: {e}")
              QMessageBox.critical(self, "Error", f"Error preparing playback:\n{e}")

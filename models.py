@@ -1,7 +1,7 @@
 """Data models for MIDI parsing and playback (notes, tracks, key events, sections, key state)."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -28,6 +28,7 @@ class MidiTrack:
     program_change: int
     is_drum: bool
     notes: List[Note]
+    pedal_events: List[Tuple[float, int]] = field(default_factory=list)
 
     @property
     def note_count(self) -> int:

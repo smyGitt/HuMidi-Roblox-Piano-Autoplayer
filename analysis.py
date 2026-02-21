@@ -235,12 +235,19 @@ class SectionAnalyzer:
         return 'normal'
 
 class PedalGenerator:
-    """Produces pedal down/up KeyEvents. Styles: hybrid (adaptive), legato (harmonic), rhythmic (per chord), none."""
+    """Produces pedal down/up KeyEvents. Styles: original (from MIDI), hybrid (adaptive), legato (harmonic), rhythmic (per chord), none."""
 
     @staticmethod
     def generate_events(config: Dict, final_notes: List[Note], sections: List[MusicalSection], debug_log: Optional[List[str]] = None) -> List[KeyEvent]:
         style = config.get('pedal_style')
         if style == 'none': return []
+
+        if style == 'original':
+            raw = config.get('raw_pedal_events', [])
+            if raw:
+                return PedalGenerator._convert_raw_pedal(raw)
+            style = 'hybrid'
+
         events = []
         
         if style == 'hybrid':
@@ -337,3 +344,17 @@ class PedalGenerator:
             current_bass_pitch = note.pitch
         final_end = max(n.end_time for n in bass_notes)
         events.append(KeyEvent(final_end, 0, 'pedal', 'up'))
+
+    @staticmethod
+    def _convert_raw_pedal(raw_events: list) -> List[KeyEvent]:
+        """Convert parsed MIDI CC64 events to KeyEvent objects (value >= 64 → down, < 64 → up)."""
+        events = []
+        pedal_down = False
+        for t, value in raw_events:
+            if value >= 64 and not pedal_down:
+                events.append(KeyEvent(t, 1, 'pedal', 'down'))
+                pedal_down = True
+            elif value < 64 and pedal_down:
+                events.append(KeyEvent(t, 0, 'pedal', 'up'))
+                pedal_down = False
+        return events

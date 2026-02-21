@@ -167,6 +167,7 @@ class MidiParser:
             program = 0
             is_drum = False
             notes: List[Note] = []
+            pedal_events: List[Tuple[float, int]] = []
             open_notes: Dict[int, List[Dict]] = defaultdict(list)
             abs_tick = 0
 
@@ -197,11 +198,17 @@ class MidiParser:
                             ))
                             note_id += 1
 
+                if (msg.type == 'control_change'
+                        and msg.control == 64):
+                    t = gmap.tick_to_time(abs_tick) / tempo_scale
+                    pedal_events.append((t, msg.value))
+
             if any(n.channel == 9 for n in notes):
                 is_drum = True
             if notes:
                 notes.sort(key=lambda n: n.start_time)
-                tracks.append(MidiTrack(i, name, program, is_drum, notes))
+                tracks.append(MidiTrack(i, name, program, is_drum, notes,
+                                        pedal_events))
 
         return tracks, tempo_map
 
