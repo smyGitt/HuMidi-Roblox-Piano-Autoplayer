@@ -292,9 +292,9 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.humanization_group)
         left_layout.addStretch()
         controls_main.addWidget(left_column, 1)
-        settings_group = self._create_settings_group()
-        settings_group.setMinimumWidth(260)
-        controls_main.addWidget(settings_group, 0)
+        self.settings_group = self._create_settings_group()
+        self.settings_group.setMinimumWidth(260)
+        controls_main.addWidget(self.settings_group, 0)
 
         self.log_output = QTextBrowser()
         self.log_output.setOpenExternalLinks(True)
@@ -528,6 +528,7 @@ class MainWindow(QMainWindow):
         self.piano_input_widget.setVisible(use_piano)
         self._playback_file_only_widget.setVisible(not use_piano)
         self.humanization_group.setVisible(not use_piano)
+        self.settings_group.setVisible(not use_piano)
         # Visualizer tab is only relevant for file playback; grey out when using Piano input.
         self.tabs.setTabEnabled(1, not use_piano)
         if use_piano and self.tabs.currentIndex() == 1:
