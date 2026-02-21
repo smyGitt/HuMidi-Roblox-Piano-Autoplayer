@@ -10,10 +10,10 @@ Tested on Windows 11, but it should work on Linux and macOS.
 # Install
 git clone https://github.com/x15rte/Jukebox.git
 cd Jukebox/
-python3 -m pip install -r ./requirements.txt
+pip install -r ./requirements.txt
 
 # Run
-python3 ./main.py
+python ./main.py
 
 # Update
 git pull
