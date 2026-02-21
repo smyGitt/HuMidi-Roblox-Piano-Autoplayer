@@ -3,3 +3,6 @@ numpy
 pynput
 PyQt6
 python-rtmidi
+
+# windows
+pydirectinput

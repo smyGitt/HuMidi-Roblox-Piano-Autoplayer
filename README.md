@@ -13,11 +13,9 @@ cd Jukebox/
 python3 -m pip install -r ./requirements.txt
 
 # Run
-cd Jukebox/
 python3 ./main.py
 
 # Update
-cd Jukebox/
 git pull
 ```
 
