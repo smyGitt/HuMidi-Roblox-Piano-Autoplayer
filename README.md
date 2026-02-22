@@ -17,7 +17,11 @@ python ./main.py
 
 # Update
 git pull
+
+# Open config dir
+cd ~/.jukebox_piano/
 ```
+
 
 # Screenshots
 
