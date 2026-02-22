@@ -148,7 +148,7 @@ class MidiParser:
     def parse_structure(filepath: str, tempo_scale: float = 1.0
                         ) -> Tuple[List[MidiTrack], TempoMap]:
         try:
-            mid = mido.MidiFile(filepath)
+            mid = mido.MidiFile(filepath, clip=True)
         except Exception as e:
             raise IOError(f"Could not read MIDI file: {e}")
 
