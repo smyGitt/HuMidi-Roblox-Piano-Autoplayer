@@ -59,6 +59,12 @@ _INPUT_KEYBOARD = 1
 _use_batched_sendinput = False
 _use_pydirectinput = False
 
+
+def is_using_pydirectinput() -> bool:
+    """Return True if pydirectinput is available and in use for numpad input."""
+    return _use_pydirectinput
+
+
 if _platform == "Windows":
     try:
         import pydirectinput

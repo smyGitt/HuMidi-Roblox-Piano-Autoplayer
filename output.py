@@ -7,7 +7,7 @@ Two concrete backends share the same interface:
 
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Set
+from typing import Callable, Dict, Optional, Set
 
 from pynput.keyboard import Key, Controller
 
@@ -197,8 +197,11 @@ class NumpadBackend(OutputBackend):
 # ---------------------------------------------------------------------------
 
 def create_backend(output_mode: str, use_88_key_layout: bool = False,
-                   inter_message_delay: float = 0.0) -> OutputBackend:
+                   inter_message_delay: float = 0.0,
+                   log_message: Optional[Callable[[str], None]] = None) -> OutputBackend:
     """Return the appropriate backend for *output_mode* (``'key'`` or ``'midi_numpad'``)."""
     if output_mode == 'midi_numpad':
+        if log_message and not rmc.is_using_pydirectinput():
+            log_message("PyDirectInput is not in use; falling back to pynput for numpad input.")
         return NumpadBackend(inter_message_delay=inter_message_delay)
     return KeyboardBackend(use_88_key_layout=use_88_key_layout)

@@ -570,7 +570,8 @@ class MainWindow(QMainWindow):
 
         self.live_backend = create_backend(
             self._current_output_mode(),
-            self.use_88_key_check.isChecked())
+            self.use_88_key_check.isChecked(),
+            log_message=self.add_log_message)
 
         self.midi_input_thread = QThread()
         self.midi_input_worker = MidiInputWorker(port_name)
@@ -641,14 +642,16 @@ class MainWindow(QMainWindow):
             self.live_backend.shutdown()
             self.live_backend = create_backend(
                 self._current_output_mode(),
-                self.use_88_key_check.isChecked())
+                self.use_88_key_check.isChecked(),
+                log_message=self.add_log_message)
 
     def _on_key_layout_changed(self, _checked: bool = False):
         if self.live_backend and self.midi_input_active:
             self.live_backend.shutdown()
             self.live_backend = create_backend(
                 self._current_output_mode(),
-                self.use_88_key_check.isChecked())
+                self.use_88_key_check.isChecked(),
+                log_message=self.add_log_message)
 
     def _handle_live_midi_message(self, msg):
         if not self.live_backend:
@@ -1100,7 +1103,8 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(1)
         
         backend = create_backend(config['output_mode'],
-                                 config.get('use_88_key_layout', False))
+                                 config.get('use_88_key_layout', False),
+                                 log_message=self.add_log_message)
         compiled_events = EventCompiler.compile(final_notes, sections, config)
 
         self.player_thread = QThread()
