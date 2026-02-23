@@ -3,8 +3,9 @@ Based on [MIDI2Key](https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplaye
 
 MIDI to Roblox Piano !  
 
-Tested on Windows 11, but it should work on Linux and macOS.
+Tested on Windows 11, but it should work on Linux and macOS.  
 
+[Discord](https://discord.gg/jaxgETk5Em)
 # Usage
 ```bash
 # Install
@@ -25,10 +26,10 @@ cd ~/.jukebox_piano/
 
 # Screenshots
 
-![PLayback1](images/Playback1.png)
-![Playback2](images/Playback2.png)
-![Visualizer](images/Visualizer.png)
-![Output](images/Output.png)
+![PLayback1](images/1.png)
+![Playback2](images/2.png)
+![Visualizer](images/3.png)
+![Output](images/4.png)
 
 
 
