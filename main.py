@@ -21,11 +21,6 @@ from analysis import SectionAnalyzer, FingeringEngine
 from visualizer import PianoWidget, TimelineWidget
 from player import Player
 
-def get_resource_path(relative_path: str) -> str:
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
-
 class HotkeyManager(QObject):
     toggle_requested = Signal()
     bound_updated = Signal(str)
@@ -118,7 +113,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("MIDI2Key v1.3")
         self.setMinimumWidth(550)
         self.setMinimumHeight(683)
-        self.setWindowIcon(QIcon(get_resource_path("icon.ico")))
         self.player_thread = None
         self.player = None
         self.config_dir = Path.home() / ".midi2key"
@@ -128,6 +122,17 @@ class MainWindow(QMainWindow):
         self.parsed_tempo_map = None
         self.current_notes = [] 
         self.total_song_duration_sec = 1.0
+
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        icon_path = os.path.join(base_path, 'icon.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            print(f"Warning: Icon file not found at {icon_path}")  
         
         self.hotkey_manager = HotkeyManager()
         self.hotkey_manager.toggle_requested.connect(self.toggle_playback_state)
