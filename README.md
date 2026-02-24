@@ -9,9 +9,16 @@ main.py will play the notes with duration, which will hold notes.
 noDuration.py, as you can tell from the name, will only press the note for a very short time.
 However, noDuration.py is very unpolished compared to main.py. I highly suggest you use main.py or the .exe from the releases.
 
-# !!! IMPORTANT !!! DO NOT USE THE CURRENT MAIN.PY AND ITS MODULES
+## !!! IMPORTANT !!! DO NOT USE THE CURRENT MAIN.PY AND ITS MODULES
 I'm currently upgrading the pedal generation logic, and currently training a model to experiment with it. I failed to version control properly (I'm dumb, I know) and accidentally pushed the planned changes to main branch. So just use the releases for now.
-
+### So ignore the instructions below! It's irrelevant for now (February 23, 2026).
+-
+-
+-
+-
+-
+-
+-
 # How do you run it?
 ## If you downloaded the .exe from the releases:
 just run the .exe (there probably shouldn't be any malfunctions), or create your own with pyinstaller. I've provided the icon `icon.ico`, so use with this command:
