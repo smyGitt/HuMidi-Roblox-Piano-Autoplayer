@@ -1,5 +1,5 @@
-# Midi2Key
-#### (or HuMidi. Way too many Midi2Keys out there..)
+# HuMidi
+#### (formerly Midi2Key. Way too many Midi2Keys out there..)
 MIDI2Key includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
 
 
