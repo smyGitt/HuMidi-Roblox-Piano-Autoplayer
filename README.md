@@ -1,11 +1,11 @@
 # Midi2Key
-
+#### (or HuMidi. Way too many Midi2Keys out there..)
 MIDI2Key includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
 
 
-<img width="326" height="396" alt="Midi2Key v1.3 Playback tab" src="https://github.com/user-attachments/assets/c9d39ad9-0517-4ea6-acb3-da312868aaed" />
-<img width="326" height="396" alt="Midi2Key v1.3 Visualizer tab" src="https://github.com/user-attachments/assets/dfe54071-70ba-4c80-b2a8-3c866f3f7cb1" />
-<img width="326" height="396" alt="image" src="https://github.com/user-attachments/assets/17b5eac5-b194-4d77-af0e-f1d1c17e463a" />
+<img width="326" height="396" alt="Midi2Key / HuMidi v1.3 Playback tab" src="https://github.com/user-attachments/assets/c9d39ad9-0517-4ea6-acb3-da312868aaed" />
+<img width="326" height="396" alt="Midi2Key / HuMidi v1.3 Visualizer tab" src="https://github.com/user-attachments/assets/dfe54071-70ba-4c80-b2a8-3c866f3f7cb1" />
+<img width="326" height="396" alt="Midi2Key / HuMidi v1.3 Settings tab" src="https://github.com/user-attachments/assets/17b5eac5-b194-4d77-af0e-f1d1c17e463a" />
 
 
 
