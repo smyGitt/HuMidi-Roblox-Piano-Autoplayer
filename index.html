@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Humidify | Advanced Algorithmic MIDI Performance System</title>
+    <meta name="description" content="Humidify parses standard MIDI files and executes them via simulated keyboard inputs with stochastic timing variations.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f111a; color: #e2e8f0; }
+        .code-font { font-family: 'Fira Code', monospace; }
+        .gradient-text {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.5);
+            transform: translateY(-2px);
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased leading-relaxed">
+
+    <nav class="fixed w-full z-50 glass-panel border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex items-center gap-3">
+                    <svg class="w-8 h-8 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                    <span class="font-bold text-2xl tracking-tight text-white">Humidify</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#architecture" class="text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-md text-sm font-medium">Architecture</a>
+                        <a href="#execution" class="text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-md text-sm font-medium">Execution Parameters</a>
+                        <a href="https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplayer-MIDI2Key/releases" class="border border-[#4facfe] text-[#4facfe] hover:bg-[#4facfe] hover:text-gray-900 transition-all px-5 py-2 rounded-md text-sm font-medium">Download Binary</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div class="relative max-w-7xl mx-auto px-6 lg:px-8 z-10 text-center">
+            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 text-white">
+                Advanced Algorithmic <br>
+                <span class="gradient-text">MIDI Performance System</span>
+            </h1>
+            <p class="mt-4 max-w-2xl text-xl text-gray-400 mx-auto mb-10">
+                Humidify parses standard MIDI files and executes them via simulated keyboard inputs. It utilizes stochastic timing variations, heuristic hand-assignment, and dynamic articulation algorithms to emulate human performance characteristics, bypassing the rigid quantization typical of standard macro engines.
+            </p>
+            <div class="flex justify-center gap-4">
+                <a href="https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplayer-MIDI2Key/releases" class="btn-primary text-gray-900 font-bold py-4 px-8 rounded-lg shadow-lg">
+                    Deploy Humidify Executable
+                </a>
+                <a href="https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplayer-MIDI2Key" class="glass-panel text-white border border-gray-600 hover:bg-gray-800 transition-colors font-semibold py-4 px-8 rounded-lg">
+                    View Source Repository
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture" class="py-20 bg-[#161925]">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-white tracking-tight sm:text-4xl">Core Architecture & Subsystems</h2>
+                <div class="h-1 w-24 bg-gradient-to-r from-[#00f2fe] to-[#4facfe] mx-auto mt-4 rounded"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Algorithmic Humanization Engine</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Introduces customizable stochastic variations to note start times, durations (articulation), and tempo. This includes a simulated hand-drift parameter that utilizes a decay factor to correct temporal drift over time, preventing long-term desynchronization across the track.
+                    </p>
+                </div>
+
+                <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Heuristic Fingering Assignment</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Analyzes pitch values and temporal proximity to dynamically assign notes to simulated left or right hand clusters. This enables realistic chord-rolling execution based on sequential note offsets rather than simultaneous block execution.
+                    </p>
+                </div>
+
+                <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Dynamic Pedal Actuation</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Parses harmonic structures and bass note intervals to automatically generate sustain pedal inputs. The subsystem utilizes bounding parameters to detect unsafe intervals (such as minor seconds or tritones) and forces a pedal reset to avoid dissonant audio overlap.
+                    </p>
+                </div>
+                 <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Real-Time Graphical Interface</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Renders an active PyQt6 piano visualizer and scrubbing timeline. This allows the user to monitor execution states, active pitches, and measure boundaries synchronized directly to the parsed MIDI tempo map.
+                    </p>
+                </div>
+                <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Configurable Error Generation</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        An optional execution subsystem that probabilistically introduces adjacent key strikes. When triggered, it calculates a logical mistake pitch (prioritizing adjacent diatonic keys) to simulate physiological performance fatigue.
+                    </p>
+                </div>
+                 <div class="glass-panel rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                    <div class="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
+                        <svg class="w-6 h-6 text-[#4facfe]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Zero Local Dependencies</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Deployed as a standalone Windows Portable Executable (PE) utilizing PyInstaller. The Python host process and required dynamically loaded libraries (DLLs) are bundled within the binary payload.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="execution" class="py-20 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8 z-10 relative">
+            <div class="flex flex-col lg:flex-row gap-12 items-center">
+                <div class="w-full lg:w-1/2">
+                    <h2 class="text-3xl font-bold text-white tracking-tight sm:text-4xl mb-6">Execution Parameters</h2>
+                    <p class="text-gray-400 mb-8 text-lg">
+                        The initialization sequence requires explicit parameter configuration prior to programmatic execution.
+                    </p>
+                    <ul class="space-y-6">
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-800 border border-[#4facfe] flex items-center justify-center text-[#4facfe] font-bold code-font text-sm">01</div>
+                            <div>
+                                <h4 class="text-white font-semibold text-lg">Parsing & Track Selection</h4>
+                                <p class="text-gray-500 text-sm mt-1">The application utilizes the <code class="bg-gray-800 text-pink-400 px-1 rounded code-font text-xs">mido</code> library to parse the MIDI structure. Users manually select specific tracks or isolate percussion channels via the PyQt6 interface.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-800 border border-[#4facfe] flex items-center justify-center text-[#4facfe] font-bold code-font text-sm">02</div>
+                            <div>
+                                <h4 class="text-white font-semibold text-lg">Parameter Configuration</h4>
+                                <p class="text-gray-500 text-sm mt-1">Users define the limits of the stochastic variables, including timing variance (in seconds), articulation overlap (as a percentage), and global tempo scaling.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-800 border border-[#4facfe] flex items-center justify-center text-[#4facfe] font-bold code-font text-sm">03</div>
+                            <div>
+                                <h4 class="text-white font-semibold text-lg">Process Injection</h4>
+                                <p class="text-gray-500 text-sm mt-1">Upon triggering the <code class="bg-gray-800 text-pink-400 px-1 rounded code-font text-xs">pynput</code> global hotkey, the application compiles the runtime events into a priority queue and begins sending synthesized keystrokes to the active operating system window manager.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="w-full lg:w-1/2 rounded-xl overflow-hidden glass-panel border border-gray-700 shadow-2xl">
+                    <div class="bg-gray-900 px-4 py-3 border-b border-gray-800 flex gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div class="p-6 overflow-x-auto code-font text-sm">
+<pre><span class="text-pink-500">def</span> <span class="text-blue-400">_compile_event_list</span>(<span class="text-orange-300">self</span>, notes_to_play: List[Note], sections: List[MusicalSection]):
+    <span class="text-orange-300">self</span>.key_states.clear()
+    use_mistakes = <span class="text-orange-300">self</span>.config.get(<span class="text-green-300">'enable_mistakes'</span>, <span class="text-purple-400">False</span>)
+    mistake_chance = <span class="text-orange-300">self</span>.config.get(<span class="text-green-300">'mistake_chance'</span>, <span class="text-purple-400">0</span>) / <span class="text-purple-400">100.0</span>
+    
+    temp_heap = []
+    played_pitches_in_section = set()
+    current_section_idx = -<span class="text-purple-400">1</span>
+    
+    <span class="text-pink-500">for</span> note <span class="text-pink-500">in</span> notes_to_play:
+        note_section_idx = -<span class="text-purple-400">1</span>
+        <span class="text-pink-500">for</span> i, sec <span class="text-pink-500">in</span> <span class="text-blue-400">enumerate</span>(sections):
+            <span class="text-pink-500">if</span> sec.start_time <= note.start_time < sec.end_time:
+                note_section_idx = i; <span class="text-pink-500">break</span></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-[#0b0c10] border-t border-gray-800 pt-12 pb-8">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-2">
+                 <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                <span class="text-gray-400 font-semibold tracking-wide">HUMIDIFY</span>
+            </div>
+            
+            <div class="text-gray-500 text-sm">
+                System architecture and repository maintained by <a href="https://github.com/smyGitt" class="text-[#4facfe] hover:underline font-medium">smyGitt</a>.
+            </div>
+
+            <div class="flex gap-6 text-sm font-medium">
+                <a href="https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplayer-MIDI2Key" class="text-gray-400 hover:text-[#4facfe] transition-colors">GitHub Repository</a>
+                <a href="https://github.com/smyGitt/Human-like-Roblox-Piano-Autoplayer-MIDI2Key/issues" class="text-gray-400 hover:text-[#4facfe] transition-colors">Submit Issue</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
