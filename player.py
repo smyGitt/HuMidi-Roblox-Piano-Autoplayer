@@ -3,6 +3,7 @@ from pynput import keyboard
 from pynput.keyboard import Key, Controller
 import time
 import threading
+import traceback
 import heapq
 import random
 import bisect
@@ -18,6 +19,7 @@ class Player(QObject):
     playback_finished = Signal()
     visualizer_updated = Signal(list)
     auto_paused = Signal()
+    error_occurred = Signal(str)
 
     def __init__(self, config: Dict, notes: List[Note], sections: List[MusicalSection], tempo_map: TempoMap):
         super().__init__()
@@ -42,7 +44,6 @@ class Player(QObject):
         self.last_pause_timestamp = 0.0
         self.total_duration = 0.0
         
-        # Throttling variables for UI updates (60 FPS)
         self.last_progress_emit_time = 0.0
         self.progress_update_interval = 1.0 / 60.0
         
@@ -56,6 +57,10 @@ class Player(QObject):
 
     def play(self):
         try:
+            self.status_updated.emit("Compiling playback events...")
+            self._compile_event_list(self.notes, self.sections)
+            self.status_updated.emit("Initiating playback sequence...")
+
             self._log_debug("\n=== STARTING PLAYBACK PROCESS ===")
             humanized_notes = copy.deepcopy(self.notes)
             self.humanizer = Humanizer(self.config, self.debug_log)
@@ -86,8 +91,9 @@ class Player(QObject):
             self._run_cursor_loop()
 
         except Exception as e:
-            import traceback
-            self.status_updated.emit(f"Error: {e}\n{traceback.format_exc()}")
+            error_msg = f"Critical Execution Error:\n{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+            self.error_occurred.emit(error_msg)
+            self.stop_event.set()
         finally:
             if self.stop_event.is_set(): 
                 self.shutdown()
@@ -186,7 +192,8 @@ class Player(QObject):
             
             played_pitches_in_section.add(note.pitch)
         
-        pedal_events = PedalGenerator.generate_events(self.config, notes_to_play, sections, self.debug_log)
+        # Bridge the execution thread telemetry directly to the PyQt frontend
+        pedal_events = PedalGenerator.generate_events(self.config, notes_to_play, sections, self._log_debug)
         for event in pedal_events: 
             heapq.heappush(temp_heap, event)
             
@@ -252,7 +259,6 @@ class Player(QObject):
             else:
                 time.sleep(0.001)
 
-            # Throttle UI progress updates to ~60 FPS
             if now - self.last_progress_emit_time >= self.progress_update_interval:
                 self.progress_updated.emit(playback_time)
                 self.last_progress_emit_time = now

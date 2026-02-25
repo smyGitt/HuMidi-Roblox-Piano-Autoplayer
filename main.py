@@ -630,6 +630,10 @@ class MainWindow(QMainWindow):
             self.selected_tracks_info = None
             self.play_button.setEnabled(False)
 
+    def show_error_dialog(self, error_message: str):
+        self.add_log_message("ERROR: Playback thread terminated unexpectedly due to an execution failure.")
+        QMessageBox.critical(self, "Hardware/Execution Failure", error_message)
+
     def handle_play(self):
         if self.player_thread and self.player_thread.isRunning(): 
             self.toggle_playback_state()
@@ -699,6 +703,10 @@ class MainWindow(QMainWindow):
         self.player.progress_updated.connect(self.update_progress)
         self.player.visualizer_updated.connect(self.piano_widget.set_active_pitches)
         self.player.auto_paused.connect(self._on_auto_paused)
+        
+        # Hardware/Execution Fault Notification Hook
+        self.player.error_occurred.connect(self.show_error_dialog)
+        
         self.player_thread.start()
 
     def handle_stop(self):

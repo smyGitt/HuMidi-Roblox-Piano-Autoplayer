@@ -1,8 +1,11 @@
+import os
 import random
 import heapq
 import numpy as np
-from typing import List, Set, Dict, Optional
+import onnxruntime as ort
+from typing import List, Set, Dict, Optional, Callable
 from dataclasses import dataclass, field
+
 from models import Note, MusicalSection, KeyEvent, Finger
 from core import TempoMap, get_time_groups
 
@@ -216,21 +219,30 @@ class SectionAnalyzer:
         return 'normal'
 
 class PedalGenerator:
+    _session = None
+
     @staticmethod
-    def generate_events(config: Dict, final_notes: List[Note], sections: List[MusicalSection], debug_log: Optional[List[str]] = None) -> List[KeyEvent]:
+    def generate_events(config: Dict, final_notes: List[Note], sections: List[MusicalSection], debug_log: Optional[Callable[[str], None]] = None) -> List[KeyEvent]:
         style = config.get('pedal_style')
         if style == 'none': return []
         events = []
         
         if style == 'hybrid':
+            # Attempt AI ONNX inference interception first
+            ai_events = PedalGenerator._generate_ai_pedal(final_notes, debug_log)
+            if ai_events:
+                return ai_events
+                
+            # If AI pipeline fails, is missing, or is mathematically rejected, seamlessly fall back to algorithmic driver
+            if debug_log is not None:
+                debug_log("Executing Algorithmic Pedal Fallback.")
+                
             bass_notes = [n for n in final_notes if n.hand == 'left']
             bass_notes.sort(key=lambda n: n.start_time)
             if not bass_notes:
                 treble_notes = [n for n in final_notes if n.hand == 'right']
                 treble_notes.sort(key=lambda n: n.start_time)
-                # Pass both the driver notes and the total track notes
                 return PedalGenerator._generate_adaptive_pedal_driver(treble_notes, final_notes)
-            # Pass both the driver notes and the total track notes
             return PedalGenerator._generate_adaptive_pedal_driver(bass_notes, final_notes)
             
         for section in sections:
@@ -255,13 +267,118 @@ class PedalGenerator:
         return events
 
     @staticmethod
+    def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], None]]) -> List[KeyEvent]:
+        fps = 50.0
+        model_path = 'pedal_bilstm.onnx'
+
+        # 1. Pipeline and Environment Validation
+        if not os.path.exists(model_path):
+            if debug_log is not None: debug_log("AI generation skipped: Model not found.")
+            return []
+
+        if PedalGenerator._session is None:
+            try:
+                providers = ['DmlExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+                PedalGenerator._session = ort.InferenceSession(model_path, providers=providers)
+            except Exception as e:
+                if debug_log is not None: debug_log(f"AI generation aborted: Runtime Error -> {str(e)}")
+                return []
+
+        # 2. Matrix Translation
+        max_time = max(note.end_time for note in notes)
+        total_steps = int(np.ceil(max_time * fps)) + 1
+        input_tensor = np.zeros((1, total_steps, 128), dtype=np.float32)
+
+        for note in notes:
+            s_idx = int(note.start_time * fps)
+            e_idx = int(note.end_time * fps)
+            input_tensor[0, s_idx:e_idx, note.pitch] = note.velocity / 127.0
+
+        # 3. Hardware Agnostic Forward Pass
+        input_name = PedalGenerator._session.get_inputs()[0].name
+        CHUNK_SIZE = 2000
+        pedal_preds_list = []
+
+        try:
+            for i in range(0, total_steps, CHUNK_SIZE):
+                chunk = input_tensor[:, i:i+CHUNK_SIZE, :]
+                ort_outs = PedalGenerator._session.run(None, {input_name: chunk})
+                pedal_preds_list.append(ort_outs[0][0, :, 0])
+            preds = np.concatenate(pedal_preds_list)
+        except Exception as e:
+            if debug_log is not None: debug_log(f"AI execution crashed during forward pass: {str(e)}")
+            return []
+
+        # 4. Min-Max Normalization
+        p_min, p_max = np.min(preds), np.max(preds)
+        if p_max > p_min:
+            preds = (preds - p_min) / (p_max - p_min)
+        else:
+            preds = np.zeros_like(preds)
+
+        # 5. Silence Masking (CRITICAL LOGIC FIX)
+        # Mirrors the 0.35s gap logic from the algorithmic driver. Forces the tensor to 0 during rests.
+        is_silent = np.ones(total_steps, dtype=bool)
+        for note in notes:
+            s_idx = int(note.start_time * fps)
+            e_idx = int((note.end_time + 0.35) * fps)
+            is_silent[s_idx:min(e_idx, total_steps)] = False
+        
+        preds[is_silent] = 0.0
+
+        # 6. Physical Mechanism Event Generation
+        events = []
+        pedal_is_down = False
+        single_threshold = 0.50
+        last_up_time = -1.0
+        PEDAL_LAG = 0.05  # CRITICAL LOGIC FIX: Mechanical delay for PyNput registration
+
+        for i in range(1, len(preds)):
+            prev_val = preds[i-1]
+            curr_val = preds[i]
+            curr_time = i / fps
+
+            # Engagement (Down)
+            if prev_val < single_threshold and curr_val >= single_threshold:
+                if not pedal_is_down:
+                    actual_down_time = curr_time
+                    # Force mechanical delay if the AI attempted to press instantly after a lift
+                    if actual_down_time - last_up_time < PEDAL_LAG:
+                        actual_down_time = last_up_time + PEDAL_LAG
+                    pedal_is_down = True
+                    events.append(KeyEvent(actual_down_time, 1, 'pedal', 'down'))
+
+            # Release (Up)
+            elif prev_val >= single_threshold and curr_val < single_threshold:
+                if pedal_is_down:
+                    pedal_is_down = False
+                    events.append(KeyEvent(curr_time, 0, 'pedal', 'up'))
+                    last_up_time = curr_time
+
+        if pedal_is_down:
+            events.append(KeyEvent(max_time, 0, 'pedal', 'up'))
+
+        # 7. Quality Assurance Rejection
+        # If the partially trained matrix is completely flat and outputs less than 4 discrete actions,
+        # it is mathematically defective. Reject it and fallback to the algorithmic generator.
+        if len(events) <= 2:
+            if debug_log is not None:
+                debug_log("AI pipeline output rejected (Insufficient mathematical variance).")
+            return []
+
+        if debug_log is not None:
+            debug_log(f"AI pipeline successful: Queued {len(events)} physical actuations.")
+
+        return events
+
+    @staticmethod
     def _generate_adaptive_pedal_driver(driver_notes: List[Note], all_notes: List[Note]) -> List[KeyEvent]:
         events = []
         if not driver_notes: return events
         
         PEDAL_LAG = 0.05 
-        SAFE_INTERVALS = {0, 3, 4, 5, 7} # Unison, minor 3rd, Major 3rd, Perfect 4th, Perfect 5th, Octave
-        UNSAFE_INTERVALS = {1, 6} # minor 2nd, Tritone
+        SAFE_INTERVALS = {0, 3, 4, 5, 7} 
+        UNSAFE_INTERVALS = {1, 6} 
 
         for i in range(len(driver_notes)):
             curr = driver_notes[i]
@@ -282,25 +399,20 @@ class PedalGenerator:
                 should_repedal = False
                 
                 if next_n:
-                    # 1. Linear Harmonic Check
                     linear_interval = abs(next_n.pitch - curr.pitch) % 12
                     if linear_interval in UNSAFE_INTERVALS:
                         should_repedal = True
                     
-                    # 2. Vertical Harmonic Check
                     if not should_repedal:
-                        # Isolate all notes occurring within a 0.05s window of the next driver note
                         concurrent_notes = [n for n in all_notes if abs(n.start_time - next_n.start_time) <= 0.05]
                         if concurrent_notes:
-                            # Establish the harmonic root for this specific timestamp
                             lowest_pitch = min(n.pitch for n in concurrent_notes)
                             
-                            # Evaluate each concurrent note against the local root
                             for n in concurrent_notes:
                                 vertical_interval = abs(n.pitch - lowest_pitch) % 12
                                 if vertical_interval in UNSAFE_INTERVALS:
                                     should_repedal = True
-                                    break # Exit early upon first detected dissonance
+                                    break 
                 
                 if should_repedal and next_n:
                     events.append(KeyEvent(next_n.start_time, 0, 'pedal', 'up'))
