@@ -2,8 +2,8 @@ from PyQt6.QtWidgets import QWidget, QSizePolicy
 from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal as Signal
 from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
 from typing import List, Set
-from models import Note
-from core import TempoMap
+from core.models import Note
+from core.core import TempoMap
 
 class PianoWidget(QWidget):
     def __init__(self, parent=None):

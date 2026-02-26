@@ -6,8 +6,8 @@ import onnxruntime as ort
 from typing import List, Set, Dict, Optional, Callable
 from dataclasses import dataclass, field
 
-from models import Note, MusicalSection, KeyEvent, Finger
-from core import TempoMap, get_time_groups
+from core.models import Note, MusicalSection, KeyEvent, Finger
+from core.core import TempoMap, get_time_groups
 
 class Humanizer:
     def __init__(self, config: Dict, debug_log: Optional[List[str]] = None):
@@ -329,7 +329,7 @@ class PedalGenerator:
         # 6. Physical Mechanism Event Generation
         events = []
         pedal_is_down = False
-        single_threshold = 0.50
+        single_threshold = 0.70
         last_up_time = -1.0
         PEDAL_LAG = 0.05  # CRITICAL LOGIC FIX: Mechanical delay for PyNput registration
 

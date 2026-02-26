@@ -9,9 +9,10 @@ import random
 import bisect
 import copy
 from typing import List, Dict, Optional, Tuple
-from models import Note, KeyEvent, MusicalSection, KeyState
-from core import TempoMap, KeyMapper
-from analysis import Humanizer, PedalGenerator
+
+from core.models import Note, KeyEvent, MusicalSection, KeyState
+from core.core import TempoMap, KeyMapper
+from core.analysis import Humanizer, PedalGenerator
 
 class Player(QObject):
     status_updated = Signal(str)
@@ -54,6 +55,68 @@ class Player(QObject):
         if self.debug_log is not None: 
             self.debug_log.append(msg)
             self.status_updated.emit(msg)
+
+    def export_compiled_events(self) -> List[KeyEvent]:
+        """
+        Standalone compilation pipeline for generating serialization data 
+        without modifying or interrupting the hardware execution loop in play().
+        """
+        self.status_updated.emit("Compiling playback events for saving...")
+        self._compile_event_list(self.notes, self.sections)
+
+        humanized_notes = copy.deepcopy(self.notes)
+        self.humanizer = Humanizer(self.config, self.debug_log)
+        left_hand_notes = [n for n in humanized_notes if n.hand == 'left']
+        right_hand_notes = [n for n in humanized_notes if n.hand == 'right']
+        resync_points = {round(n.start_time, 2) for n in left_hand_notes}.intersection({round(n.start_time, 2) for n in right_hand_notes})
+        
+        self.humanizer.apply_to_hand(left_hand_notes, 'left', resync_points)
+        self.humanizer.apply_to_hand(right_hand_notes, 'right', resync_points)
+        
+        all_notes = sorted(left_hand_notes + right_hand_notes, key=lambda n: n.start_time)
+        self.humanizer.apply_tempo_rubato(all_notes, self.sections)
+        
+        self._compile_event_list(all_notes, self.sections)
+        return self.compiled_events
+
+    def play_saved_events(self):
+        """
+        Dedicated execution branch for running pre-compiled JSON events,
+        completely skipping the internal compilation pipeline.
+        """
+        try:
+            self.status_updated.emit("Initiating saved playback sequence...")
+            
+            # CRITICAL FIX: Ensure KeyState memory map is populated from serialized data
+            # Without this, the physical simulation loop would ignore the keystrokes
+            self.key_states.clear()
+            for ev in self.compiled_events:
+                if ev.key_char not in self.key_states:
+                    self.key_states[ev.key_char] = KeyState(ev.key_char)
+                    
+            self.status_updated.emit(f"Successfully loaded {len(self.compiled_events)} physical execution instructions.")
+
+            if self.config.get('countdown'): self._run_countdown()
+            if self.stop_event.is_set():
+                self.playback_finished.emit()
+                return
+
+            self.status_updated.emit("Playing from save!")
+            self.start_time = time.perf_counter()
+            self.total_paused_time = 0.0
+            self.event_index = 0
+            self.last_progress_emit_time = self.start_time
+            
+            self._run_cursor_loop()
+
+        except Exception as e:
+            error_msg = f"Critical Execution Error:\n{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+            self.error_occurred.emit(error_msg)
+            self.stop_event.set()
+        finally:
+            if self.stop_event.is_set(): 
+                self.shutdown()
+                self.playback_finished.emit()
 
     def play(self):
         try:
@@ -192,7 +255,6 @@ class Player(QObject):
             
             played_pitches_in_section.add(note.pitch)
         
-        # Bridge the execution thread telemetry directly to the PyQt frontend
         pedal_events = PedalGenerator.generate_events(self.config, notes_to_play, sections, self._log_debug)
         for event in pedal_events: 
             heapq.heappush(temp_heap, event)
@@ -222,7 +284,7 @@ class Player(QObject):
             playback_time = (now - self.start_time) - self.total_paused_time
             
             next_sec_idx = self.current_section_idx + 1
-            if next_sec_idx < len(self.sections):
+            if self.sections and next_sec_idx < len(self.sections):
                 if playback_time >= self.sections[next_sec_idx].start_time:
                     self.current_section_idx = next_sec_idx
                     sec = self.sections[next_sec_idx]
@@ -298,7 +360,8 @@ class Player(QObject):
             try: 
                 self.keyboard.release(base_key)
                 self._log_debug(f"      [PHYSICAL] Releasing Key '{base_key}'")
-            except: pass
+            except Exception as e:
+                self._log_debug(f"      [PHYSICAL FAILURE] {e}")
 
         for event in press_events:
             self._log_debug(f"[ACT] {playback_time:.4f}s | PRESS   | {event.key_char} (Delta: {playback_time - event.time:+.4f}s)")
@@ -325,7 +388,8 @@ class Player(QObject):
                     elif not was_physically_down:
                         self.keyboard.press(base_key)
                         self._log_debug(f"      [PHYSICAL] Pressing Key '{base_key}' with modifiers {modifiers}")
-            except Exception: pass
+            except Exception as e: 
+                self._log_debug(f"      [PHYSICAL FAILURE] {e}")
 
         if state_changed:
             self.visualizer_updated.emit(list(self.active_pitches))

@@ -2,7 +2,7 @@ import mido
 import bisect
 from collections import defaultdict
 from typing import List, Tuple, Dict, Optional
-from models import Note, MidiTrack
+from core.models import Note, MidiTrack
 from pynput.keyboard import Key
 
 def get_time_groups(notes: List[Note], threshold: float = 0.015) -> List[List[Note]]:
