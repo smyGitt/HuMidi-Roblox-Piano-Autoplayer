@@ -488,28 +488,45 @@
             </div>
         </div>
 
-        <div class="flex flex-col items-center gap-6">
-            <div class="flex flex-col sm:flex-row gap-4">
-                <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-                    Windows
-                </a>
-                <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
-                    macOS
+        <div class="flex flex-col items-center gap-8 max-w-2xl mx-auto">
+
+            <!-- SourceForge: one-click download -->
+            <div class="w-full bg-slate-800/40 rounded-3xl border border-slate-700/50 p-8 flex flex-col items-center gap-4">
+                <h3 class="text-lg font-bold text-white">Fastest Way to Play</h3>
+                <p class="text-sm text-slate-400 text-center">One click, zero thinking. SourceForge detects your OS and delivers the right build automatically: <span class="text-slate-300">.exe</span> for Windows, <span class="text-slate-300">.dmg</span> for macOS, or <span class="text-slate-300">.tar.gz</span> for Linux.</p>
+                <!-- Begin SF Badge -->
+                <div class="sf-root" data-id="3982299" data-badge="oss-users-love-us-white" style="width:125px">
+                    <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/" target="_blank">HuMidi</a>
+                </div>
+                <script>(function () {var sc=document.createElement('script');sc.async=true;sc.src='https://b.sf-syn.com/badge_js?sf_id=3982299';var p=document.getElementsByTagName('script')[0];p.parentNode.insertBefore(sc, p);})();</script>
+                <!-- End SF Badge -->
+                <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/files/latest/download" target="_blank" class="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(249,115,22,0.5)] hover:shadow-[0_0_60px_-15px_rgba(249,115,22,0.7)] transition-all transform hover:scale-105 flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Download from SourceForge
                 </a>
             </div>
-            <p class="text-sm text-slate-500">Requires Windows 10/11 or macOS. No installation required.</p>
-            <!-- Begin  Tag -->
-            <div class="sf-root" data-id="3982299" data-badge="oss-users-love-us-white" style="width:125px">
-                <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/" target="_blank">HuMidi</a>
+
+            <!-- GitHub: platform-specific builds -->
+            <div class="w-full bg-slate-800/40 rounded-3xl border border-slate-700/50 p-8 flex flex-col items-center gap-4">
+                <h3 class="text-lg font-bold text-white">Or Grab a Specific Build</h3>
+                <p class="text-sm text-slate-400 text-center">Pick your platform directly from the GitHub releases page.</p>
+                <div class="flex flex-col sm:flex-row gap-4 mt-2">
+                    <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                        Windows
+                    </a>
+                    <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+                        macOS
+                    </a>
+                </div>
+                <p class="text-xs text-slate-600 mt-1">No installation required on any platform.</p>
+                <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer" target="_blank" class="mt-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-bold text-sm border border-slate-700 transition-all flex items-center gap-2">
+                    <svg viewBox="0 0 24 24" class="h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                    Source Code
+                </a>
             </div>
-            <script>(function () {var sc=document.createElement('script');sc.async=true;sc.src='https://b.sf-syn.com/badge_js?sf_id=3982299';var p=document.getElementsByTagName('script')[0];p.parentNode.insertBefore(sc, p);})();
-            </script>
-            <!-- End  Tag -->
-            <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer" target="_blank" class="text-blue-400 hover:text-blue-300 underline underline-offset-4 text-sm mt-4 transition-colors">
-                Or download the Python source code here
-            </a>
+
         </div>
     </section>
 
