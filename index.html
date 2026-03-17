@@ -7,7 +7,7 @@
     <!-- Primary Meta Tags -->
     <title>HuMidi (formerly MIDI2Key) - The Ultimate Roblox Virtual Piano Autoplayer</title>
     <meta name="title" content="HuMidi (MIDI2Key) - The Ultimate Roblox Virtual Piano Autoplayer">
-    <meta name="description" content="Tired of robotic autoplayers? HuMidi (formerly MIDI2Key) uses advanced humanization algorithms to play Roblox virtual pianos like a real, living pianist. Free and open-source.">
+    <meta name="description" content="Tired of robotic autoplayers? HuMidi (formerly MIDI2Key) uses advanced humanization algorithms to play Roblox virtual pianos like a real, living pianist. Free and open-source. Now with v2.0's expanded humanization suite.">
     <meta name="keywords" content="HuMidi, MIDI2Key, Roblox piano autoplayer, virtual piano macro, humanized midi player, auto piano roblox, Garry's Mod piano, VRChat piano, auto keyboard">
     <meta name="author" content="smyGitt">
 
@@ -53,6 +53,7 @@
             transform: translateX(-50%);
             z-index: -1;
         }
+        .vcard { position: relative; transition: transform 0.42s cubic-bezier(0.4,0,0.2,1); }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-300 leading-relaxed selection:bg-indigo-500 selection:text-white overflow-x-hidden relative">
@@ -90,7 +91,7 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                     </span>
-                    v1.3 Available Now
+                    v2.0 Available Now
                 </a>
             </div>
         </div>
@@ -106,7 +107,7 @@
 
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
             <a href="#download" class="w-full sm:w-auto px-8 py-4 bg-blue-500 hover:bg-blue-400 text-white rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(59,130,246,0.5)] hover:shadow-[0_0_60px_-15px_rgba(59,130,246,0.7)] transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                Download for Windows
+                Download for Windows / Mac
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
@@ -155,7 +156,7 @@
             <div class="bg-slate-900/50 p-8 rounded-3xl border border-slate-800 hover:border-purple-500/50 transition-colors group">
                 <div class="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 text-2xl group-hover:scale-110 transition-transform">🧠</div>
                 <h3 class="text-xl font-bold text-white mb-3">Lifelike Humanization</h3>
-                <p class="text-slate-400 text-sm leading-relaxed">Adjust hand drift, chord rolling, and even add a customizable "mistake chance". Make your performance sound so real, nobody will ever guess it's automated.</p>
+                <p class="text-slate-400 text-sm leading-relaxed">A full suite of independent controls: velocity dynamics, articulation shaping, chord rolling, timing variance, hand drift correction, and a customizable mistake chance. Dial in exactly how human you want to sound.</p>
             </div>
 
             <!-- Card 3 -->
@@ -183,39 +184,106 @@
 
     <!-- GUI Showcases -->
     <section id="interface" class="relative py-24 bg-slate-900/30 border-y border-slate-800/50">
-        <div class="max-w-6xl mx-auto px-6">
+        <div class="max-w-4xl mx-auto px-6">
             <div class="text-center mb-16">
                 <h2 class="text-3xl md:text-5xl font-bold text-white mb-4">A UI Built for Control</h2>
                 <p class="text-slate-400 text-lg">Everything you need to fine-tune your performance in one sleek window.</p>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="flex flex-col items-center group">
-                    <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6">
-                        <img src="https://github.com/user-attachments/assets/c9d39ad9-0517-4ea6-acb3-da312868aaed" alt="Playback Controls" class="object-cover w-full max-w-[326px] transform group-hover:scale-105 transition-transform duration-500">
+
+            <!-- Carousel -->
+            <div class="relative" id="screenshot-carousel">
+                <!-- Track -->
+                <div class="overflow-hidden rounded-2xl">
+                    <div class="flex transition-transform duration-500 ease-in-out" id="carousel-track">
+
+                        <!-- Slide 1: Full humanization panel -->
+                        <div class="min-w-full flex flex-col items-center px-2 md:px-12">
+                            <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6 w-full">
+                                <img src="https://github.com/user-attachments/assets/e253ae9e-9280-4cb9-97bb-4ad6ac302237" alt="HuMidi v2.0 expanded humanization panel" class="w-full h-auto block">
+                            </div>
+                            <h4 class="text-lg font-bold text-white">1. Fine-Tune Every Detail</h4>
+                            <p class="text-sm text-slate-500 text-center mt-2 max-w-md">An expanded panel puts every humanization control at your fingertips: velocity dynamics, articulation, timing variance, chord rolling, hand drift correction, and more.</p>
+                        </div>
+
+                        <!-- Slide 2: Save & Load presets -->
+                        <div class="min-w-full flex flex-col items-center px-2 md:px-12">
+                            <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6 w-full">
+                                <img src="https://github.com/user-attachments/assets/d851f986-8d44-43b4-a5a8-fa26b9020cb3" alt="HuMidi v2.0 save and load presets screen" class="w-full h-auto block">
+                            </div>
+                            <h4 class="text-lg font-bold text-white">2. Presets, Organized Your Way</h4>
+                            <p class="text-sm text-slate-500 text-center mt-2 max-w-md">Save complete playback configurations as named presets, organized per-MIDI. Reload any performance setup with one click, no re-dialing required.</p>
+                        </div>
+
+                        <!-- Slide 3: Themes & settings -->
+                        <div class="min-w-full flex flex-col items-center px-2 md:px-12">
+                            <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6 w-full">
+                                <img src="https://github.com/user-attachments/assets/11065766-a107-461a-a46f-84f8119098cf" alt="HuMidi v2.0 light mode theme and settings" class="w-full h-auto block">
+                            </div>
+                            <h4 class="text-lg font-bold text-white">3. Make It Yours</h4>
+                            <p class="text-sm text-slate-500 text-center mt-2 max-w-md">Switch to light mode or dial in a custom color scheme. HuMidi's new theme editor lets you personalize the look without touching a config file.</p>
+                        </div>
+
+                        <!-- Slide 4: Minimized overlay -->
+                        <div class="min-w-full flex flex-col items-center px-2 md:px-12">
+                            <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6 w-fit mx-auto">
+                                <img src="https://github.com/user-attachments/assets/344cf20a-ffe2-482c-bc71-53c4c378a5ad" alt="HuMidi v2.0 minimized compact overlay" class="block h-auto">
+                            </div>
+                            <h4 class="text-lg font-bold text-white">4. Stay in the Game</h4>
+                            <p class="text-sm text-slate-500 text-center mt-2 max-w-md">Collapse HuMidi down to its bare essentials. The minimized overlay keeps only the controls you need visible, with everything else tucked away.</p>
+                        </div>
+
                     </div>
-                    <h4 class="text-lg font-bold text-white">1. Configure Playback</h4>
-                    <p class="text-sm text-slate-500 text-center mt-2">Set your tempo, choose your tracks, select your pedaling style, and dial in the exact amount of human-like drift and mistakes you want.</p>
                 </div>
 
-                <div class="flex flex-col items-center group">
-                    <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6 md:-mt-8">
-                        <img src="https://github.com/user-attachments/assets/dfe54071-70ba-4c80-b2a8-3c866f3f7cb1" alt="Visualizer" class="object-cover w-full max-w-[326px] transform group-hover:scale-105 transition-transform duration-500">
-                    </div>
-                    <h4 class="text-lg font-bold text-white">2. Watch it Play</h4>
-                    <p class="text-sm text-slate-500 text-center mt-2">Follow along with a beautiful real-time piano roll and keyboard visualizer.</p>
-                </div>
+                <!-- Prev Button -->
+                <button id="carousel-prev" onclick="carouselMove(-1)" aria-label="Previous" class="absolute left-0 top-1/2 -translate-y-[calc(50%+2rem)] -translate-x-4 md:-translate-x-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                </button>
 
-                <div class="flex flex-col items-center group">
-                    <div class="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-700/50 mb-6">
-                        <img src="https://github.com/user-attachments/assets/17b5eac5-b194-4d77-af0e-f1d1c17e463a" alt="Humanization Settings" class="object-cover w-full max-w-[326px] transform group-hover:scale-105 transition-transform duration-500">
-                    </div>
-                    <h4 class="text-lg font-bold text-white">3. Built for Convenience</h4>
-                    <p class="text-sm text-slate-500 text-center mt-2">Bind custom hotkeys for instant playback control, and use the transparent overlay mode to keep HuMidi accessible while you play.</p>
+                <!-- Next Button -->
+                <button id="carousel-next" onclick="carouselMove(1)" aria-label="Next" class="absolute right-0 top-1/2 -translate-y-[calc(50%+2rem)] translate-x-4 md:translate-x-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-full w-10 h-10 flex items-center justify-center transition-colors shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+
+                <!-- Dot Indicators -->
+                <div class="flex justify-center gap-2 mt-8" id="carousel-dots">
+                    <button onclick="carouselGoTo(0)" class="carousel-dot w-2 h-2 rounded-full bg-blue-500 transition-all" aria-label="Slide 1"></button>
+                    <button onclick="carouselGoTo(1)" class="carousel-dot w-2 h-2 rounded-full bg-slate-600 hover:bg-slate-400 transition-all" aria-label="Slide 2"></button>
+                    <button onclick="carouselGoTo(2)" class="carousel-dot w-2 h-2 rounded-full bg-slate-600 hover:bg-slate-400 transition-all" aria-label="Slide 3"></button>
+                    <button onclick="carouselGoTo(3)" class="carousel-dot w-2 h-2 rounded-full bg-slate-600 hover:bg-slate-400 transition-all" aria-label="Slide 4"></button>
                 </div>
             </div>
         </div>
     </section>
+
+    <script>
+        (function () {
+            let current = 0;
+            const total = 4;
+            const track = document.getElementById('carousel-track');
+            const dots = document.querySelectorAll('.carousel-dot');
+
+            function update() {
+                track.style.transform = `translateX(-${current * 100}%)`;
+                dots.forEach((d, i) => {
+                    d.classList.toggle('bg-blue-500', i === current);
+                    d.classList.toggle('w-4', i === current);
+                    d.classList.toggle('bg-slate-600', i !== current);
+                    d.classList.toggle('w-2', i !== current);
+                });
+            }
+
+            window.carouselMove = function (dir) {
+                current = (current + dir + total) % total;
+                update();
+            };
+
+            window.carouselGoTo = function (idx) {
+                current = idx;
+                update();
+            };
+        })();
+    </script>
 
     <!-- Roadmap / Version History -->
     <section id="history" class="max-w-4xl mx-auto px-6 py-24">
@@ -224,119 +292,150 @@
             <p class="text-slate-400 text-lg">See how HuMidi evolved into the ultimate virtual pianist.</p>
         </div>
 
-        <div class="relative border-l-2 border-slate-800 ml-4 md:ml-6 space-y-12 pb-8">
-            
-            <!-- V2.0 TEASER -->
-            <div class="relative pl-8 md:pl-12 group">
-                <div class="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-fuchsia-500 ring-4 ring-slate-950 animate-pulse"></div>
-                <div class="bg-gradient-to-br from-slate-900 to-fuchsia-900/20 border border-fuchsia-500/50 rounded-2xl p-6 shadow-[0_0_30px_-5px_rgba(217,70,239,0.15)] relative overflow-hidden">
-                    
-                    <!-- Decorative background glow -->
-                    <div class="absolute -top-20 -right-20 w-40 h-40 bg-fuchsia-500/20 blur-3xl rounded-full"></div>
+        <!-- Stacked card deck — hover expands in place, neighbors push away -->
+        <div id="vstack" class="relative">
 
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4 relative z-10">
-                        <div>
-                            <div class="flex items-center gap-3 mb-1">
-                                <h3 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-blue-400">Version 2.0: DeepPedal Engine</h3>
-                            </div>
-                            <span class="text-fuchsia-400 text-sm font-semibold tracking-wide uppercase">In Active Training</span>
+            <!-- 0: DeepPedal Teaser (top of stack, highest z-index) -->
+            <div class="vcard" style="z-index:16">
+                <div class="rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 to-fuchsia-900/20 border border-fuchsia-500/50 shadow-[0_0_30px_-5px_rgba(217,70,239,0.15)]">
+                    <div class="h-[58px] flex items-center justify-between px-5 relative">
+                        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div class="absolute -top-8 -right-8 w-28 h-28 bg-fuchsia-500/15 blur-3xl rounded-full"></div>
                         </div>
-                        <div class="inline-flex items-center gap-2 px-4 py-2 bg-fuchsia-500/10 text-fuchsia-300 text-sm font-bold rounded-lg border border-fuchsia-500/30 shrink-0">
-                            Targeting May 2026
+                        <div class="relative min-w-0">
+                            <div class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-blue-400 text-[15px] leading-tight">DeepPedal Engine</div>
+                            <div class="text-fuchsia-400 text-[10px] font-semibold tracking-widest uppercase">In Active Training</div>
+                        </div>
+                        <div class="relative inline-flex items-center px-2.5 py-1 bg-fuchsia-500/10 text-fuchsia-300 text-[11px] font-bold rounded-lg border border-fuchsia-500/30 shrink-0 ml-3">Targeting May 2026</div>
+                    </div>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <div class="px-5 pb-5">
+                            <p class="text-slate-300 text-sm leading-relaxed mb-4">We are ripping out the old algorithmic rules and replacing them with true intuition. HuMidi's next major feature is a dedicated Machine Learning model built exclusively to master the sustain pedal. By training on the prestigious <strong>MAESTRO Dataset V3.0.0</strong>, the engine is learning how professional concert pianists <em>actually</em> use the pedal, anticipating harmonic changes rather than just reacting to them.</p>
+                            <ul class="space-y-2 text-sm text-slate-400">
+                                <li class="flex items-center gap-2"><span class="text-fuchsia-400">🎵</span> <strong>Concert-Grade Pedaling:</strong> Trained on hundreds of hours of elite, competition-level piano performances.</li>
+                                <li class="flex items-center gap-2"><span class="text-fuchsia-400">🧠</span> <strong>Neural Prediction:</strong> Replaces rigid math with intuitive, time-series AI analysis.</li>
+                                <li class="flex items-center gap-2"><span class="text-fuchsia-400">⚡</span> <strong>Lightweight Integration:</strong> Optimized to predict sustain timings without eating your game's framerate.</li>
+                            </ul>
                         </div>
                     </div>
-                    <p class="text-slate-300 text-sm leading-relaxed mb-4 relative z-10">
-                        We are ripping out the old algorithmic rules and replacing them with true intuition. HuMidi V2.0 introduces a dedicated Machine Learning model built exclusively to master the sustain pedal. By training on the prestigious <strong>MAESTRO Dataset V3.0.0</strong>, the engine is learning how professional concert pianists <em>actually</em> use the pedal—anticipating harmonic changes rather than just reacting to them.
-                    </p>
-                    <ul class="space-y-2 text-sm text-slate-400 relative z-10">
-                        <li class="flex items-center gap-2"><span class="text-fuchsia-400">🎵</span> <strong>Concert-Grade Pedaling:</strong> Trained on hundreds of hours of elite, competition-level piano performances.</li>
-                        <li class="flex items-center gap-2"><span class="text-fuchsia-400">🧠</span> <strong>Neural Prediction:</strong> Replaces rigid math with intuitive, time-series AI analysis.</li>
-                        <li class="flex items-center gap-2"><span class="text-fuchsia-400">⚡</span> <strong>Lightweight Integration:</strong> Optimized to predict sustain timings without eating your game's framerate.</li>
-                    </ul>
                 </div>
             </div>
 
-            <!-- v1.3 -->
-            <div class="relative pl-8 md:pl-12 group">
-                <div class="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-slate-950 transition-transform group-hover:scale-125"></div>
-                <div class="bg-slate-900/60 border border-slate-700/80 rounded-2xl p-6 hover:border-blue-500/40 transition-colors">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-white">Version 1.3</h3>
-                            <span class="text-blue-400 text-sm font-medium">The Overlay & Visualization Update</span>
+            <!-- 1: v2.0 -->
+            <div class="vcard" style="z-index:15;margin-top:-13px">
+                <div class="rounded-2xl overflow-hidden bg-slate-900/80 border border-slate-700/80">
+                    <div class="h-[58px] flex items-center justify-between px-5">
+                        <div class="min-w-0">
+                            <div class="font-bold text-white text-[15px] leading-tight">Version 2.0</div>
+                            <div class="text-blue-400 text-[11px] font-medium">The Humanization & Performance Update</div>
                         </div>
-                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.3" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg border border-slate-700 transition-colors w-fit shrink-0">
-                            Download v1.3
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        </a>
+                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v2.0" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-lg border border-slate-700 transition-colors shrink-0 ml-3">Download <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>
                     </div>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        The definitive quality-of-life update. Introduced the interactive timeline visualizer allowing users to scrub and seek through tracks in real-time. Added the highly requested Overlay Mode (featuring customizable window opacity and always-on-top toggles), alongside fully bindable custom hotkeys for seamless background operation while gaming.
-                    </p>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <p class="text-slate-400 text-sm leading-relaxed px-5 pb-5">The biggest humanization overhaul yet. V2.0 expands the performance engine with a full suite of independent controls: velocity dynamics, articulation shaping, configurable timing variance, and a new drift correction system with a tunable decay factor. Added a complete preset system for saving and loading your favorite playback configurations instantly, a real-time transpose slider, a built-in auto-update checker, and UI theme customization. A significant engine tightening pass rounds out the release.</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- v1.2 -->
-            <div class="relative pl-8 md:pl-12 group">
-                <div class="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-slate-500 ring-4 ring-slate-950 transition-transform group-hover:scale-125 group-hover:bg-blue-400"></div>
-                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-colors">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-white">Version 1.2</h3>
-                            <span class="text-slate-400 text-sm font-medium">Logic & Settings Expansion</span>
+            <!-- 2: v1.3 -->
+            <div class="vcard" style="z-index:14;margin-top:-13px">
+                <div class="rounded-2xl overflow-hidden bg-slate-900/60 border border-slate-800">
+                    <div class="h-[58px] flex items-center justify-between px-5">
+                        <div class="min-w-0">
+                            <div class="font-bold text-white text-[15px] leading-tight">Version 1.3</div>
+                            <div class="text-slate-400 text-[11px] font-medium">The Overlay & Visualization Update</div>
                         </div>
-                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.2" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg border border-slate-700 transition-colors w-fit shrink-0">
-                            Download v1.2
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        </a>
+                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.3" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold rounded-lg border border-slate-700 transition-colors shrink-0 ml-3">Download <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>
                     </div>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        Added auto-save config (loads automatically when the .exe runs and saves on Play). Introduced the option to invert tempo sway weights. Rearranged the GUI and added more behind-the-scenes UX features. Tweaked humanization factors and significantly advanced the dynamic pedal logic.
-                    </p>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <p class="text-slate-400 text-sm leading-relaxed px-5 pb-5">The definitive quality-of-life update. Introduced the interactive timeline visualizer allowing users to scrub and seek through tracks in real-time. Added the highly requested Overlay Mode (featuring customizable window opacity and always-on-top toggles), alongside fully bindable custom hotkeys for seamless background operation while gaming.</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- v1.1 -->
-            <div class="relative pl-8 md:pl-12 group">
-                <div class="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-slate-600 ring-4 ring-slate-950 transition-transform group-hover:scale-125 group-hover:bg-blue-400"></div>
-                <div class="bg-slate-900/30 border border-slate-800/60 rounded-2xl p-6 hover:border-slate-700 transition-colors">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-white">Version 1.1</h3>
-                            <span class="text-slate-500 text-sm font-medium">Performance & Theory Overhaul</span>
+            <!-- 3: v1.2 -->
+            <div class="vcard" style="z-index:13;margin-top:-13px">
+                <div class="rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800/70">
+                    <div class="h-[58px] flex items-center justify-between px-5">
+                        <div class="min-w-0">
+                            <div class="font-bold text-slate-200 text-[15px] leading-tight">Version 1.2</div>
+                            <div class="text-slate-500 text-[11px] font-medium">Logic & Settings Expansion</div>
                         </div>
-                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.1" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg border border-slate-700 transition-colors w-fit shrink-0">
-                            Download v1.1
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        </a>
+                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.2" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700/80 transition-colors shrink-0 ml-3">Download <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>
                     </div>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        Fixed playback generation bugs and introduced 88-key layout support for specific experiences. Improved general UI and overall performance. Featured a massive logic overhaul, optimizing the engine and greatly increasing accuracy based on advanced music theory rather than basic assumptions.
-                    </p>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <p class="text-slate-400 text-sm leading-relaxed px-5 pb-5">Added auto-save config (loads automatically when the application runs and saves on Play). Introduced the option to invert tempo sway weights. Rearranged the GUI and added more behind-the-scenes UX features. Tweaked humanization factors and significantly advanced the dynamic pedal logic.</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- v1.0 -->
-            <div class="relative pl-8 md:pl-12 group">
-                <div class="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-slate-700 ring-4 ring-slate-950 transition-transform group-hover:scale-125 group-hover:bg-slate-500"></div>
-                <div class="bg-slate-900/20 border border-slate-800/40 rounded-2xl p-6 hover:border-slate-700 transition-colors">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-slate-300">Version 1.0</h3>
-                            <span class="text-slate-500 text-sm font-medium">The GUI Release</span>
+            <!-- 4: v1.1 -->
+            <div class="vcard" style="z-index:12;margin-top:-13px">
+                <div class="rounded-2xl overflow-hidden bg-slate-900/40 border border-slate-800/50">
+                    <div class="h-[58px] flex items-center justify-between px-5">
+                        <div class="min-w-0">
+                            <div class="font-bold text-slate-300 text-[15px] leading-tight">Version 1.1</div>
+                            <div class="text-slate-500 text-[11px] font-medium">Performance & Theory Overhaul</div>
                         </div>
-                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/Release" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/30 hover:bg-slate-700 text-slate-400 text-sm font-semibold rounded-lg border border-slate-800 transition-colors w-fit shrink-0">
-                            Download v1.0
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        </a>
+                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/v1.1" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/60 hover:bg-slate-700 text-slate-400 text-[11px] font-semibold rounded-lg border border-slate-800 transition-colors shrink-0 ml-3">Download <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>
                     </div>
-                    <p class="text-slate-500 text-sm leading-relaxed">
-                        The original major release! Brought the core humanization options to life. Evolved the application from a difficult-to-use CLI script into an accessible GUI, allowing users to easily toggle flags, load files, and send assembled commands with a click.
-                    </p>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <p class="text-slate-400 text-sm leading-relaxed px-5 pb-5">Fixed playback generation bugs and introduced 88-key layout support for specific experiences. Improved general UI and overall performance. Featured a massive logic overhaul, optimizing the engine and greatly increasing accuracy based on advanced music theory rather than basic assumptions.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5: v1.0 -->
+            <div class="vcard" style="z-index:11;margin-top:-13px">
+                <div class="rounded-2xl overflow-hidden bg-slate-900/30 border border-slate-800/30">
+                    <div class="h-[58px] flex items-center justify-between px-5">
+                        <div class="min-w-0">
+                            <div class="font-bold text-slate-400 text-[15px] leading-tight">Version 1.0</div>
+                            <div class="text-slate-600 text-[11px] font-medium">The GUI Release</div>
+                        </div>
+                        <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/tag/Release" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/40 hover:bg-slate-700 text-slate-500 text-[11px] font-semibold rounded-lg border border-slate-800/60 transition-colors shrink-0 ml-3">Download <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>
+                    </div>
+                    <div class="vbody overflow-hidden" style="max-height:none;opacity:1">
+                        <p class="text-slate-500 text-sm leading-relaxed px-5 pb-5">The original major release! Brought the core humanization options to life. Evolved the application from a difficult-to-use CLI script into an accessible GUI, allowing users to easily toggle flags, load files, and send assembled commands with a click.</p>
+                    </div>
                 </div>
             </div>
 
         </div>
+
+        <script>
+        (function () {
+            const SHIFT = 13;
+            const wrap  = document.getElementById('vstack');
+            const cards = [...wrap.querySelectorAll(':scope > .vcard')];
+            const origZ = cards.map(c => c.style.zIndex);
+            const n     = cards.length;
+            let   active = -1;
+
+            function setActive(i) {
+                if (i === active) return;
+                active = i;
+                cards.forEach((card, j) => {
+                    if (j === i) {
+                        card.style.zIndex    = String(n * 3);
+                        card.style.transform = '';
+                    } else if (i !== -1 && j < i) {
+                        card.style.zIndex    = origZ[j];
+                        card.style.transform = `translateY(-${SHIFT}px)`;
+                    } else {
+                        card.style.zIndex    = origZ[j];
+                        card.style.transform = '';
+                    }
+                });
+            }
+
+            wrap.addEventListener('mouseover', e => {
+                const card = e.target.closest('.vcard');
+                if (card && card.parentElement === wrap) setActive(cards.indexOf(card));
+            });
+            wrap.addEventListener('mouseleave', () => setActive(-1));
+        })();
+        </script>
     </section>
 
     <!-- Companion Tools / Resources -->
@@ -374,7 +473,7 @@
                 <div class="flex-1 p-6 flex flex-col items-center">
                     <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mb-3">1</span>
                     <h4 class="font-bold text-white mb-1">Download</h4>
-                    <p class="text-xs text-slate-400">Grab the lightweight .exe file.</p>
+                    <p class="text-xs text-slate-400">Grab the lightweight executable for your platform.</p>
                 </div>
                 <div class="flex-1 p-6 flex flex-col items-center">
                     <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mb-3">2</span>
@@ -384,19 +483,23 @@
                 <div class="flex-1 p-6 flex flex-col items-center">
                     <span class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mb-3">3</span>
                     <h4 class="font-bold text-white mb-1">Press Play</h4>
-                    <p class="text-xs text-slate-400">Tab into Roblox and let HuMidi take over.</p>
+                    <p class="text-xs text-slate-400">Tab into Roblox and let HuMidi perform.</p>
                 </div>
             </div>
         </div>
 
         <div class="flex flex-col items-center gap-6">
-            <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-10 py-5 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download HuMidi Now
-            </a>
-            <p class="text-sm text-slate-500">Requires Windows 10/11. No installation required.</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    Windows
+                </a>
+                <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases" target="_blank" class="px-8 py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-full font-bold text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] transition-all transform hover:scale-105 flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+                    macOS
+                </a>
+            </div>
+            <p class="text-sm text-slate-500">Requires Windows 10/11 or macOS. No installation required.</p>
             <!-- Begin  Tag -->
             <div class="sf-root" data-id="3982299" data-badge="oss-users-love-us-white" style="width:125px">
                 <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/" target="_blank">HuMidi</a>
