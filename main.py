@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import sys
 import os
+import json
 import bisect
+from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QDialog
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -23,8 +25,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"HuMidi v{APP_VERSION}")
-        self.setMinimumWidth(820)
-        self.setMinimumHeight(485)
+        self.setMinimumWidth(960)
+        self.setMinimumHeight(660)
         self.resize(self.minimumWidth(), self.minimumHeight())
 
         # Set specific Icon base execution path (Required for OS Contexts)
@@ -43,6 +45,8 @@ class MainWindow(QMainWindow):
         self.loaded_save_data = None
         self.loaded_save_filename = None
         self.selected_tracks_info = None
+        self._parsed_tracks = None
+        self._loaded_pedal_count = 0
         self.current_notes = []
         self._note_start_times = []
         self.total_song_duration_sec = 1.0
@@ -56,10 +60,12 @@ class MainWindow(QMainWindow):
         if loaded_cfg:
             self.ui.load_config_to_ui(loaded_cfg, self.config_manager.save_dir)
             self.ui.settings_tab.hk_label.setText(
-                f"Hotkey: {self.hotkey_manager._format_key_string(self.hotkey_manager.current_key)}"
+                f"Hotkey: {self.hotkey_manager.format_hotkey_string()}"
             )
         else:
             self.ui.reset_controls_to_default()
+
+        self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
 
         self._update_checker = UpdateChecker(APP_VERSION)
         self._update_checker.update_available.connect(self._on_update_available)
@@ -73,10 +79,11 @@ class MainWindow(QMainWindow):
         self.ui.reset_button.clicked.connect(self.ui.reset_controls_to_default)
         self.ui.playback_tab.browse_button.clicked.connect(self.select_file)
         self.ui.playback_tab.load_saved_btn.clicked.connect(self.open_load_dialog)
+        self.ui.playback_tab.all_saves_btn.clicked.connect(self.open_load_dialog)
+        self.ui.playback_tab.drop_zone.file_dropped.connect(self._open_midi)
         self.ui.settings_tab.save_browse_btn.clicked.connect(self._browse_save_dir)
         self.ui._collapsed_load_btn.clicked.connect(self.select_file)
         self.ui._collapsed_load_saved_btn.clicked.connect(self.open_load_dialog)
-        self.ui._collapsed_save_btn.clicked.connect(self.handle_save)
         self.ui.settings_tab.hk_btn.clicked.connect(self._change_hotkey)
         self.ui.settings_tab.check_update_btn.clicked.connect(self._manual_check_update)
 
@@ -102,6 +109,13 @@ class MainWindow(QMainWindow):
         # External IO bridging
         self.hotkey_manager.toggle_requested.connect(self.toggle_playback_state)
         self.hotkey_manager.bound_updated.connect(self._on_hotkey_bound)
+
+        # File strip reveal action
+        self.ui.playback_tab.file_strip.reveal_requested.connect(self._reveal_in_explorer)
+
+        # Edit Selection button on the LOADED card
+        self.ui.playback_tab.edit_selection_requested.connect(self._edit_track_selection)
+        self.ui.playback_tab.save_card_clicked.connect(self._on_save_card_quick_load)
 
         # System Logic bridging to the View representations
         self.playback_controller.status_updated.connect(self.ui.log_output.append)
@@ -152,7 +166,7 @@ class MainWindow(QMainWindow):
 
     def _sync_play_button(self):
         """Single authoritative update for the play button, derived from current playback state."""
-        key_str = self.hotkey_manager._format_key_string(self.hotkey_manager.current_key)
+        key_str = self.hotkey_manager.format_hotkey_string()
         if self.ui._is_collapsed:
             if self.playback_controller.is_paused():
                 self.ui.play_button.setText("\uE768")
@@ -165,12 +179,14 @@ class MainWindow(QMainWindow):
                 self.ui.play_button.setToolTip(f"Play ({key_str})")
         else:
             if self.playback_controller.is_paused():
-                self.ui.play_button.setText(f"Resume ({key_str})")
+                self.ui.play_button.setText("▶")
+                self.ui.play_button.setToolTip("Resume playback.")
             elif self.playback_controller.is_playing():
-                self.ui.play_button.setText(f"Pause ({key_str})")
+                self.ui.play_button.setText("⏸")
+                self.ui.play_button.setToolTip("Pause playback.")
             else:
-                self.ui.play_button.setText(f"Play ({key_str})")
-            self.ui.play_button.setToolTip("Start, pause, or resume playback")
+                self.ui.play_button.setText("▶")
+                self.ui.play_button.setToolTip("Start playback.")
 
     def toggle_playback_state(self):
         if not self.playback_controller.is_paused():
@@ -222,56 +238,136 @@ class MainWindow(QMainWindow):
         self.ui.update_progress(current_time, self.total_song_duration_sec)
 
     # --- Loading & File State Dialogs ---
+    def _reveal_in_explorer(self) -> None:
+        path = self.ui.playback_tab.file_path_label.toolTip()
+        if path and os.path.exists(path):
+            import subprocess
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+
     def select_file(self):
         if self.playback_controller.is_playing() or self.playback_controller.is_paused(): return
         filepath, _ = QFileDialog.getOpenFileName(self, "Select MIDI File", "", "MIDI Files (*.mid *.midi)")
         if filepath:
-            self.loaded_save_data = None
-            self.loaded_save_filename = None
-            self.ui.playback_tab.playback_group.setEnabled(True)
-            self.ui.playback_tab.humanization_group.setEnabled(True)
-            self.ui.update_file_label(os.path.basename(filepath), filepath)
-            self.ui.log_output.append(f"Selected file: {filepath}")
-            self._parse_and_select_tracks(filepath)
+            self._open_midi(filepath)
+
+    def _open_midi(self, filepath: str) -> None:
+        if not filepath:
+            return
+        if self.playback_controller.is_playing() or self.playback_controller.is_paused():
+            return
+        self.loaded_save_data = None
+        self.loaded_save_filename = None
+        self._parsed_tracks = None
+        self._loaded_pedal_count = 0
+        self.ui.playback_tab.clear_loaded_summary()
+        self.ui.playback_tab.set_groups_enabled(True)
+        self.ui.update_file_label(os.path.basename(filepath), filepath)
+        self.ui.log_output.append(f"Selected file: {filepath}")
+        self._parse_and_select_tracks(filepath)
             
+    def _apply_save(self, filepath: str, data: dict) -> None:
+        """Apply a loaded save dict to UI state and stamp last_accessed on disk."""
+        try:
+            data.setdefault('metadata', {})['last_accessed'] = datetime.now().isoformat()
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=4)
+        except Exception:
+            pass
+
+        self.loaded_save_data = data
+        self.loaded_save_filename = os.path.basename(filepath)
+        self._parsed_tracks = None
+        self._loaded_pedal_count = 0
+        track_details = data.get('metadata', {}).get('track_details', [])
+        compiled_pedal_count = data.get('metadata', {}).get('compiled_pedal_count', 0)
+        self.ui.playback_tab.update_loaded_summary_from_save(track_details, compiled_pedal_count)
+        if self.config.get('debug_mode'):
+            self.ui.log_output.append(
+                f"[DEBUG] Loaded save with {len(track_details)} track(s), "
+                f"{compiled_pedal_count} compiled pedal event(s)."
+            )
+        self.ui.update_file_label(self.loaded_save_filename, filepath)
+        self.ui.playback_tab.set_groups_enabled(False)
+        self.ui._set_save_enabled(False)
+        self.ui.play_button.setEnabled(True)
+        self.ui.scrubber_slider.setEnabled(True)
+        self.ui.log_output.append(f"Loaded save file: {self.loaded_save_filename}")
+        self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
+
     def open_load_dialog(self):
         dialog = LoadSaveDialog(self.config_manager.save_dir, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_file, data = dialog.get_selected_data()
             if selected_file and data:
-                self.loaded_save_data = data
-                self.loaded_save_filename = os.path.basename(selected_file)
-                
-                self.ui.update_file_label(self.loaded_save_filename, selected_file)
-                self.ui.playback_tab.playback_group.setEnabled(False)
-                self.ui.playback_tab.humanization_group.setEnabled(False)
-                self.ui._set_save_enabled(False)
-                self.ui.play_button.setEnabled(True)
-                self.ui.scrubber_slider.setEnabled(True)
-                self.ui.log_output.append(f"Loaded save file: {self.loaded_save_filename}")
+                self._apply_save(selected_file, data)
+
+    def _on_save_card_quick_load(self, filepath: str, save_name: str, song_name: str) -> None:
+        if self.playback_controller.is_playing() or self.playback_controller.is_paused():
+            return
+        reply = QMessageBox.question(
+            self,
+            "Load Save",
+            f"Load \"{save_name}\"?\n\nMIDI: {song_name}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to read save file:\n{e}")
+            return
+        self._apply_save(filepath, data)
 
     def _parse_and_select_tracks(self, filepath):
         self.ui.log_output.append("Parsing MIDI structure...")
         try:
-            tracks, tempo_map = MidiParser.parse_structure(filepath, 1.0, None)
+            tracks, tempo_map, pedal_count = MidiParser.parse_structure(filepath, 1.0, None)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to parse MIDI:\n{e}")
             return
-            
+
+        self._parsed_tracks = tracks
+        self._loaded_pedal_count = pedal_count
+        self.parsed_tempo_map = tempo_map
+
         dialog = TrackSelectionDialog(tracks, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.selected_tracks_info = dialog.get_selection()
-            self.parsed_tempo_map = tempo_map 
             self.ui.log_output.append(f"Tracks selected: {len(self.selected_tracks_info)}")
+            self.ui.playback_tab.update_loaded_summary(
+                self.selected_tracks_info, self._loaded_pedal_count
+            )
             self.ui.play_button.setEnabled(True)
             self.ui.scrubber_slider.setEnabled(True)
             self.ui._set_save_enabled(True)
         else:
             self.ui.log_output.append("Track selection cancelled.")
             self.selected_tracks_info = None
+            self.ui.playback_tab.clear_loaded_summary()
             self.ui.play_button.setEnabled(False)
             self.ui.scrubber_slider.setEnabled(False)
             self.ui._set_save_enabled(False)
+
+    def _edit_track_selection(self) -> None:
+        if self.playback_controller.is_playing() or self.playback_controller.is_paused():
+            return
+        if not self._parsed_tracks:
+            return
+        dialog = TrackSelectionDialog(self._parsed_tracks, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self.selected_tracks_info = dialog.get_selection()
+        self.ui.log_output.append(
+            f"Track selection updated: {len(self.selected_tracks_info)}"
+        )
+        self.ui.playback_tab.update_loaded_summary(
+            self.selected_tracks_info, self._loaded_pedal_count
+        )
+        self.ui._set_save_enabled(bool(self.selected_tracks_info))
+        self.ui.play_button.setEnabled(bool(self.selected_tracks_info))
 
     # --- Translator ---
     def _on_play_sheet(self, text: str, format_name: str, bpm: int, humanize: bool):
@@ -363,6 +459,7 @@ class MainWindow(QMainWindow):
         self.playback_controller.save(config, self.selected_tracks_info, self.config_manager.save_dir, original_filename)
 
     def _on_save_successful(self, filepath: str, message: str):
+        self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
         QMessageBox.information(self, "Save Successful", f"{message}\n{filepath}")
 
     def _on_save_failed(self, error_message: str):

@@ -1,6 +1,11 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QTextEdit)
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFrame,
+    QLabel, QTextEdit, QListWidget, QAbstractItemView
+)
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+
+from ui.widgets import make_card
 
 
 _LICENSE_TEXTS: dict[str, str] = {
@@ -33,7 +38,7 @@ The following datasets were used to train the BiLSTM AI pedal timing
 model bundled with HuMidi.
 
 ────────────────
-POP909        
+POP909
 ────────────────
 A piano MIDI dataset of 909 popular songs with performance annotations.
 
@@ -95,31 +100,73 @@ class LicenseTab(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 0, 16, 16)
+        layout.setSpacing(0)
 
-        header = QLabel("Licenses & Credits")
-        header.setProperty("role", "title")
+        # -- Page header -------------------------------------------------------
+        header = QFrame()
+        header.setObjectName("page_header")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(0, 14, 0, 8)
+        hl.setSpacing(8)
+        title_lbl = QLabel("Licenses & Credits")
+        title_lbl.setProperty("role", "title")
+        hl.addWidget(title_lbl)
+        hl.addStretch()
+        # TODO: meta chips (e.g. component count)
         layout.addWidget(header)
 
-        selector_row = QHBoxLayout()
-        selector_row.setSpacing(8)
-        sel_lbl = QLabel("View:")
-        sel_lbl.setProperty("role", "muted")
-        sel_lbl.setFixedWidth(34)
-        self._combo = QComboBox()
+        # -- Master-detail grid (~244px : rest) --------------------------------
+        body_row = QHBoxLayout()
+        body_row.setSpacing(10)
+
+        # Left card: Components list (~244px fixed)
+        comp_card, comp_body = make_card("Components")
+        comp_card.setFixedWidth(244)
+        self._list = QListWidget()
+        self._list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         for name in _LICENSE_TEXTS:
-            self._combo.addItem(name)
-        self._combo.currentTextChanged.connect(self._on_changed)
-        selector_row.addWidget(sel_lbl)
-        selector_row.addWidget(self._combo, 1)
-        layout.addLayout(selector_row)
+            self._list.addItem(name)
+        self._list.setCurrentRow(0)
+        self._list.currentItemChanged.connect(self._on_list_changed)
+        # TODO: per-row license badge (MIT / CC BY 4.0 / GPL v3)
+        comp_body.addWidget(self._list)
+        body_row.addWidget(comp_card)
+
+        # Right card: License Text (document header + full text)
+        detail_card, detail_body = make_card("License Text")
+
+        doc_header = QHBoxLayout()
+        doc_header.setSpacing(8)
+        first_name = self._list.item(0).text() if self._list.count() else ""
+        self._doc_title_lbl = QLabel(first_name)
+        self._doc_title_lbl.setProperty("role", "section")
+        doc_header.addWidget(self._doc_title_lbl)
+        doc_header.addStretch()
+        # TODO: license badge label and URL link
+        detail_body.addLayout(doc_header)
+
+        sep = QFrame()
+        sep.setObjectName("h_sep")
+        sep.setFrameShape(QFrame.Shape.HLine)
+        detail_body.addWidget(sep)
 
         self._text = QTextEdit()
         self._text.setReadOnly(True)
         self._text.setFont(QFont("Courier New", 9))
-        self._text.setPlainText(_LICENSE_TEXTS.get(self._combo.currentText(), ""))
-        layout.addWidget(self._text)
+        self._text.setPlainText(_LICENSE_TEXTS.get(first_name, ""))
+        detail_body.addWidget(self._text)
+
+        body_row.addWidget(detail_card, 1)
+        layout.addLayout(body_row, 1)
+
+    # ── Slots ─────────────────────────────────────────────────────────────────
+
+    def _on_list_changed(self, current, previous) -> None:
+        if current is None:
+            return
+        self._on_changed(current.text())
 
     def _on_changed(self, name: str) -> None:
+        self._doc_title_lbl.setText(name)
         self._text.setPlainText(_LICENSE_TEXTS.get(name, ""))

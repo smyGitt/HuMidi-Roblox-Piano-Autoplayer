@@ -124,7 +124,7 @@ class GlobalTickMap:
 
 class MidiParser:
     @staticmethod
-    def parse_structure(filepath: str, tempo_scale: float = 1.0, debug_log: Optional[List[str]] = None) -> Tuple[List[MidiTrack], TempoMap]:
+    def parse_structure(filepath: str, tempo_scale: float = 1.0, debug_log: Optional[List[str]] = None) -> Tuple[List[MidiTrack], TempoMap, int]:
         try:
             try:
                 mid = mido.MidiFile(filepath, charset='utf-8')
@@ -132,13 +132,17 @@ class MidiParser:
                 mid = mido.MidiFile(filepath)
         except Exception as e:
             raise IOError(f"Could not read MIDI file: {e}")
-            
+
         global_map = GlobalTickMap(mid)
         tempo_map_data = [(entry[1], entry[2]) for entry in global_map.tick_map]
         tempo_map = TempoMap(tempo_map_data, global_map.time_signatures)
         tracks = []
         note_id_counter = 0
-        
+        # CC 64 = damper / sustain pedal. Count on/off transitions per channel.
+        # An on->off pair is one event; threshold matches the GM convention.
+        pedal_state_by_channel: Dict[int, bool] = {}
+        pedal_event_count = 0
+
         for i, track in enumerate(mid.tracks):
             track_name = f"Track {i}"
             program_change = 0
@@ -146,14 +150,21 @@ class MidiParser:
             notes: List[Note] = []
             open_notes: Dict[int, List[Dict]] = defaultdict(list)
             current_abs_tick = 0
-            
+
             for msg in track:
                 current_abs_tick += msg.time
                 if msg.type == 'track_name': track_name = msg.name
                 if msg.type == 'program_change':
                     program_change = msg.program
                     if msg.channel == 9: is_drum = True
-                
+
+                if msg.type == 'control_change' and msg.control == 64:
+                    is_on = msg.value >= 64
+                    was_on = pedal_state_by_channel.get(msg.channel, False)
+                    if was_on and not is_on:
+                        pedal_event_count += 1
+                    pedal_state_by_channel[msg.channel] = is_on
+
                 if msg.type == 'note_on' and msg.velocity > 0:
                     open_notes[msg.note].append({'start_tick': current_abs_tick, 'vel': msg.velocity})
                 elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
@@ -171,7 +182,9 @@ class MidiParser:
             if notes:
                 notes.sort(key=lambda n: n.start_time)
                 tracks.append(MidiTrack(i, track_name, program_change, is_drum, notes))
-        return tracks, tempo_map
+        # Any pedal still held at EOF counts as one event.
+        pedal_event_count += sum(1 for held in pedal_state_by_channel.values() if held)
+        return tracks, tempo_map, pedal_event_count
 
 class KeyMapper:
     SYMBOL_MAP = {'!': '1', '@': '2', '#': '3', '$': '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0'}

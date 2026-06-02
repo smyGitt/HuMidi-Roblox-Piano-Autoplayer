@@ -38,7 +38,7 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     should catch and surface the exception appropriately.
     """
     tempo_scale = config.get('tempo', 100.0) / 100.0
-    tracks, tempo_map = MidiParser.parse_structure(config['midi_file'], tempo_scale, None)
+    tracks, tempo_map, _ = MidiParser.parse_structure(config['midi_file'], tempo_scale, None)
     selected_indices = [t.index for t, _ in selected_tracks_info]
     role_map = {t.index: r for t, r in selected_tracks_info}
     final_notes = []
@@ -111,10 +111,40 @@ class _SaveWorker(QObject):
             for ev in events_to_serialize
         ]
 
+        track_details = []
+        for track, role in self.selected_tracks_info:
+            pitches = [n.pitch for n in track.notes]
+            track_details.append({
+                'name': track.name or '',
+                'note_count': len(track.notes),
+                'pitch_min': min(pitches) if pitches else None,
+                'pitch_max': max(pitches) if pitches else None,
+                'role': role,
+            })
+
+        compiled_pedal_count = sum(
+            1 for ev in events_to_serialize
+            if ev['action'] == 'pedal' and ev['key_char'] == 'down'
+        )
+
+        debug = self.config.get('debug_mode')
+        if debug:
+            self.status_updated.emit(
+                f"[DEBUG] Serializing {len(track_details)} track(s), "
+                f"{compiled_pedal_count} compiled pedal event(s)."
+            )
+
+        # last_accessed mirrors creation_timestamp at save time so a freshly
+        # created save shows up at the top of the "recently opened" list
+        # before the user ever re-opens it.
+        now_iso = datetime.now().isoformat()
         metadata = {
-            'creation_timestamp': datetime.now().isoformat(),
+            'creation_timestamp': now_iso,
+            'last_accessed':      now_iso,
             'source_midi_filename': self.original_filename,
-            'playback_settings': self.config
+            'playback_settings': self.config,
+            'track_details': track_details,
+            'compiled_pedal_count': compiled_pedal_count,
         }
 
         save_data = {'metadata': metadata, 'compiled_events': serialized_events}

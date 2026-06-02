@@ -1,235 +1,260 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QCheckBox, QSlider,
-    QLabel, QComboBox, QDoubleSpinBox, QSpinBox, QGridLayout, QFrame)
-from PyQt6.QtCore import Qt
+    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
+    QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
+from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
-from ui.widgets import make_card
+from ui.widgets import (
+    make_card, SubTabBar, FileStrip, MidiDropZone,
+    LoadedRow, SavedSongsPanel, PerformanceCard, OptionsCard,
+    HumanizeMasterRow, HumRow,
+)
 
 
 class PlaybackTab(QWidget):
 
-    PEDAL_MAPPING = {
-        "Auto (Default)": "hybrid",
-        "PedalAI":        "ai",
-        "Harmonic":        "legato",
-        "Rhythmic":        "rhythmic",
-        "None":            "none",
-    }
-    PEDAL_MAPPING_INV = {v: k for k, v in PEDAL_MAPPING.items()}
+    edit_selection_requested = Signal()
+    save_card_clicked = Signal(str, str, str)  # (filepath, save_name, song_name)
+
+    # Re-exported from PerformanceCard for backward-compatible callers.
+    PEDAL_MAPPING     = PerformanceCard.PEDAL_MAPPING
+    PEDAL_MAPPING_INV = PerformanceCard.PEDAL_MAPPING_INV
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
 
     def _setup_ui(self):
-        outer = QHBoxLayout(self)
-        outer.setContentsMargins(12, 12, 12, 12)
-        outer.setSpacing(12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        left_col = QVBoxLayout()
-        left_col.setSpacing(10)
-        self.file_group = self._create_file_group()
-        left_col.addWidget(self.file_group)
-        self.playback_group = self._create_playback_group()
-        left_col.addWidget(self.playback_group, 1)
+        # Persistent file info strip
+        self.file_strip = FileStrip()
+        outer.addWidget(self.file_strip)
 
-        right_col = QVBoxLayout()
-        right_col.setSpacing(10)
-        self.humanization_group = self._create_humanization_group()
-        right_col.addWidget(self.humanization_group, 1)
+        # Sub-tab bar (I-III)
+        self._sub_tab_bar = SubTabBar()
+        self._sub_tab_bar.tab_changed.connect(self._on_sub_tab_changed)
+        outer.addWidget(self._sub_tab_bar)
 
-        outer.addLayout(left_col, 1)
-        outer.addLayout(right_col, 1)
+        # Stacked content pages
+        self._stack = QStackedWidget()
+        outer.addWidget(self._stack, 1)
 
-    # ── Card builders ──────────────────────────────────────────────────
+        self._stack.addWidget(self._scrollable(self._build_file_tab()))        # I
+        self._stack.addWidget(self._scrollable(self._build_playback_tab())) # II
+        self._stack.addWidget(self._scrollable(self._build_humanize_tab())) # III
 
-    def _create_file_group(self):
-        card, layout = make_card("MIDI File")
+    def _on_sub_tab_changed(self, index: int) -> None:
+        self._stack.setCurrentIndex(index)
 
+    @staticmethod
+    def _scrollable(widget: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(widget)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        return scroll
+
+    # -- Tab I: File ----------------------------------------------------------
+
+    def _build_file_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        # Row 1: LOADED card containing the LoadedRow widget.
+        tracks_card, tracks_layout = make_card("LOADED")
+        self._loaded_row = LoadedRow()
+        self._loaded_row.edit_selection_btn.clicked.connect(
+            self.edit_selection_requested.emit
+        )
+        # Proxy for backward-compatible attribute access on PlaybackTab.
+        self.edit_selection_btn = self._loaded_row.edit_selection_btn
+        tracks_layout.addWidget(self._loaded_row)
+        layout.addWidget(tracks_card)
+
+        # Row 2: drop zone on the left, saved songs panel on the right.
+        cols = QHBoxLayout()
+        cols.setSpacing(14)
+
+        self.drop_zone = MidiDropZone()
+        self.browse_button  = self.drop_zone.browse_button
+        self.load_saved_btn = self.drop_zone.load_saved_btn
+
+        # file_path_label kept for API compat -- stores full path in toolTip.
         self.file_path_label = QLabel("No file selected.")
         self.file_path_label.setObjectName("file_path_label")
-        self.file_path_label.setWordWrap(True)
+        self.file_path_label.setVisible(False)
 
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(6)
-        self.browse_button = QPushButton("Browse…")
-        self.browse_button.setToolTip("Open a MIDI file to play")
-        self.load_saved_btn = QPushButton("Load Save")
-        self.load_saved_btn.setToolTip("Load a previously saved humanized performance")
-        btn_layout.addWidget(self.browse_button)
-        btn_layout.addWidget(self.load_saved_btn)
+        self._saved_panel = SavedSongsPanel()
+        self._saved_panel.save_card_clicked.connect(self.save_card_clicked.emit)
+        # Proxy attributes for MainWindow._bind_signals.
+        self.all_saves_btn          = self._saved_panel.all_saves_btn
+        self.refresh_saved_songs_btn = self._saved_panel.refresh_saved_songs_btn
 
-        layout.addWidget(self.file_path_label)
-        layout.addLayout(btn_layout)
-        return card
+        cols.addWidget(self.drop_zone, 1)
+        cols.addWidget(self._saved_panel, 1)
+        layout.addLayout(cols, 1)
+        return page
 
-    def _create_playback_group(self):
-        card, layout = make_card("Playback")
-        grid = QGridLayout()
-        grid.setSpacing(8)
-        grid.setColumnMinimumWidth(1, 8)
-        grid.setColumnStretch(2, 1)
+    # -- Tab II: Playback (includes Mapping and Activity) ---------------------
 
-        tempo_label = QLabel("Tempo")
-        self.tempo_slider, self.tempo_spinbox = self._make_slider_spinbox(
-            10.0, 200.0, 100.0, "%", factor=10.0, decimals=1
+    def _build_playback_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        # Row 1: two equal columns
+        row1 = QHBoxLayout()
+        row1.setSpacing(14)
+
+        # Left column: PERFORMANCE card stretched to fill column height.
+        self._perf_card = PerformanceCard()
+        self._perf_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.tempo_spinbox.setFixedWidth(72)
-        self.tempo_slider.setToolTip("Playback speed as a percentage of the original tempo")
-        self.tempo_spinbox.setToolTip("Playback speed as a percentage of the original tempo")
-        grid.addWidget(tempo_label, 0, 0)
-        grid.addWidget(self.tempo_slider, 0, 2)
-        grid.addWidget(self.tempo_spinbox, 0, 3)
+        self.tempo_slider      = self._perf_card.tempo_slider
+        self.tempo_spinbox     = self._perf_card.tempo_spinbox
+        self.pedal_style_combo = self._perf_card.pedal_style_combo
+        self.transpose_spinbox = self._perf_card.transpose_spinbox
 
-        pedal_label = QLabel("Pedal")
-        self.pedal_style_combo = QComboBox()
-        self.pedal_style_combo.addItems(list(self.PEDAL_MAPPING.keys()))
-        self.pedal_style_combo.setToolTip(
-            "Auto (Default): Adaptive hybrid of rhythmic and harmonic analysis\n"
-            "AI Pedal: BiLSTM model-generated pedal with adaptive fallback\n"
-            "Harmonic: Hold pedal through harmonic regions, releasing at chord/bass changes\n"
-            "Rhythmic: Release pedal on beat boundaries only\n"
-            "None: No sustain pedal"
+        # Right column: OPTIONS card (includes auto-detect hands).
+        self._opts_card = OptionsCard()
+        self._opts_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        grid.addWidget(pedal_label, 1, 0)
-        grid.addWidget(self.pedal_style_combo, 1, 2, 1, 2)
+        self.use_88_key_check         = self._opts_card.use_88_key_check
+        self.countdown_check          = self._opts_card.countdown_check
+        self.debug_check              = self._opts_card.debug_check
+        self._auto_detect_hands_check = self._opts_card.auto_detect_hands_check
 
-        transpose_label = QLabel("Transpose")
-        self.transpose_spinbox = QSpinBox()
-        self.transpose_spinbox.setRange(-24, 24)
-        self.transpose_spinbox.setValue(0)
-        self.transpose_spinbox.setSuffix(" st")
-        self.transpose_spinbox.setFixedWidth(72)
-        self.transpose_spinbox.setToolTip("Shift all notes up or down by the given number of semitones")
-        grid.addWidget(transpose_label, 2, 0)
-        grid.addWidget(self.transpose_spinbox, 2, 2, 1, 2)
+        row1.addWidget(self._perf_card, 1)
+        row1.addWidget(self._opts_card, 1)
 
-        self.use_88_key_check = QCheckBox("88-Key Layout")
-        self.use_88_key_check.setToolTip(
-            "Map notes to the full 88-key piano layout instead of a compressed keyboard layout"
+        # Row 2: ACTIVITY log spanning full width, fills remaining height.
+        act_card, act_layout = make_card("ACTIVITY")
+        self.activity_log = QTextEdit()
+        self.activity_log.setObjectName("activity_log")
+        self.activity_log.setReadOnly(True)
+        self.activity_log.setFontFamily("JetBrains Mono")
+        self.activity_log.setFontPointSize(8)
+        self.activity_log.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.countdown_check = QCheckBox("Countdown")
-        self.countdown_check.setToolTip("Show a 3-second countdown before playback begins")
-        self.debug_check = QCheckBox("Debug Output")
-        self.debug_check.setToolTip("Print verbose event logs to the Debug tab during playback")
-        layout.addLayout(grid)
-        layout.addWidget(self.use_88_key_check)
-        layout.addWidget(self.countdown_check)
-        layout.addWidget(self.debug_check)
-        layout.addStretch()
-        return card
-
-    def _create_humanization_group(self):
-        card, main_v_layout = make_card("Humanization")
-
-        self.select_all_humanization_check = QCheckBox("All")
-        self.select_all_humanization_check.setToolTip(
-            "Enable or disable all humanization options at once"
+        self.activity_log.setMinimumHeight(60)
+        act_layout.addWidget(self.activity_log, 1)
+        act_card.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
-        self.all_humanization_checks = {}
+        layout.addLayout(row1)
+        layout.addWidget(act_card, 1)
+        return page
+
+    # -- Tab III: Humanize ----------------------------------------------------
+
+    def _build_humanize_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        self.all_humanization_checks    = {}
         self.all_humanization_spinboxes = {}
-        self.all_humanization_sliders = {}
+        self.all_humanization_sliders   = {}
 
-        self.all_humanization_checks['simulate_hands'] = QCheckBox("Simulate Hands")
-        self.all_humanization_checks['simulate_hands'].setToolTip(
-            "Assign notes to left/right hand and limit simultaneous finger usage "
-            "to simulate realistic hand behavior"
+        # Master row card
+        self._humanize_master = HumanizeMasterRow()
+        self.select_all_humanization_check = (
+            self._humanize_master.select_all_humanization_check
         )
-        self.all_humanization_checks['enable_chord_roll'] = QCheckBox("Chord Roll")
-        self.all_humanization_checks['enable_chord_roll'].setToolTip(
-            "Slightly stagger the notes within each chord to simulate the natural "
-            "roll of fingers across the keys"
+        self.all_humanization_checks['simulate_hands']   = (
+            self._humanize_master.simulate_hands_check
         )
+        self.all_humanization_checks['enable_chord_roll'] = (
+            self._humanize_master.enable_chord_roll_check
+        )
+        layout.addWidget(self._humanize_master)
 
-        main_v_layout.addWidget(self.select_all_humanization_check)
-        main_v_layout.addWidget(self.all_humanization_checks['simulate_hands'])
-        main_v_layout.addWidget(self.all_humanization_checks['enable_chord_roll'])
+        # Two-column detail cards
+        cols = QHBoxLayout()
+        cols.setSpacing(14)
 
-        h_sep = QFrame()
-        h_sep.setObjectName("h_sep")
-        h_sep.setFrameShape(QFrame.Shape.HLine)
-        main_v_layout.addWidget(h_sep)
-
-        detailed_layout = QGridLayout()
-        detailed_layout.setSpacing(6)
-        detailed_layout.setColumnStretch(2, 1)
-        detailed_layout.setColumnMinimumWidth(1, 4)
-
-        def add_row(row_idx, name, key, min_val, max_val, def_val,
-                    suffix, factor=1.0, decimals=3, tooltip=""):
-            check = QCheckBox(name)
-            slider, spinbox = self._make_slider_spinbox(
-                min_val, max_val, def_val, suffix, factor=factor, decimals=decimals
-            )
-            spinbox.setFixedWidth(80)
-            check.toggled.connect(slider.setEnabled)
-            check.toggled.connect(spinbox.setEnabled)
-            if tooltip:
-                check.setToolTip(tooltip)
-                slider.setToolTip(tooltip)
-                spinbox.setToolTip(tooltip)
-            detailed_layout.addWidget(check,   row_idx, 0)
-            detailed_layout.addWidget(slider,  row_idx, 2)
-            detailed_layout.addWidget(spinbox, row_idx, 3)
-            self.all_humanization_checks[key]   = check
-            self.all_humanization_sliders[key]  = slider
-            self.all_humanization_spinboxes[key] = spinbox
-
-        add_row(0, "Vary Timing",       "vary_timing",       0,  0.1, 0.01, " s",
-                factor=10000.0,
-                tooltip="Add random timing offsets to note events (in seconds)")
-        add_row(1, "Vary Articulation", "vary_articulation", 50, 100,   95, "%",
-                factor=100.0, decimals=1,
-                tooltip="Randomize note hold duration — lower values create a more staccato feel")
-        add_row(2, "Hand Drift",        "hand_drift",         0, 100,   25, "%",
-                factor=100.0, decimals=1,
-                tooltip="Simulate gradual timing drift between the left and right hands")
-        add_row(3, "Mistakes",          "mistake_chance",     0,  10,    0, "%",
-                factor=100.0, decimals=1,
-                tooltip="Randomly skip notes to simulate human errors")
-        add_row(4, "Tempo Sway",        "tempo_sway",         0, 0.1,   0, " s",
-                factor=10000.0,
-                tooltip="Apply a sinusoidal tempo variation across the song for a more expressive feel")
-
+        # Left: Timing & Feel
+        left_card, left_layout = make_card("TIMING & FEEL")
+        self._add_hum_row(left_layout, "Vary Timing",       "vary_timing",
+                          0, 0.1, 0.01, " s",  factor=10000.0,
+                          tooltip="Add random timing offsets to note events (in seconds)",
+                          desc="random per-note timing offset in seconds")
+        self._add_hum_row(left_layout, "Vary Articulation", "vary_articulation",
+                          50, 100, 95,  "%",   factor=100.0, decimals=1,
+                          tooltip="Randomize note hold duration; lower values create a more staccato feel",
+                          desc="randomize note hold duration")
+        self._add_hum_row(left_layout, "Tempo Sway",        "tempo_sway",
+                          0, 0.1, 0,   " s",  factor=10000.0,
+                          tooltip="Apply a sinusoidal tempo variation across the song for a more expressive feel",
+                          desc="sinusoidal tempo variation across the song")
         self.invert_sway_check = QCheckBox("Invert Sway")
         self.invert_sway_check.setToolTip("Invert the phase of the tempo sway curve")
         self.all_humanization_checks['invert_tempo_sway'] = self.invert_sway_check
         self.all_humanization_checks['tempo_sway'].toggled.connect(
             self.invert_sway_check.setEnabled
         )
-        detailed_layout.addWidget(self.invert_sway_check, 5, 0)
+        _invert_container = QWidget()
+        _invert_vbox = QVBoxLayout(_invert_container)
+        _invert_vbox.setContentsMargins(0, 0, 0, 0)
+        _invert_vbox.setSpacing(1)
+        _invert_vbox.addWidget(self.invert_sway_check)
+        _invert_desc = QLabel("flip the sway curve phase")
+        _invert_desc.setProperty("role", "muted")
+        _invert_desc.setContentsMargins(25, 0, 0, 0)
+        _invert_vbox.addWidget(_invert_desc)
+        left_layout.addWidget(_invert_container)
+        left_layout.addStretch()
 
-        main_v_layout.addLayout(detailed_layout)
-        main_v_layout.addStretch()
+        # Right: Hands & Imperfection
+        right_card, right_layout = make_card("HANDS & IMPERFECTION")
+        self._add_hum_row(right_layout, "Hand Drift",   "hand_drift",
+                          0, 100, 25, "%", factor=100.0, decimals=1,
+                          tooltip="Simulate gradual timing drift between the left and right hands",
+                          desc="gradual timing drift between hands")
+        self._add_hum_row(right_layout, "Mistakes",     "mistake_chance",
+                          0, 10,   0, "%", factor=100.0, decimals=1,
+                          tooltip="Randomly skip notes to simulate human errors",
+                          desc="randomly skip notes during playback")
+        right_layout.addStretch()
 
-        self.all_humanization_checks['vary_velocity'] = QCheckBox()  # dummy for logic compat
+        cols.addWidget(left_card, 1)
+        cols.addWidget(right_card, 1)
+        layout.addLayout(cols)
+
+        # Dummy vary_velocity entry for legacy save compatibility.
+        self.all_humanization_checks['vary_velocity'] = QCheckBox()
+
         self.select_all_humanization_check.toggled.connect(self._toggle_all)
         for check in self.all_humanization_checks.values():
             if check.text():
                 check.toggled.connect(self._update_select_all_state)
 
-        return card
+        layout.addStretch()
+        return page
 
-    # ── Widget factory ─────────────────────────────────────────────────
+    def _add_hum_row(self, parent_layout, name, key, min_val, max_val, def_val,
+                     suffix, factor=1.0, decimals=3, tooltip="", desc=""):
+        """Create a HumRow, add it to parent_layout, and register it in the dicts."""
+        row = HumRow(name, min_val, max_val, def_val, suffix,
+                     factor=factor, decimals=decimals, tooltip=tooltip, desc=desc)
+        parent_layout.addWidget(row)
+        self.all_humanization_checks[key]    = row.check
+        self.all_humanization_sliders[key]   = row.slider
+        self.all_humanization_spinboxes[key] = row.spinbox
 
-    @staticmethod
-    def _make_slider_spinbox(min_val, max_val, default_val,
-                             text_suffix="", factor=10000.0, decimals=4):
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(int(min_val * factor), int(max_val * factor))
-        spinbox = QDoubleSpinBox()
-        spinbox.setDecimals(decimals)
-        spinbox.setRange(0.0, 9999.9999)
-        spinbox.setSingleStep(1.0 / factor)
-        spinbox.setSuffix(text_suffix)
-        slider.setValue(int(default_val * factor))
-        spinbox.setValue(default_val)
-        slider.valueChanged.connect(lambda v: spinbox.setValue(v / factor))
-        spinbox.valueChanged.connect(lambda v: slider.setValue(int(v * factor)))
-        return slider, spinbox
-
-    # ── Humanization helpers ───────────────────────────────────────────
+    # -- Humanization helpers -------------------------------------------------
 
     def _toggle_all(self, checked: bool) -> None:
         for check in self.all_humanization_checks.values():
@@ -242,17 +267,47 @@ class PlaybackTab(QWidget):
         self.select_all_humanization_check.setChecked(all(c.isChecked() for c in checks))
         self.select_all_humanization_check.blockSignals(False)
 
-    # ── Public API ─────────────────────────────────────────────────────
+    # -- Public API -----------------------------------------------------------
 
     def update_file_label(self, text: str, tooltip: str = "") -> None:
         self.file_path_label.setText(text)
         self.file_path_label.setToolTip(tooltip)
+        self.file_strip.update_file(text)
+
+    def log_activity(self, msg: str) -> None:
+        self.activity_log.append(msg)
+
+    def update_loaded_summary(self, parts: list, pedal_count: int) -> None:
+        """Refresh the LOADED row from live (MidiTrack, role) pairs."""
+        self._loaded_row.update_loaded_summary(parts, pedal_count)
+
+    def update_loaded_summary_from_save(self, track_details: list, pedal_count: int) -> None:
+        """Populate the LOADED row from save-file metadata dicts."""
+        self._loaded_row.update_loaded_summary_from_save(track_details, pedal_count)
+
+    def clear_loaded_summary(self) -> None:
+        """Reset the LOADED row to the empty placeholder state."""
+        self._loaded_row.clear_loaded_summary()
+
+    def refresh_saved_songs(self, save_dir) -> None:
+        """Rescan save_dir and redraw the saved songs list."""
+        self._saved_panel.refresh_saved_songs(save_dir)
 
     def set_groups_enabled(self, enabled: bool, skip_playback_humanization: bool = False) -> None:
-        self.file_group.setEnabled(enabled)
+        self.file_strip.setEnabled(enabled)
         if not skip_playback_humanization:
-            self.playback_group.setEnabled(enabled)
-            self.humanization_group.setEnabled(enabled)
+            self.tempo_slider.setEnabled(enabled)
+            self.tempo_spinbox.setEnabled(enabled)
+            self.pedal_style_combo.setEnabled(enabled)
+            self.transpose_spinbox.setEnabled(enabled)
+            self.use_88_key_check.setEnabled(enabled)
+            self.countdown_check.setEnabled(enabled)
+            self.debug_check.setEnabled(enabled)
+            self.select_all_humanization_check.setEnabled(enabled)
+            for w in list(self.all_humanization_checks.values()) + \
+                     list(self.all_humanization_sliders.values()) + \
+                     list(self.all_humanization_spinboxes.values()):
+                w.setEnabled(enabled)
 
     def update_enabled_states(self) -> None:
         for key, check in self.all_humanization_checks.items():
@@ -287,74 +342,108 @@ class PlaybackTab(QWidget):
     def load_config(self, config: dict) -> None:
         self.tempo_spinbox.setValue(config.get('tempo', 100.0))
         self.transpose_spinbox.setValue(config.get('transpose', 0))
-        display = self.PEDAL_MAPPING_INV.get(config.get('pedal_style', 'hybrid'), "Auto (Default)")
+        display = self.PEDAL_MAPPING_INV.get(
+            config.get('pedal_style', 'hybrid'), "Auto (Default)"
+        )
         self.pedal_style_combo.setCurrentText(display)
         self.use_88_key_check.setChecked(config.get('use_88_key_layout', False))
         self.countdown_check.setChecked(config.get('countdown', True))
         self.debug_check.setChecked(config.get('debug_mode', False))
-        self.select_all_humanization_check.setChecked(config.get('select_all_humanization', False))
-        self.all_humanization_checks['simulate_hands'].setChecked(config.get('simulate_hands', False))
-        self.all_humanization_checks['enable_chord_roll'].setChecked(config.get('enable_chord_roll', False))
-        self.all_humanization_checks['vary_timing'].setChecked(config.get('enable_vary_timing', False))
-        self.all_humanization_spinboxes['vary_timing'].setValue(config.get('value_timing_variance', 0.010))
-        self.all_humanization_checks['vary_articulation'].setChecked(config.get('enable_vary_articulation', False))
-        self.all_humanization_spinboxes['vary_articulation'].setValue(config.get('value_articulation', 95.0))
-        self.all_humanization_checks['hand_drift'].setChecked(config.get('enable_hand_drift', False))
-        self.all_humanization_spinboxes['hand_drift'].setValue(config.get('value_hand_drift_decay', 25.0))
-        self.all_humanization_checks['mistake_chance'].setChecked(config.get('enable_mistakes', False))
-        self.all_humanization_spinboxes['mistake_chance'].setValue(config.get('value_mistake_chance', 0.5))
-        self.all_humanization_checks['tempo_sway'].setChecked(config.get('enable_tempo_sway', False))
-        self.all_humanization_spinboxes['tempo_sway'].setValue(config.get('value_tempo_sway_intensity', 0.015))
-        self.all_humanization_checks['invert_tempo_sway'].setChecked(config.get('invert_tempo_sway', False))
+        self.select_all_humanization_check.setChecked(
+            config.get('select_all_humanization', False)
+        )
+        self.all_humanization_checks['simulate_hands'].setChecked(
+            config.get('simulate_hands', False)
+        )
+        self.all_humanization_checks['enable_chord_roll'].setChecked(
+            config.get('enable_chord_roll', False)
+        )
+        self.all_humanization_checks['vary_timing'].setChecked(
+            config.get('enable_vary_timing', False)
+        )
+        self.all_humanization_spinboxes['vary_timing'].setValue(
+            config.get('value_timing_variance', 0.010)
+        )
+        self.all_humanization_checks['vary_articulation'].setChecked(
+            config.get('enable_vary_articulation', False)
+        )
+        self.all_humanization_spinboxes['vary_articulation'].setValue(
+            config.get('value_articulation', 95.0)
+        )
+        self.all_humanization_checks['hand_drift'].setChecked(
+            config.get('enable_hand_drift', False)
+        )
+        self.all_humanization_spinboxes['hand_drift'].setValue(
+            config.get('value_hand_drift_decay', 25.0)
+        )
+        self.all_humanization_checks['mistake_chance'].setChecked(
+            config.get('enable_mistakes', False)
+        )
+        self.all_humanization_spinboxes['mistake_chance'].setValue(
+            config.get('value_mistake_chance', 0.5)
+        )
+        self.all_humanization_checks['tempo_sway'].setChecked(
+            config.get('enable_tempo_sway', False)
+        )
+        self.all_humanization_spinboxes['tempo_sway'].setValue(
+            config.get('value_tempo_sway_intensity', 0.015)
+        )
+        self.all_humanization_checks['invert_tempo_sway'].setChecked(
+            config.get('invert_tempo_sway', False)
+        )
         self.update_enabled_states()
 
     def gather_playback_config(self) -> dict:
-        internal = self.PEDAL_MAPPING.get(self.pedal_style_combo.currentText(), 'hybrid')
+        internal = self.PEDAL_MAPPING.get(
+            self.pedal_style_combo.currentText(), 'hybrid'
+        )
         return {
-            'midi_file':             self.file_path_label.toolTip(),
-            'tempo':                 self.tempo_spinbox.value(),
-            'transpose':             self.transpose_spinbox.value(),
-            'countdown':             self.countdown_check.isChecked(),
-            'use_88_key_layout':     self.use_88_key_check.isChecked(),
-            'pedal_style':           internal,
-            'debug_mode':            self.debug_check.isChecked(),
-            'simulate_hands':        self.all_humanization_checks['simulate_hands'].isChecked(),
-            'vary_velocity':         False,
-            'enable_chord_roll':     self.all_humanization_checks['enable_chord_roll'].isChecked(),
-            'vary_timing':           self.all_humanization_checks['vary_timing'].isChecked(),
-            'timing_variance':       self.all_humanization_spinboxes['vary_timing'].value(),
-            'vary_articulation':     self.all_humanization_checks['vary_articulation'].isChecked(),
-            'articulation':          self.all_humanization_spinboxes['vary_articulation'].value() / 100.0,
+            'midi_file':               self.file_path_label.toolTip(),
+            'tempo':                   self.tempo_spinbox.value(),
+            'transpose':               self.transpose_spinbox.value(),
+            'countdown':               self.countdown_check.isChecked(),
+            'use_88_key_layout':       self.use_88_key_check.isChecked(),
+            'pedal_style':             internal,
+            'debug_mode':              self.debug_check.isChecked(),
+            'simulate_hands':          self.all_humanization_checks['simulate_hands'].isChecked(),
+            'vary_velocity':           False,
+            'enable_chord_roll':       self.all_humanization_checks['enable_chord_roll'].isChecked(),
+            'vary_timing':             self.all_humanization_checks['vary_timing'].isChecked(),
+            'timing_variance':         self.all_humanization_spinboxes['vary_timing'].value(),
+            'vary_articulation':       self.all_humanization_checks['vary_articulation'].isChecked(),
+            'articulation':            self.all_humanization_spinboxes['vary_articulation'].value() / 100.0,
             'enable_drift_correction': self.all_humanization_checks['hand_drift'].isChecked(),
-            'drift_decay_factor':    self.all_humanization_spinboxes['hand_drift'].value() / 100.0,
-            'enable_mistakes':       self.all_humanization_checks['mistake_chance'].isChecked(),
-            'mistake_chance':        self.all_humanization_spinboxes['mistake_chance'].value(),
-            'enable_tempo_sway':     self.all_humanization_checks['tempo_sway'].isChecked(),
-            'tempo_sway_intensity':  self.all_humanization_spinboxes['tempo_sway'].value(),
-            'invert_tempo_sway':     self.all_humanization_checks['invert_tempo_sway'].isChecked(),
+            'drift_decay_factor':      self.all_humanization_spinboxes['hand_drift'].value() / 100.0,
+            'enable_mistakes':         self.all_humanization_checks['mistake_chance'].isChecked(),
+            'mistake_chance':          self.all_humanization_spinboxes['mistake_chance'].value(),
+            'enable_tempo_sway':       self.all_humanization_checks['tempo_sway'].isChecked(),
+            'tempo_sway_intensity':    self.all_humanization_spinboxes['tempo_sway'].value(),
+            'invert_tempo_sway':       self.all_humanization_checks['invert_tempo_sway'].isChecked(),
         }
 
     def gather_app_config(self) -> dict:
-        internal = self.PEDAL_MAPPING.get(self.pedal_style_combo.currentText(), 'hybrid')
+        internal = self.PEDAL_MAPPING.get(
+            self.pedal_style_combo.currentText(), 'hybrid'
+        )
         return {
-            'tempo':                   self.tempo_spinbox.value(),
-            'transpose':               self.transpose_spinbox.value(),
-            'pedal_style':             internal,
-            'use_88_key_layout':       self.use_88_key_check.isChecked(),
-            'countdown':               self.countdown_check.isChecked(),
-            'debug_mode':              self.debug_check.isChecked(),
-            'select_all_humanization': self.select_all_humanization_check.isChecked(),
-            'simulate_hands':          self.all_humanization_checks['simulate_hands'].isChecked(),
-            'enable_chord_roll':       self.all_humanization_checks['enable_chord_roll'].isChecked(),
-            'enable_vary_timing':      self.all_humanization_checks['vary_timing'].isChecked(),
-            'value_timing_variance':   self.all_humanization_spinboxes['vary_timing'].value(),
-            'enable_vary_articulation': self.all_humanization_checks['vary_articulation'].isChecked(),
-            'value_articulation':      self.all_humanization_spinboxes['vary_articulation'].value(),
-            'enable_hand_drift':       self.all_humanization_checks['hand_drift'].isChecked(),
-            'value_hand_drift_decay':  self.all_humanization_spinboxes['hand_drift'].value(),
-            'enable_mistakes':         self.all_humanization_checks['mistake_chance'].isChecked(),
-            'value_mistake_chance':    self.all_humanization_spinboxes['mistake_chance'].value(),
-            'enable_tempo_sway':       self.all_humanization_checks['tempo_sway'].isChecked(),
+            'tempo':                      self.tempo_spinbox.value(),
+            'transpose':                  self.transpose_spinbox.value(),
+            'pedal_style':                internal,
+            'use_88_key_layout':          self.use_88_key_check.isChecked(),
+            'countdown':                  self.countdown_check.isChecked(),
+            'debug_mode':                 self.debug_check.isChecked(),
+            'select_all_humanization':    self.select_all_humanization_check.isChecked(),
+            'simulate_hands':             self.all_humanization_checks['simulate_hands'].isChecked(),
+            'enable_chord_roll':          self.all_humanization_checks['enable_chord_roll'].isChecked(),
+            'enable_vary_timing':         self.all_humanization_checks['vary_timing'].isChecked(),
+            'value_timing_variance':      self.all_humanization_spinboxes['vary_timing'].value(),
+            'enable_vary_articulation':   self.all_humanization_checks['vary_articulation'].isChecked(),
+            'value_articulation':         self.all_humanization_spinboxes['vary_articulation'].value(),
+            'enable_hand_drift':          self.all_humanization_checks['hand_drift'].isChecked(),
+            'value_hand_drift_decay':     self.all_humanization_spinboxes['hand_drift'].value(),
+            'enable_mistakes':            self.all_humanization_checks['mistake_chance'].isChecked(),
+            'value_mistake_chance':       self.all_humanization_spinboxes['mistake_chance'].value(),
+            'enable_tempo_sway':          self.all_humanization_checks['tempo_sway'].isChecked(),
             'value_tempo_sway_intensity': self.all_humanization_spinboxes['tempo_sway'].value(),
-            'invert_tempo_sway':       self.all_humanization_checks['invert_tempo_sway'].isChecked(),
+            'invert_tempo_sway':          self.all_humanization_checks['invert_tempo_sway'].isChecked(),
         }

@@ -2,7 +2,7 @@
 HuMidi theme engine.
 
 A ThemeColors holds the 9 user-visible colour slots.  Everything else
-(button backgrounds, disabled states, derived hover tints …) is computed
+(button backgrounds, disabled states, derived hover tints ...) is computed
 automatically by generate_stylesheet().
 
 ThemeManager persists custom themes and the active-theme name to
@@ -15,7 +15,7 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
 
-# ── Colour helpers ─────────────────────────────────────────────────────────
+# -- Colour helpers -----------------------------------------------------------
 
 def _hex_to_rgb(h: str) -> tuple[int, int, int]:
     h = h.lstrip("#")
@@ -23,7 +23,7 @@ def _hex_to_rgb(h: str) -> tuple[int, int, int]:
 
 
 def _mix(hex1: str, hex2: str, t: float) -> str:
-    """Blend hex1 → hex2.  t=0 returns hex1, t=1 returns hex2."""
+    """Blend hex1 -> hex2.  t=0 returns hex1, t=1 returns hex2."""
     r1, g1, b1 = _hex_to_rgb(hex1)
     r2, g2, b2 = _hex_to_rgb(hex2)
     r = max(0, min(255, int(r1 + (r2 - r1) * t)))
@@ -32,7 +32,7 @@ def _mix(hex1: str, hex2: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-# ── Data model ─────────────────────────────────────────────────────────────
+# -- Data model ---------------------------------------------------------------
 
 @dataclass
 class ThemeColors:
@@ -60,9 +60,25 @@ class ThemeColors:
         return cls(**d)
 
 
-# ── Built-in presets ───────────────────────────────────────────────────────
+# -- Built-in presets ---------------------------------------------------------
 
 BUILTIN_THEMES: dict[str, ThemeColors] = {
+    "Paper": ThemeColors(
+        name="Paper",
+        bg_primary="#f3ecdb", bg_secondary="#fbf6e8", bg_input="#f7efd9",
+        accent="#c4922c", text_primary="#211a12", text_secondary="#7a6a55",
+        border="#e4d7bd", accent_play="#6e8b4e", accent_stop="#a64a3a",
+        pedal_color="#b88130",
+        builtin=True,
+    ),
+    "Lacquer": ThemeColors(
+        name="Lacquer",
+        bg_primary="#1f1a14", bg_secondary="#28221a", bg_input="#1a1611",
+        accent="#c4922c", text_primary="#ecdfc8", text_secondary="#8a7a64",
+        border="#3a3128", accent_play="#6e8b4e", accent_stop="#a64a3a",
+        pedal_color="#b88130",
+        builtin=True,
+    ),
     "Dark": ThemeColors(
         name="Dark",
         bg_primary="#1c1c2e", bg_secondary="#21213a", bg_input="#24243e",
@@ -98,8 +114,8 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
 }
 
 
-# ── Stylesheet template ────────────────────────────────────────────────────
-# Uses %(key)s substitution — CSS braces do not need escaping.
+# -- Stylesheet template ------------------------------------------------------
+# Uses %(key)s substitution -- CSS braces do not need escaping.
 
 _QSS = """\
 QMainWindow {
@@ -108,8 +124,8 @@ QMainWindow {
 QWidget {
     background-color: transparent;
     color: %(text_primary)s;
-    font-family: "Segoe UI";
-    font-size: 10pt;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 9pt;
 }
 QWidget#main_widget, QStackedWidget {
     background-color: %(bg_primary)s;
@@ -148,7 +164,7 @@ QGroupBox {
     margin-top: 14px;
     padding: 10px 8px 8px 8px;
     font-weight: 600;
-    font-size: 8pt;
+    font-size: 7pt;
     color: %(text_secondary)s;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -183,77 +199,6 @@ QPushButton:disabled {
     color: %(dis_text)s;
     border-color: %(dis_border)s;
     background-color: %(dis_bg)s;
-}
-
-/* Play button — solid fill */
-QPushButton#play_button {
-    background-color: %(accent_play)s;
-    border: none;
-    border-radius: 6px;
-    color: #ffffff;
-    font-weight: bold;
-    min-width: 90px;
-}
-QPushButton#play_button:hover {
-    background-color: %(accent_play_hover)s;
-    border: none;
-}
-QPushButton#play_button:pressed {
-    background-color: %(accent_play)s;
-}
-QPushButton#play_button:disabled {
-    background-color: %(play_dis_bg)s;
-    border: none;
-    color: %(play_dis_text)s;
-}
-
-/* Stop button — outlined, fills on hover */
-QPushButton#stop_button {
-    background-color: transparent;
-    border: 1.5px solid %(accent_stop)s;
-    border-radius: 6px;
-    color: %(accent_stop)s;
-    font-weight: bold;
-    min-width: 80px;
-}
-QPushButton#stop_button:hover {
-    background-color: %(accent_stop)s;
-    border-color: %(accent_stop)s;
-    color: #ffffff;
-}
-QPushButton#stop_button:disabled {
-    background-color: transparent;
-    border-color: %(stop_dis_border)s;
-    color: %(stop_dis_text)s;
-}
-
-/* Save button */
-QPushButton#save_button {
-    background-color: %(save_bg)s;
-    border-color: %(save_border)s;
-    color: %(accent)s;
-    min-width: 70px;
-}
-QPushButton#save_button:hover {
-    background-color: %(save_hover)s;
-    border-color: %(accent)s;
-}
-QPushButton#save_button:disabled {
-    background-color: %(save_dis_bg)s;
-    border-color: %(save_dis_border)s;
-    color: %(save_dis_text)s;
-}
-
-/* Reset button */
-QPushButton#reset_button {
-    background-color: transparent;
-    border-color: %(border)s;
-    color: %(text_secondary)s;
-}
-QPushButton#reset_button:hover {
-    border-color: %(accent_stop)s;
-    color: %(accent_stop)s;
-    background-color: %(stop_bg)s;
 }
 
 /* Sliders */
@@ -293,6 +238,8 @@ QDoubleSpinBox, QSpinBox, QLineEdit {
     color: %(text_primary)s;
     min-height: 24px;
     selection-background-color: %(accent)s;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 8pt;
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus {
     border-color: %(accent)s;
@@ -379,7 +326,6 @@ QScrollBar:horizontal {
 QScrollBar::handle:horizontal {
     background: %(scroll_handle)s;
     border-radius: 4px;
-    min-width: 30px;
 }
 QScrollBar::handle:horizontal:hover { background: %(accent)s; }
 QScrollBar:vertical {
@@ -391,7 +337,6 @@ QScrollBar:vertical {
 QScrollBar::handle:vertical {
     background: %(scroll_handle)s;
     border-radius: 4px;
-    min-height: 30px;
 }
 QScrollBar::handle:vertical:hover { background: %(accent)s; }
 QScrollBar::add-line, QScrollBar::sub-line,
@@ -404,7 +349,7 @@ QStatusBar {
     background-color: %(status_bg)s;
     border-top: 1px solid %(border)s;
     color: %(text_secondary)s;
-    font-size: 8.5pt;
+    font-size: 8pt;
 }
 
 /* Tree */
@@ -441,7 +386,7 @@ QHeaderView::section {
     border-bottom: 1px solid %(border)s;
     padding: 6px 8px;
     font-weight: 600;
-    font-size: 8pt;
+    font-size: 7pt;
     text-transform: uppercase;
 }
 
@@ -501,22 +446,24 @@ QToolTip {
 /* Semantic label roles (set via setProperty("role", "...")) */
 QLabel[role="muted"] {
     color: %(text_secondary)s;
-    font-size: 9pt;
+    font-size: 8pt;
 }
 QLabel[role="section"] {
     color: %(text_secondary)s;
-    font-size: 8pt;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 7pt;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.6px;
 }
 QLabel[role="value"] {
     color: %(text_primary)s;
+    font-family: "JetBrains Mono", "Consolas", monospace;
     font-size: 9pt;
 }
 QLabel[role="success"] {
     color: %(accent_play)s;
-    font-size: 9pt;
+    font-size: 8pt;
 }
 QLabel[role="title"] {
     color: %(text_primary)s;
@@ -526,14 +473,25 @@ QLabel[role="title"] {
 
 /* Named labels */
 QLabel#time_label {
-    font-size: 10pt;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 8pt;
     font-weight: 600;
     color: %(text_primary)s;
+}
+QLabel#time_start_label {
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 8pt;
+    color: %(text_primary)s;
+}
+QLabel#time_end_label {
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 8pt;
+    color: %(text_secondary)s;
 }
 QLabel#file_path_label {
     color: %(text_secondary)s;
     font-style: italic;
-    font-size: 9pt;
+    font-size: 8pt;
 }
 
 /* Transport bar */
@@ -556,12 +514,26 @@ QFrame#v_sep {
     max-width: 1px;
 }
 
-/* ── Sidebar navigation ─────────────────────────────────────── */
+/* -- Sidebar navigation ---------------------------------------------------- */
 QFrame#sidebar {
     background-color: %(bg_secondary)s;
     border-right: 1px solid %(border)s;
     padding: 0px;
     margin: 0px;
+}
+QLabel#sidebar_wordmark {
+    font-family: "Georgia", serif;
+    font-size: 17pt;
+    font-weight: 500;
+    color: %(text_primary)s;
+    padding: 14px 0 2px 0;
+}
+QLabel#sidebar_version {
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 7pt;
+    color: %(text_secondary)s;
+    letter-spacing: 1.4px;
+    padding-bottom: 8px;
 }
 QLabel#app_title {
     color: %(text_primary)s;
@@ -586,7 +558,7 @@ QFrame#nav_btn[active="true"] {
     background-color: %(nav_active_bg)s;
 }
 QLabel#nav_icon {
-    font-size: 16pt;
+    font-size: 14pt;
     font-family: "Segoe MDL2 Assets";
     color: %(text_secondary)s;
     background: transparent;
@@ -599,7 +571,8 @@ QLabel#nav_icon:disabled {
     color: %(dis_text)s;
 }
 QLabel#nav_label {
-    font-size: 8pt;
+    font-size: 9pt;
+    font-weight: 500;
     color: %(text_secondary)s;
     background: transparent;
     border: none;
@@ -615,41 +588,149 @@ QFrame#nav_btn:disabled {
     border-left-color: transparent;
 }
 
-/* ── Section cards (replace QGroupBox) ──────────────────────── */
+/* -- File strip ------------------------------------------------------------ */
+QFrame#file_strip {
+    background-color: %(bg_secondary)s;
+    border-bottom: 1px solid %(border)s;
+}
+QFrame#file_strip_tile {
+    background-color: %(accent_tint)s;
+    border-radius: 6px;
+}
+QLabel#file_strip_name {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    font-size: 12pt;
+    color: %(text_primary)s;
+}
+QLabel#file_strip_meta {
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 7pt;
+    color: %(text_secondary)s;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* -- Sub-tab bar ----------------------------------------------------------- */
+QFrame#sub_tab_bar {
+    border-bottom: 1px solid %(border)s;
+    background-color: %(bg_primary)s;
+}
+QPushButton#sub_tab_btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: "Georgia", serif;
+    font-size: 11pt;
+    color: %(text_secondary)s;
+    padding: 10px 18px 8px 18px;
+    min-height: 0;
+}
+QPushButton#sub_tab_btn[active="true"] {
+    color: %(text_primary)s;
+    border-bottom-color: %(accent)s;
+}
+QPushButton#sub_tab_btn:hover {
+    color: %(text_primary)s;
+}
+
+/* -- Stats tiles ----------------------------------------------------------- */
+QFrame#stats_tile {
+    background-color: %(bg_input)s;
+    border: 1px solid %(border)s;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+QLabel#stats_tile_value {
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 12pt;
+    font-weight: 600;
+    color: %(text_primary)s;
+}
+QLabel#stats_tile_label {
+    font-size: 7pt;
+    color: %(text_secondary)s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* -- Section cards --------------------------------------------------------- */
 QFrame#section_card {
     background-color: %(bg_secondary)s;
     border: 1px solid %(border)s;
     border-radius: 10px;
 }
 
-/* ── Collapsed mini strip ────────────────────────────────────── */
+/* -- Loaded-row part cards (one per MIDI part, plus pedal summary) --------- */
+QFrame#part_card {
+    background-color: %(bg_input)s;
+    border: 1px solid %(border)s;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+QLabel#part_card_title {
+    font-size: 9pt;
+    font-weight: 600;
+    color: %(text_primary)s;
+}
+QLabel#part_card_meta {
+    font-size: 8pt;
+    color: %(text_secondary)s;
+}
+
+/* -- Clickable save-row cards (raised at rest, sunken on press) ------------- */
+QFrame#save_card {
+    background-color: %(bg_input)s;
+    border-top: 1px solid %(save_card_bevel_hi)s;
+    border-left: 1px solid %(save_card_bevel_hi)s;
+    border-bottom: 1px solid %(save_card_bevel_lo)s;
+    border-right: 1px solid %(save_card_bevel_lo)s;
+    border-radius: 6px;
+}
+QFrame#save_card:hover {
+    background-color: %(save_card_hover)s;
+}
+QFrame#save_card[pressed="true"] {
+    background-color: %(save_card_hover)s;
+    border-top: 1px solid %(save_card_bevel_lo)s;
+    border-left: 1px solid %(save_card_bevel_lo)s;
+    border-bottom: 1px solid %(save_card_bevel_hi)s;
+    border-right: 1px solid %(save_card_bevel_hi)s;
+}
+
+/* -- SAVED SONGS inner panel ---------------------------------------------- */
+/* Sits inside the SAVED SONGS section_card and spans its full width. Uses
+   the window bg so the part_cards stacked on top read as raised, inverting
+   the LOADED row's relationship. Only top and bottom edges carry a border
+   so the panel reads as a horizontal band running through the card. */
+QFrame#saved_songs_list_panel {
+    background-color: %(bg_primary)s;
+    border-top: 1px solid %(border)s;
+    border-bottom: 1px solid %(border)s;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+}
+
+/* -- MIDI drop zone -------------------------------------------------------- */
+QFrame#midi_dropzone {
+    background-color: %(bg_secondary)s;
+    border: 2px dashed %(dropzone_border)s;
+    border-radius: 10px;
+}
+QFrame#midi_dropzone[drag_active="true"] {
+    border-color: %(accent)s;
+    background-color: %(accent_tint)s;
+}
+
+/* -- Collapsed mini strip -------------------------------------------------- */
 QFrame#collapsed_strip {
     background-color: %(bg_secondary)s;
     border-bottom: 1px solid %(border)s;
 }
 
-/* ── Collapsed strip icon buttons ───────────────────────────── */
-QPushButton#cs_save_btn {
-    font-family: "Segoe MDL2 Assets";
-    font-size: 12pt;
-}
-
-/* ── Transport buttons in icon mode (collapsed view) ─────────── */
-QPushButton#play_button[icon_mode="true"],
-QPushButton#stop_button[icon_mode="true"] {
-    font-family: "Segoe MDL2 Assets";
-    font-size: 14pt;
-    min-width: 0;
-}
-QPushButton#save_button[icon_mode="true"],
-QPushButton#reset_button[icon_mode="true"] {
-    font-family: "Segoe MDL2 Assets";
-    font-size: 14pt;
-    min-width: 60px;
-    max-width: 60px;
-}
-
-/* ── Collapse toggle button ──────────────────────────────────── */
+/* -- Collapsed strip icon buttons ------------------------------------------ */
+/* -- Collapse toggle button ------------------------------------------------ */
 QPushButton#collapse_btn {
     background: transparent;
     border: 1px solid %(border)s;
@@ -661,7 +742,9 @@ QPushButton#collapse_btn:hover {
     color: %(text_primary)s;
 }
 QPushButton#collapse_btn[strip_mode="true"] {
-    font-size: 9pt;
+    font-size: 8pt;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    letter-spacing: 1px;
     padding: 5px 16px;
     color: %(text_primary)s;
 }
@@ -717,6 +800,25 @@ def generate_stylesheet(c: ThemeColors) -> str:
     nav_active_bg = _mix(c.bg_secondary, c.accent, 0.10)
     nav_hover_bg  = _mix(c.bg_secondary, c.accent, 0.05)
 
+    # New derived colors for paper/ink design language
+    accent_tint = _mix(c.bg_secondary, c.accent, 0.12)
+    ink_faint   = _mix(c.text_secondary, c.bg_primary, 0.45)
+    rule_strong = _mix(c.border, c.text_secondary, 0.18)
+
+    # Drop-zone dashed border: always darker than bg_secondary so the affordance
+    # reads consistently across light and dark themes.
+    dropzone_border = _mix(c.bg_secondary, "#000000", 0.35)
+
+    # Save card bevel edges: raised = light top-left / dark bottom-right;
+    # swapped on press to produce sunken. 18% toward white / 28% toward black
+    # keep the effect readable without being garish.
+    save_card_bevel_hi = _mix(c.bg_input, "#ffffff", 0.18)
+    save_card_bevel_lo = _mix(c.bg_input, "#000000", 0.28)
+
+    # Save card hover: 10% toward black -- always slightly darker than the
+    # resting bg_input regardless of theme, so the hover reads as "press in".
+    save_card_hover = _mix(c.bg_input, "#000000", 0.10)
+
     d = dict(
         bg_primary=c.bg_primary, bg_secondary=c.bg_secondary, bg_input=c.bg_input,
         accent=c.accent, accent_play=c.accent_play, accent_stop=c.accent_stop,
@@ -736,11 +838,15 @@ def generate_stylesheet(c: ThemeColors) -> str:
         spinner_btn=spinner_btn, spinner_hover=spinner_hover,
         accent_play_hover=accent_play_hover,
         nav_active_bg=nav_active_bg, nav_hover_bg=nav_hover_bg,
+        accent_tint=accent_tint, ink_faint=ink_faint, rule_strong=rule_strong,
+        dropzone_border=dropzone_border,
+        save_card_bevel_hi=save_card_bevel_hi, save_card_bevel_lo=save_card_bevel_lo,
+        save_card_hover=save_card_hover,
     )
     return _QSS % d
 
 
-# ── Theme manager ──────────────────────────────────────────────────────────
+# -- Theme manager ------------------------------------------------------------
 
 class ThemeManager:
     """Loads/saves custom themes and the active theme name from disk."""
@@ -748,7 +854,7 @@ class ThemeManager:
     _themes_dir = Path.home() / ".humidi"
     _themes_file = Path.home() / ".humidi" / "themes.json"
 
-    # ── Disk I/O ──────────────────────────────────────────────────────
+    # -- Disk I/O -------------------------------------------------------------
 
     @classmethod
     def _load_raw(cls) -> dict:
@@ -764,7 +870,7 @@ class ThemeManager:
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
 
-    # ── Public API ────────────────────────────────────────────────────
+    # -- Public API -----------------------------------------------------------
 
     @classmethod
     def all_themes(cls) -> dict[str, ThemeColors]:
@@ -782,7 +888,7 @@ class ThemeManager:
 
     @classmethod
     def get_active_name(cls) -> str:
-        return cls._load_raw().get("active", "Midnight")
+        return cls._load_raw().get("active", "Paper")
 
     @classmethod
     def set_active_name(cls, name: str) -> None:
@@ -793,7 +899,7 @@ class ThemeManager:
     @classmethod
     def get_active(cls) -> ThemeColors:
         name = cls.get_active_name()
-        return cls.all_themes().get(name, BUILTIN_THEMES["Dark"])
+        return cls.all_themes().get(name, BUILTIN_THEMES["Paper"])
 
     @classmethod
     def save_custom(cls, theme: ThemeColors) -> None:
@@ -810,5 +916,5 @@ class ThemeManager:
         raw = cls._load_raw()
         raw["custom"] = [d for d in raw.get("custom", []) if d.get("name") != name]
         if raw.get("active") == name:
-            raw["active"] = "Dark"
+            raw["active"] = "Paper"
         cls._save_raw(raw)

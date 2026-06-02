@@ -1,19 +1,17 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QTabWidget, QTextEdit, QSpinBox, QCheckBox, QPushButton, QFrame
+    QTextEdit, QSpinBox, QCheckBox, QPushButton, QFrame, QStackedWidget
 )
-from PyQt6.QtCore import pyqtSignal as Signal
+from PyQt6.QtCore import pyqtSignal as Signal, Qt
 from PyQt6.QtGui import QFont
 
 from core.translator import FormatRegistry
+from ui.widgets import make_card
 
 
 class TranslatorTab(QWidget):
-    # Emitted when the user wants to play an imported sheet
     # (text, format_name, bpm, humanize)
     play_sheet_requested = Signal(str, str, int, bool)
-
-    # Emitted when the user wants to export the current MIDI as a sheet
     # (format_name)
     export_requested = Signal(str)
 
@@ -23,50 +21,95 @@ class TranslatorTab(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 0, 16, 16)
+        layout.setSpacing(0)
 
-        # Format selector row
-        fmt_row = QHBoxLayout()
-        fmt_label = QLabel("Format")
-        fmt_label.setProperty("role", "section")
+        # -- Page header -------------------------------------------------------
+        header = QFrame()
+        header.setObjectName("page_header")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(0, 14, 0, 8)
+        hl.setSpacing(8)
+        title_lbl = QLabel("Translator")
+        title_lbl.setProperty("role", "title")
+        hl.addWidget(title_lbl)
+        hl.addStretch()
+        # TODO: meta chips (e.g. format count)
+        layout.addWidget(header)
+
+        # -- Toolbar: format dropdown (left) | Import / Export toggle (right) --
+        toolbar = QFrame()
+        tbl = QHBoxLayout(toolbar)
+        tbl.setContentsMargins(0, 4, 0, 8)
+        tbl.setSpacing(8)
+
+        fmt_lbl = QLabel("Format")
+        fmt_lbl.setProperty("role", "muted")
         self.format_combo = QComboBox()
         self.format_combo.addItems(FormatRegistry.names())
         self.format_combo.setToolTip("Select the Roblox piano sheet format")
-        fmt_row.addWidget(fmt_label)
-        fmt_row.addWidget(self.format_combo, 1)
-        layout.addLayout(fmt_row)
+        tbl.addWidget(fmt_lbl)
+        tbl.addWidget(self.format_combo)
+        tbl.addStretch()
 
-        # Sub-tabs
-        self.sub_tabs = QTabWidget()
-        self.sub_tabs.addTab(self._build_import_tab(), "Import")
-        self.sub_tabs.addTab(self._build_export_tab(), "Export")
-        layout.addWidget(self.sub_tabs)
+        self._import_btn = QPushButton("Import")
+        self._import_btn.setObjectName("sub_tab_btn")
+        self._import_btn.setProperty("active", "true")
+        self._import_btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._export_btn = QPushButton("Export")
+        self._export_btn.setObjectName("sub_tab_btn")
+        self._export_btn.setProperty("active", "false")
+        self._export_btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._import_btn.clicked.connect(lambda: self._set_mode(0))
+        self._export_btn.clicked.connect(lambda: self._set_mode(1))
+        tbl.addWidget(self._import_btn)
+        tbl.addWidget(self._export_btn)
+        layout.addWidget(toolbar)
 
-    # ── Import tab ────────────────────────────────────────────────────
+        # -- Workspace (stacked: import page / export page) --------------------
+        self._workspace = QStackedWidget()
+        self._workspace.addWidget(self._build_import_page())
+        self._workspace.addWidget(self._build_export_page())
+        layout.addWidget(self._workspace, 1)
 
-    def _build_import_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+    # ── Import page ───────────────────────────────────────────────────────────
 
-        hint = QLabel("Paste sheet text:")
-        hint.setProperty("role", "muted")
-        layout.addWidget(hint)
+    def _build_import_page(self) -> QWidget:
+        page = QWidget()
+        vl = QVBoxLayout(page)
+        vl.setContentsMargins(0, 0, 0, 0)
+        vl.setSpacing(10)
 
+        body = QHBoxLayout()
+        body.setSpacing(10)
+
+        # Source card: sheet-text input
+        src_card, src_body = make_card("Source")
         self.import_text = QTextEdit()
         self.import_text.setFont(QFont("Courier New", 9))
         self.import_text.setPlaceholderText(
             "e.g.\ne e e [6t] e\ne y 9 y t [wy] t\ne w [6e] e e t"
         )
-        layout.addWidget(self.import_text)
+        src_body.addWidget(self.import_text)
+        body.addWidget(src_card, 1)
 
-        # Options row
-        options_row = QHBoxLayout()
-        options_row.setSpacing(12)
-        bpm_label = QLabel("BPM")
-        bpm_label.setProperty("role", "muted")
+        # Preview card (notation legend / key-range bar / stat tiles not yet implemented)
+        prev_card, prev_body = make_card("Preview")
+        prev_lbl = QLabel("Not yet implemented")
+        prev_lbl.setProperty("role", "muted")
+        prev_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # TODO: parsed preview -- notation legend, key-range bar, stat tiles
+        prev_body.addWidget(prev_lbl)
+        body.addWidget(prev_card, 1)
+
+        vl.addLayout(body, 1)
+
+        # Action bar
+        ab = QHBoxLayout()
+        ab.setContentsMargins(0, 4, 0, 0)
+        ab.setSpacing(8)
+        bpm_lbl = QLabel("BPM")
+        bpm_lbl.setProperty("role", "muted")
         self.bpm_spinbox = QSpinBox()
         self.bpm_spinbox.setRange(20, 400)
         self.bpm_spinbox.setValue(120)
@@ -77,66 +120,84 @@ class TranslatorTab(QWidget):
             "Apply current humanization settings during playback.\n"
             "When unchecked, the sheet plays back exactly as written."
         )
-        options_row.addWidget(bpm_label)
-        options_row.addWidget(self.bpm_spinbox)
-        options_row.addWidget(self.humanize_check)
-        options_row.addStretch()
-        layout.addLayout(options_row)
-
         self.import_play_btn = QPushButton("▶  Play Sheet")
-        self.import_play_btn.setToolTip(
-            "Convert the pasted sheet to keystrokes and begin playback"
-        )
+        self.import_play_btn.setToolTip("Convert the pasted sheet to keystrokes and begin playback")
         self.import_play_btn.clicked.connect(self._on_play_clicked)
-        layout.addWidget(self.import_play_btn)
+        ab.addWidget(bpm_lbl)
+        ab.addWidget(self.bpm_spinbox)
+        ab.addWidget(self.humanize_check)
+        ab.addStretch()
+        ab.addWidget(self.import_play_btn)
+        vl.addLayout(ab)
 
-        return tab
+        return page
 
-    # ── Export tab ────────────────────────────────────────────────────
+    # ── Export page ───────────────────────────────────────────────────────────
 
-    def _build_export_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+    def _build_export_page(self) -> QWidget:
+        page = QWidget()
+        vl = QVBoxLayout(page)
+        vl.setContentsMargins(0, 0, 0, 0)
+        vl.setSpacing(10)
 
+        body = QHBoxLayout()
+        body.setSpacing(10)
+
+        # Source card (loaded MIDI track list for export mode -- not yet implemented)
+        track_card, track_body = make_card("Source")
+        track_lbl = QLabel("Not yet implemented")
+        track_lbl.setProperty("role", "muted")
+        track_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # TODO: loaded MIDI track list for export mode
+        track_body.addWidget(track_lbl)
+        body.addWidget(track_card, 1)
+
+        # Output card: generated sheet text
+        out_card, out_body = make_card("Output")
         self.export_status_label = QLabel(
             "Load a MIDI file on the Playback tab, then click Generate."
         )
         self.export_status_label.setProperty("role", "muted")
         self.export_status_label.setStyleSheet("font-style: italic;")
-        layout.addWidget(self.export_status_label)
+        out_body.addWidget(self.export_status_label)
+        self.export_text = QTextEdit()
+        self.export_text.setReadOnly(True)
+        self.export_text.setFont(QFont("Courier New", 9))
+        self.export_text.setPlaceholderText("Generated sheet will appear here...")
+        out_body.addWidget(self.export_text)
+        body.addWidget(out_card, 1)
 
+        vl.addLayout(body, 1)
+
+        # Action bar
+        ab = QHBoxLayout()
+        ab.setContentsMargins(0, 4, 0, 0)
+        ab.setSpacing(8)
         self.export_generate_btn = QPushButton("Generate Sheet")
         self.export_generate_btn.setToolTip(
             "Convert the currently loaded MIDI notes to sheet text in the selected format"
         )
         self.export_generate_btn.clicked.connect(self._on_export_clicked)
-        layout.addWidget(self.export_generate_btn)
-
-        sep = QFrame()
-        sep.setObjectName("h_sep")
-        sep.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep)
-
-        out_label = QLabel("Output")
-        out_label.setProperty("role", "muted")
-        layout.addWidget(out_label)
-
-        self.export_text = QTextEdit()
-        self.export_text.setReadOnly(True)
-        self.export_text.setFont(QFont("Courier New", 9))
-        self.export_text.setPlaceholderText("Generated sheet will appear here…")
-        layout.addWidget(self.export_text)
-
+        ab.addWidget(self.export_generate_btn)
+        ab.addStretch()
         self.copy_btn = QPushButton("Copy to Clipboard")
         self.copy_btn.setToolTip("Copy the generated sheet to the clipboard")
         self.copy_btn.clicked.connect(self._on_copy_clicked)
-        layout.addWidget(self.copy_btn)
+        ab.addWidget(self.copy_btn)
+        # TODO: Save Sheet to File button
+        vl.addLayout(ab)
 
-        return tab
+        return page
 
-    # ── Slots ─────────────────────────────────────────────────────────
+    # ── Internal ──────────────────────────────────────────────────────────────
+
+    def _set_mode(self, index: int) -> None:
+        self._workspace.setCurrentIndex(index)
+        self._import_btn.setProperty("active", "true" if index == 0 else "false")
+        self._export_btn.setProperty("active", "false" if index == 0 else "true")
+        for btn in (self._import_btn, self._export_btn):
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
 
     def _on_play_clicked(self):
         text = self.import_text.toPlainText().strip()
@@ -156,7 +217,7 @@ class TranslatorTab(QWidget):
         from PyQt6.QtWidgets import QApplication
         QApplication.clipboard().setText(self.export_text.toPlainText())
 
-    # ── Public API ────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def set_export_text(self, text: str):
         self.export_text.setPlainText(text)
