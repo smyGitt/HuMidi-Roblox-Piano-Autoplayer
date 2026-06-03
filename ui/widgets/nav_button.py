@@ -1,14 +1,26 @@
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QEvent, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QEvent, QSize, pyqtSignal as Signal
+from PyQt6.QtGui import QPixmap
 
 
 class NavButton(QFrame):
-    """Sidebar nav item: icon glyph on the left, label on the right."""
+    """Sidebar nav item: Phosphor Duotone icon on the left, label on the right.
+
+    Call update_icon_colors(normal_hex, active_hex, size) after construction
+    (and again on every theme change) to supply rendered pixmaps. Until that
+    method is called the icon slot is empty.
+    """
 
     clicked = Signal()
 
-    def __init__(self, icon: str, label: str, parent=None):
+    _ICON_SIZE = 22
+
+    def __init__(self, icon_name: str, label: str, parent=None):
         super().__init__(parent)
+        self._icon_name = icon_name
+        self._pix_normal: QPixmap | None = None
+        self._pix_active: QPixmap | None = None
+
         self.setObjectName("nav_btn")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -20,11 +32,11 @@ class NavButton(QFrame):
         hbox.setContentsMargins(12, 11, 12, 11)
         hbox.setSpacing(10)
 
-        self._icon_lbl = QLabel(icon)
+        self._icon_lbl = QLabel()
         self._icon_lbl.setObjectName("nav_icon")
         self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon_lbl.setFixedWidth(26)
-        self._icon_lbl.setProperty("highlighted", "false")
+        self._icon_lbl.setFixedSize(QSize(self._ICON_SIZE, self._ICON_SIZE))
+        self._icon_lbl.setScaledContents(True)
         self._icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self._text_lbl = QLabel(label)
@@ -37,6 +49,16 @@ class NavButton(QFrame):
 
         hbox.addWidget(self._icon_lbl)
         hbox.addWidget(self._text_lbl, 1)
+
+    def update_icon_colors(self, normal_hex: str, active_hex: str,
+                           size: int | None = None) -> None:
+        """Re-render both pixmap states using the given hex color strings."""
+        from ui.widgets.ph_icon import ph_icon
+        sz = size or self._ICON_SIZE
+        self._pix_normal = ph_icon(self._icon_name, normal_hex, sz).pixmap(sz * 2, sz * 2)
+        self._pix_active = ph_icon(self._icon_name, active_hex, sz).pixmap(sz * 2, sz * 2)
+        is_hi = self.property("active") == "true" or self.property("hovered") == "true"
+        self._icon_lbl.setPixmap(self._pix_active if is_hi else self._pix_normal)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -58,12 +80,14 @@ class NavButton(QFrame):
         if event.type() == QEvent.Type.EnabledChange and not self.isEnabled():
             self.setProperty("active",  "false")
             self.setProperty("hovered", "false")
-            for lbl in (self._icon_lbl, self._text_lbl):
+            for lbl in (self._text_lbl,):
                 lbl.setProperty("highlighted", "false")
                 lbl.style().unpolish(lbl)
                 lbl.style().polish(lbl)
             self.style().unpolish(self)
             self.style().polish(self)
+            if self._pix_normal is not None:
+                self._icon_lbl.setPixmap(self._pix_normal)
             self.update()
         super().changeEvent(event)
 
@@ -71,11 +95,13 @@ class NavButton(QFrame):
         self.setProperty(key, "true" if value else "false")
         active  = self.property("active")  == "true"
         hovered = self.property("hovered") == "true"
-        hi = "true" if (active or hovered) else "false"
-        for lbl in (self._icon_lbl, self._text_lbl):
-            lbl.setProperty("highlighted", hi)
-            lbl.style().unpolish(lbl)
-            lbl.style().polish(lbl)
+        hi = active or hovered
+        hi_str = "true" if hi else "false"
+        self._text_lbl.setProperty("highlighted", hi_str)
+        self._text_lbl.style().unpolish(self._text_lbl)
+        self._text_lbl.style().polish(self._text_lbl)
         self.style().unpolish(self)
         self.style().polish(self)
+        if self._pix_normal is not None and self._pix_active is not None:
+            self._icon_lbl.setPixmap(self._pix_active if hi else self._pix_normal)
         self.update()

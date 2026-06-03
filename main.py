@@ -27,7 +27,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"HuMidi v{APP_VERSION}")
         self.setMinimumWidth(960)
         self.setMinimumHeight(660)
-        self.resize(self.minimumWidth(), self.minimumHeight())
 
         # Set specific Icon base execution path (Required for OS Contexts)
         base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +69,8 @@ class MainWindow(QMainWindow):
         self._update_checker = UpdateChecker(APP_VERSION)
         self._update_checker.update_available.connect(self._on_update_available)
         self._update_checker.start()
+
+        self.resize(self.minimumWidth(), self.minimumHeight())
 
     def _bind_signals(self):
         # UI controls bound strictly to Execution/Router logic
@@ -169,23 +170,23 @@ class MainWindow(QMainWindow):
         key_str = self.hotkey_manager.format_hotkey_string()
         if self.ui._is_collapsed:
             if self.playback_controller.is_paused():
-                self.ui.play_button.setText("\uE768")
+                self.ui.play_button.setIcon(self.ui._icon_play)
                 self.ui.play_button.setToolTip(f"Resume ({key_str})")
             elif self.playback_controller.is_playing():
-                self.ui.play_button.setText("\uE769")
+                self.ui.play_button.setIcon(self.ui._icon_pause)
                 self.ui.play_button.setToolTip(f"Pause ({key_str})")
             else:
-                self.ui.play_button.setText("\uE768")
+                self.ui.play_button.setIcon(self.ui._icon_play)
                 self.ui.play_button.setToolTip(f"Play ({key_str})")
         else:
             if self.playback_controller.is_paused():
-                self.ui.play_button.setText("▶")
+                self.ui.play_button.setIcon(self.ui._icon_play)
                 self.ui.play_button.setToolTip("Resume playback.")
             elif self.playback_controller.is_playing():
-                self.ui.play_button.setText("⏸")
+                self.ui.play_button.setIcon(self.ui._icon_pause)
                 self.ui.play_button.setToolTip("Pause playback.")
             else:
-                self.ui.play_button.setText("▶")
+                self.ui.play_button.setIcon(self.ui._icon_play)
                 self.ui.play_button.setToolTip("Start playback.")
 
     def toggle_playback_state(self):

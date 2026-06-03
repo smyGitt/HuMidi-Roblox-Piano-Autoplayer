@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
+
+from ui.widgets.ph_icon import ph_icon
 
 
 class MidiDropZone(QFrame):
@@ -32,12 +34,10 @@ class MidiDropZone(QFrame):
         title_lbl = QLabel("REPLACE")
         title_lbl.setProperty("role", "section")
 
-        drop_icon = QLabel("")  # Segoe MDL2 open-folder glyph (left empty to match prior look)
-        drop_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_icon.setStyleSheet(
-            'font-family: "Segoe MDL2 Assets"; font-size: 28pt;'
-            'color: palette(mid);'
-        )
+        self._drop_icon_lbl = QLabel()
+        self._drop_icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._drop_icon_lbl.setFixedSize(QSize(48, 48))
+        self._drop_icon_lbl.setScaledContents(True)
 
         drop_hint = QLabel("Drop a .mid file")
         drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -62,12 +62,18 @@ class MidiDropZone(QFrame):
 
         vbox.addWidget(title_lbl)
         vbox.addStretch()
-        vbox.addWidget(drop_icon)
+        vbox.addWidget(self._drop_icon_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
         vbox.addWidget(drop_hint)
         vbox.addWidget(drop_sub)
         vbox.addSpacing(8)
         vbox.addLayout(btn_row)
         vbox.addStretch()
+
+    def update_icon_color(self, hex_color: str, size: int = 48) -> None:
+        """Re-render the drop-zone folder icon with the given theme color."""
+        self._drop_icon_lbl.setPixmap(
+            ph_icon("folder-open", hex_color, size).pixmap(size * 2, size * 2)
+        )
 
     @classmethod
     def _first_midi_path(cls, mime) -> str | None:

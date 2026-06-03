@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton, QSizePolicy, QWidget)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
+
+from ui.widgets.ph_icon import ph_icon
 
 
 class FileStrip(QFrame):
@@ -25,12 +27,11 @@ class FileStrip(QFrame):
         tile.setFixedSize(34, 34)
         tile_layout = QVBoxLayout(tile)
         tile_layout.setContentsMargins(0, 0, 0, 0)
-        tile_glyph = QLabel("")  # Segoe MDL2 Music note / layers icon
-        tile_glyph.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tile_glyph.setStyleSheet(
-            'font-family: "Segoe MDL2 Assets"; font-size: 14pt;'
-        )
-        tile_layout.addWidget(tile_glyph)
+        self._tile_icon = QLabel()
+        self._tile_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._tile_icon.setFixedSize(QSize(20, 20))
+        self._tile_icon.setScaledContents(True)
+        tile_layout.addWidget(self._tile_icon, alignment=Qt.AlignmentFlag.AlignCenter)
         hbox.addWidget(tile)
 
         # File info column
@@ -70,6 +71,10 @@ class FileStrip(QFrame):
         btn_layout.addWidget(self.replace_btn)
         btn_layout.addWidget(self.reveal_btn)
         hbox.addLayout(btn_layout)
+
+    def update_icon_color(self, hex_color: str, size: int = 20) -> None:
+        """Re-render the music-note tile icon with the given theme color."""
+        self._tile_icon.setPixmap(ph_icon("music-note", hex_color, size).pixmap(size * 2, size * 2))
 
     def update_file(self, name: str, meta: str = "") -> None:
         self._name_lbl.setText(name)

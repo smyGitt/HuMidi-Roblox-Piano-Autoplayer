@@ -748,6 +748,23 @@ QPushButton#collapse_btn[strip_mode="true"] {
     padding: 5px 16px;
     color: %(text_primary)s;
 }
+
+/* -- Card-level reset icon buttons ----------------------------------------- */
+QPushButton[role="card_reset"] {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 4px;
+    min-height: 0px;
+    min-width: 0px;
+}
+QPushButton[role="card_reset"]:hover {
+    background-color: %(btn_hover)s;
+    border-color: %(border)s;
+}
+QPushButton[role="card_reset"]:pressed {
+    background-color: %(btn_pressed)s;
+}
 """
 
 

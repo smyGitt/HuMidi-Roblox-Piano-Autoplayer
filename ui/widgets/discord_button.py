@@ -1,59 +1,13 @@
 import webbrowser
 
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QByteArray
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor, QFont, QPainter, QPixmap
 
-try:
-    from PyQt6.QtSvg import QSvgRenderer as _QSvgRenderer
-    _HAS_SVG = True
-except ImportError:
-    _HAS_SVG = False
-
-# Full Discord "Clyde" logo SVG (viewBox 0 0 127.14 96.36).
-# The closing " of the d attribute and /> are split across the last two
-# string literals so Python concatenation produces valid XML without
-# embedding a literal quote character inside the path data itself.
-_DISCORD_SVG_TMPL = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 127.14 96.36">'
-    '<path fill="{color}" d="'
-    "M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83"
-    "A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09"
-    "C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25"
-    "a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0"
-    "c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1"
-    "A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07Z"
-    "M42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Z"
-    "m42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"
-    '"/></svg>'
-)
-
-# Segoe MDL2 "People" glyph used as fallback when QtSvg is unavailable.
-_DISCORD_FALLBACK_GLYPH = ""
+from ui.widgets.ph_icon import ph_icon
 
 
-def _render_discord_svg(hex_color: str, width: int, height: int) -> QPixmap:
-    svg_bytes = QByteArray(_DISCORD_SVG_TMPL.format(color=hex_color).encode())
-    renderer = _QSvgRenderer(svg_bytes)
-    pix = QPixmap(width, height)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    renderer.render(p)
-    p.end()
-    return pix
-
-
-def _render_discord_fallback(hex_color: str, pixel_size: int) -> QPixmap:
-    pix = QPixmap(pixel_size, pixel_size)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    f = QFont("Segoe MDL2 Assets")
-    f.setPixelSize(pixel_size)
-    p.setFont(f)
-    p.setPen(QColor(hex_color))
-    p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, _DISCORD_FALLBACK_GLYPH)
-    p.end()
-    return pix
+_ICON_SIZE = 22
 
 
 class DiscordNavButton(QFrame):
@@ -78,7 +32,8 @@ class DiscordNavButton(QFrame):
         hbox.setSpacing(10)
 
         self._icon_lbl = QLabel()
-        self._icon_lbl.setFixedWidth(26)
+        self._icon_lbl.setFixedSize(QSize(_ICON_SIZE, _ICON_SIZE))
+        self._icon_lbl.setScaledContents(True)
         self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
@@ -97,10 +52,7 @@ class DiscordNavButton(QFrame):
 
     def _refresh_icon(self) -> None:
         color = self._color_hi if self._hovered else self._color_dim
-        if _HAS_SVG:
-            pix = _render_discord_svg(color, 22, 16)
-        else:
-            pix = _render_discord_fallback(color, 20)
+        pix = ph_icon("discord-logo", color, _ICON_SIZE).pixmap(_ICON_SIZE * 2, _ICON_SIZE * 2)
         self._icon_lbl.setPixmap(pix)
 
     def update_colors(self, dim: str, hi: str) -> None:

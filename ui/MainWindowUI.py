@@ -4,9 +4,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                              QCheckBox, QSlider, QLabel, QStackedWidget, QFrame,
                              QSizePolicy, QScrollArea)
 from PyQt6.QtCore import Qt, QObject, QSize
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton
+from ui.widgets.ph_icon import ph_icon
 from ui.PlaybackTab import PlaybackTab
 from ui.SettingsTab import SettingsTab
 from ui.TranslatorTab import TranslatorTab
@@ -14,20 +15,6 @@ from ui.VisualizerTab import VisualizerTab
 from ui.DebugTab import DebugTab
 from ui.LicenseTab import LicenseTab
 from ui.theme import ThemeManager, generate_stylesheet
-
-
-def _make_mdl2_icon(glyph: str, color: QColor, pixel_size: int = 14) -> QIcon:
-    """Render a Segoe MDL2 Assets glyph into a QIcon at the given pixel size."""
-    pix = QPixmap(pixel_size, pixel_size)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    f = QFont("Segoe MDL2 Assets")
-    f.setPixelSize(pixel_size)
-    p.setFont(f)
-    p.setPen(color)
-    p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, glyph)
-    p.end()
-    return QIcon(pix)
 
 
 def _wrap_in_scroll(widget: QWidget) -> QScrollArea:
@@ -82,6 +69,7 @@ class MainWindowUI(QObject):
         main_layout.setSpacing(0)
 
         self._is_collapsed = False
+        self._expanded_size = QSize(960, 660)
 
         # -- Collapsed mini strip ---------------------------------------------
         self._collapsed_strip = QFrame()
@@ -170,23 +158,23 @@ class MainWindowUI(QObject):
         self.tabs.currentChanged.connect(self._on_page_changed)
 
         _NAV_ITEMS = [
-            ("", "Playback"),
-            ("", "Visualizer"),
-            ("", "Translator"),
-            ("", "Settings"),
-            ("", "Debug"),
-            ("", "License"),
+            ("music-note",   "Playback"),
+            ("waveform",     "Visualizer"),
+            ("translate",    "Translator"),
+            ("gear-six",     "Settings"),
+            ("bug",          "Debug"),
+            ("certificate",  "License"),
         ]
         self._nav_btns: list[NavButton] = []
-        for i, (icon, label) in enumerate(_NAV_ITEMS):
-            btn = NavButton(icon, label)
+        for i, (icon_name, label) in enumerate(_NAV_ITEMS):
+            btn = NavButton(icon_name, label)
             btn.clicked.connect(lambda idx=i: self._switch_page(idx))
             sidebar_vbox.addWidget(btn)
             self._nav_btns.append(btn)
             if i == 4:  # insert Discord + GitHub links after Debug
                 self._discord_btn = DiscordNavButton("https://discord.gg/bRaXP9gYZN")
                 sidebar_vbox.addWidget(self._discord_btn)
-                self._github_nav = NavButton("", "GitHub")
+                self._github_nav = NavButton("github-logo", "GitHub")
                 self._github_nav.clicked.connect(
                     lambda: webbrowser.open("https://github.com/smyGitt/HuMidi")
                 )
@@ -270,14 +258,13 @@ class MainWindowUI(QObject):
         btn_row.setContentsMargins(0, 0, 0, 0)
         btn_row.setSpacing(5)
 
-        self.play_button = HuMidiButton("▶", tooltip="Start, pause, or resume playback.")
+        self.play_button = HuMidiButton(tooltip="Start, pause, or resume playback.")
         self.play_button.setObjectName("play_button")
 
-        self.stop_button = HuMidiButton("⏹", tooltip="Stop playback and return to the beginning.")
+        self.stop_button = HuMidiButton(tooltip="Stop playback and return to the beginning.")
         self.stop_button.setObjectName("stop_button")
 
         self.save_button = HuMidiButton(
-            "🖫",
             tooltip="Save the current playback to a file so it can be replayed without re-processing the MIDI.",
         )
         self.save_button.setObjectName("save_button")
@@ -352,12 +339,37 @@ class MainWindowUI(QObject):
         ThemeManager.set_active_name(name)
         self.main_window.setStyleSheet(generate_stylesheet(theme))
         self._discord_btn.update_colors(theme.text_secondary, theme.text_primary)
-        _c = QColor(theme.text_primary)
+
+        # Nav sidebar icons
+        for btn in self._nav_btns:
+            btn.update_icon_colors(theme.text_secondary, theme.text_primary)
+        self._github_nav.update_icon_colors(theme.text_secondary, theme.text_primary)
+
+        # Collapsed strip load buttons
         _px = self._collapsed_load_btn.fontMetrics().height()
         self._collapsed_load_btn.setIconSize(QSize(_px, _px))
-        self._collapsed_load_btn.setIcon(_make_mdl2_icon("", _c, _px))
+        self._collapsed_load_btn.setIcon(ph_icon("folder-open", theme.text_primary, _px))
         self._collapsed_load_saved_btn.setIconSize(QSize(_px, _px))
-        self._collapsed_load_saved_btn.setIcon(_make_mdl2_icon("", _c, _px))
+        self._collapsed_load_saved_btn.setIcon(ph_icon("floppy-disk", theme.text_primary, _px))
+
+        # Transport button icons (stored for play/pause toggling in main.py)
+        _ti = 22
+        self._icon_play  = ph_icon("play",       theme.accent_play,  _ti)
+        self._icon_pause = ph_icon("pause",      theme.accent_play,  _ti)
+        self._icon_stop  = ph_icon("stop",       theme.accent_stop,  _ti)
+        self._icon_save  = ph_icon("floppy-disk", theme.text_primary, _ti)
+        self.play_button.setIconSize(QSize(_ti, _ti))
+        self.play_button.setIcon(self._icon_play)
+        self.stop_button.setIconSize(QSize(_ti, _ti))
+        self.stop_button.setIcon(self._icon_stop)
+        self.save_button.setIconSize(QSize(_ti, _ti))
+        self.save_button.setIcon(self._icon_save)
+
+        # File strip, drop-zone, and card-level reset button icons
+        self.playback_tab.file_strip.update_icon_color(theme.text_secondary)
+        self.playback_tab.drop_zone.update_icon_color(theme.text_secondary)
+        self.playback_tab.update_icon_color(theme.text_secondary)
+
         self.timeline_widget.left_hand_color.setNamedColor(theme.accent)
         self.timeline_widget.left_hand_color.setAlpha(210)
         self.timeline_widget.right_hand_color.setNamedColor(theme.accent_play)
@@ -482,7 +494,6 @@ class MainWindowUI(QObject):
             self._transport_bar.setVisible(False)
             self.main_window.setMinimumWidth(0)
             self.main_window.setMinimumHeight(0)
-            self.main_window.adjustSize()
             self.main_window.resize(270, 300)
         else:
             self._body.setVisible(True)
@@ -507,7 +518,7 @@ class MainWindowUI(QObject):
             btn_row_layout.addWidget(self.collapse_btn)
             self._transport_bar.setVisible(True)
             self.main_window.setMinimumWidth(960)
-            self.main_window.setMinimumHeight(720)
+            self.main_window.setMinimumHeight(660)
             self.main_window.resize(self._expanded_size)
 
     # -- Collapsed-strip humanize sync ----------------------------------------

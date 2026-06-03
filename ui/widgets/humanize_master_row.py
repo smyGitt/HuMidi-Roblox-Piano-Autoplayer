@@ -1,6 +1,9 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QFrame, QLabel
+from PyQt6.QtCore import QSize
 
 from ui.widgets.section_card import make_card
+from ui.widgets.humidi_button import HuMidiButton
+from ui.widgets.ph_icon import ph_icon
 
 
 def _make_check_pair(checkbox: QCheckBox, desc_text: str) -> QWidget:
@@ -76,6 +79,22 @@ class HumanizeMasterRow(QWidget):
             "slight arpeggiation of simultaneous notes",
         ))
         master_row.addStretch()
+
+        self._reset_btn = HuMidiButton(tooltip="Reset humanize master options to defaults")
+        self._reset_btn.setProperty("role", "card_reset")
+        self._reset_btn.setFixedSize(20, 20)
+        self._reset_btn.clicked.connect(self.reset_to_default)
+        master_row.addWidget(self._reset_btn)
+
         body.addLayout(master_row)
 
         outer.addWidget(card)
+
+    def reset_to_default(self) -> None:
+        self.simulate_hands_check.setChecked(False)
+        self.enable_chord_roll_check.setChecked(False)
+
+    def update_icon_color(self, color: str) -> None:
+        _sz = 14
+        self._reset_btn.setIcon(ph_icon("arrow-counter-clockwise", color, _sz))
+        self._reset_btn.setIconSize(QSize(_sz, _sz))

@@ -1,13 +1,14 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
     QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
 
 from ui.widgets import (
     make_card, SubTabBar, FileStrip, MidiDropZone,
     LoadedRow, SavedSongsPanel, PerformanceCard, OptionsCard,
-    HumanizeMasterRow, HumRow,
+    HumanizeMasterRow, HumRow, HuMidiButton,
 )
+from ui.widgets.ph_icon import ph_icon
 
 
 class PlaybackTab(QWidget):
@@ -186,7 +187,11 @@ class PlaybackTab(QWidget):
         cols.setSpacing(14)
 
         # Left: Timing & Feel
-        left_card, left_layout = make_card("TIMING & FEEL")
+        self._timing_reset_btn = HuMidiButton(tooltip="Reset timing & feel to defaults")
+        self._timing_reset_btn.setProperty("role", "card_reset")
+        self._timing_reset_btn.setFixedSize(20, 20)
+        self._timing_reset_btn.clicked.connect(self._reset_timing_to_default)
+        left_card, left_layout = make_card("TIMING & FEEL", title_buttons=[self._timing_reset_btn])
         self._add_hum_row(left_layout, "Vary Timing",       "vary_timing",
                           0, 0.1, 0.01, " s",  factor=10000.0,
                           tooltip="Add random timing offsets to note events (in seconds)",
@@ -218,7 +223,11 @@ class PlaybackTab(QWidget):
         left_layout.addStretch()
 
         # Right: Hands & Imperfection
-        right_card, right_layout = make_card("HANDS & IMPERFECTION")
+        self._hands_reset_btn = HuMidiButton(tooltip="Reset hands & imperfection to defaults")
+        self._hands_reset_btn.setProperty("role", "card_reset")
+        self._hands_reset_btn.setFixedSize(20, 20)
+        self._hands_reset_btn.clicked.connect(self._reset_hands_to_default)
+        right_card, right_layout = make_card("HANDS & IMPERFECTION", title_buttons=[self._hands_reset_btn])
         self._add_hum_row(right_layout, "Hand Drift",   "hand_drift",
                           0, 100, 25, "%", factor=100.0, decimals=1,
                           tooltip="Simulate gradual timing drift between the left and right hands",
@@ -323,21 +332,40 @@ class PlaybackTab(QWidget):
         )
 
     def reset_to_default(self) -> None:
-        self.tempo_spinbox.setValue(100)
-        self.transpose_spinbox.setValue(0)
-        self.pedal_style_combo.setCurrentText("Auto (Default)")
-        self.use_88_key_check.setChecked(False)
-        self.countdown_check.setChecked(True)
-        self.debug_check.setChecked(False)
-        self.all_humanization_spinboxes['vary_timing'].setValue(0.010)
-        self.all_humanization_spinboxes['vary_articulation'].setValue(95.0)
-        self.all_humanization_spinboxes['hand_drift'].setValue(25.0)
-        self.all_humanization_spinboxes['mistake_chance'].setValue(0.5)
-        self.all_humanization_spinboxes['tempo_sway'].setValue(0.015)
-        for check in self.all_humanization_checks.values():
-            if check.text():
-                check.setChecked(False)
+        self._perf_card.reset_to_default()
+        self._opts_card.reset_to_default()
+        self._humanize_master.reset_to_default()
+        self._reset_timing_to_default()
+        self._reset_hands_to_default()
         self.update_enabled_states()
+
+    def _reset_timing_to_default(self) -> None:
+        self.all_humanization_checks['vary_timing'].setChecked(False)
+        self.all_humanization_spinboxes['vary_timing'].setValue(0.010)
+        self.all_humanization_checks['vary_articulation'].setChecked(False)
+        self.all_humanization_spinboxes['vary_articulation'].setValue(95.0)
+        self.all_humanization_checks['tempo_sway'].setChecked(False)
+        self.all_humanization_spinboxes['tempo_sway'].setValue(0.015)
+        self.all_humanization_checks['invert_tempo_sway'].setChecked(False)
+        self.update_enabled_states()
+
+    def _reset_hands_to_default(self) -> None:
+        self.all_humanization_checks['hand_drift'].setChecked(False)
+        self.all_humanization_spinboxes['hand_drift'].setValue(25.0)
+        self.all_humanization_checks['mistake_chance'].setChecked(False)
+        self.all_humanization_spinboxes['mistake_chance'].setValue(0.5)
+        self.update_enabled_states()
+
+    def update_icon_color(self, color: str) -> None:
+        _sz = QSize(14, 14)
+        _icon = ph_icon("arrow-counter-clockwise", color, 14)
+        self._perf_card.update_icon_color(color)
+        self._opts_card.update_icon_color(color)
+        self._humanize_master.update_icon_color(color)
+        self._timing_reset_btn.setIcon(_icon)
+        self._timing_reset_btn.setIconSize(_sz)
+        self._hands_reset_btn.setIcon(_icon)
+        self._hands_reset_btn.setIconSize(_sz)
 
     def load_config(self, config: dict) -> None:
         self.tempo_spinbox.setValue(config.get('tempo', 100.0))
