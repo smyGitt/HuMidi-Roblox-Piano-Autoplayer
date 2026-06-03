@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
     QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
 from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
+from PyQt6.QtGui import QIcon
 
 from ui.widgets import (
     make_card, SubTabBar, FileStrip, MidiDropZone,
@@ -69,6 +70,7 @@ class PlaybackTab(QWidget):
 
         # Row 1: LOADED card containing the LoadedRow widget.
         tracks_card, tracks_layout = make_card("LOADED")
+        tracks_card.setMinimumHeight(100)
         self._loaded_row = LoadedRow()
         self._loaded_row.edit_selection_btn.clicked.connect(
             self.edit_selection_requested.emit
@@ -189,7 +191,7 @@ class PlaybackTab(QWidget):
         # Left: Timing & Feel
         self._timing_reset_btn = HuMidiButton(tooltip="Reset timing & feel to defaults")
         self._timing_reset_btn.setProperty("role", "card_reset")
-        self._timing_reset_btn.setFixedSize(20, 20)
+        self._timing_reset_btn.setFixedSize(28, 28)
         self._timing_reset_btn.clicked.connect(self._reset_timing_to_default)
         left_card, left_layout = make_card("TIMING & FEEL", title_buttons=[self._timing_reset_btn])
         self._add_hum_row(left_layout, "Vary Timing",       "vary_timing",
@@ -225,7 +227,7 @@ class PlaybackTab(QWidget):
         # Right: Hands & Imperfection
         self._hands_reset_btn = HuMidiButton(tooltip="Reset hands & imperfection to defaults")
         self._hands_reset_btn.setProperty("role", "card_reset")
-        self._hands_reset_btn.setFixedSize(20, 20)
+        self._hands_reset_btn.setFixedSize(28, 28)
         self._hands_reset_btn.clicked.connect(self._reset_hands_to_default)
         right_card, right_layout = make_card("HANDS & IMPERFECTION", title_buttons=[self._hands_reset_btn])
         self._add_hum_row(right_layout, "Hand Drift",   "hand_drift",
@@ -357,8 +359,11 @@ class PlaybackTab(QWidget):
         self.update_enabled_states()
 
     def update_icon_color(self, color: str) -> None:
-        _sz = QSize(14, 14)
-        _icon = ph_icon("arrow-counter-clockwise", color, 14)
+        _logical = 14
+        _sz = QSize(_logical, _logical)
+        _pix = ph_icon("arrow-counter-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
+        _pix.setDevicePixelRatio(2.0)
+        _icon = QIcon(_pix)
         self._perf_card.update_icon_color(color)
         self._opts_card.update_icon_color(color)
         self._humanize_master.update_icon_color(color)

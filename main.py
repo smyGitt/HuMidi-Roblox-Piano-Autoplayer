@@ -25,8 +25,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"HuMidi v{APP_VERSION}")
-        self.setMinimumWidth(960)
-        self.setMinimumHeight(660)
+        self.setMinimumWidth(720)
+        self.setMinimumHeight(495)
 
         # Set specific Icon base execution path (Required for OS Contexts)
         base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
@@ -77,7 +77,7 @@ class MainWindow(QMainWindow):
         self.ui.play_button.clicked.connect(self.handle_play)
         self.ui.stop_button.clicked.connect(self.handle_stop)
         self.ui.save_button.clicked.connect(self.handle_save)
-        self.ui.reset_button.clicked.connect(self.ui.reset_controls_to_default)
+        self.ui.settings_tab.reset_all_btn.clicked.connect(self.ui.reset_controls_to_default)
         self.ui.playback_tab.browse_button.clicked.connect(self.select_file)
         self.ui.playback_tab.load_saved_btn.clicked.connect(self.open_load_dialog)
         self.ui.playback_tab.all_saves_btn.clicked.connect(self.open_load_dialog)
@@ -268,6 +268,39 @@ class MainWindow(QMainWindow):
             
     def _apply_save(self, filepath: str, data: dict) -> None:
         """Apply a loaded save dict to UI state and stamp last_accessed on disk."""
+        def _check_save(d):
+            """Return (ok: bool, reason: str). reason is '' when ok is True."""
+            metadata = d.get('metadata')
+            events = d.get('compiled_events')
+            if not isinstance(metadata, dict):
+                return False, "Missing or invalid metadata block."
+            if not isinstance(events, list) or len(events) == 0:
+                return False, "Missing or empty compiled_events list."
+            ev0 = events[0]
+            try:
+                float(ev0['time'])
+                int(ev0['priority'])
+                str(ev0['action'])
+                str(ev0['key_char'])
+            except (KeyError, TypeError, ValueError):
+                return False, "Compiled events have an unrecognised format."
+            if 'track_details' not in metadata or 'compiled_pedal_count' not in metadata:
+                return False, (
+                    "This save was created with an older version of HuMidi and is missing "
+                    "required fields (track_details, compiled_pedal_count).\n\n"
+                    "Please re-save your MIDI file with the current version."
+                )
+            return True, ''
+
+        ok, reason = _check_save(data)
+        if not ok:
+            QMessageBox.critical(
+                self,
+                "Incompatible Save",
+                f"This save cannot be loaded.\n\n{reason}\n\nFile: {os.path.basename(filepath)}",
+            )
+            return
+
         try:
             data.setdefault('metadata', {})['last_accessed'] = datetime.now().isoformat()
             with open(filepath, 'w') as f:
@@ -282,7 +315,7 @@ class MainWindow(QMainWindow):
         track_details = data.get('metadata', {}).get('track_details', [])
         compiled_pedal_count = data.get('metadata', {}).get('compiled_pedal_count', 0)
         self.ui.playback_tab.update_loaded_summary_from_save(track_details, compiled_pedal_count)
-        if self.config.get('debug_mode'):
+        if self.ui.playback_tab.debug_check.isChecked():
             self.ui.log_output.append(
                 f"[DEBUG] Loaded save with {len(track_details)} track(s), "
                 f"{compiled_pedal_count} compiled pedal event(s)."
@@ -472,7 +505,14 @@ class MainWindow(QMainWindow):
             return
             
         if self.loaded_save_data:
-            self.playback_controller.play_from_save(self.loaded_save_data)
+            try:
+                self.playback_controller.play_from_save(self.loaded_save_data)
+            except Exception as e:
+                QMessageBox.critical(self, "Incompatible Save", f"This save file could not be played:\n{e}")
+                self.loaded_save_data = None
+                self.loaded_save_filename = None
+                self.ui.play_button.setEnabled(False)
+                return
         else:
             config = self.ui.gather_playback_config()
             if not self.selected_tracks_info:

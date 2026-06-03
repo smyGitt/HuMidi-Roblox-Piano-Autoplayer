@@ -3,19 +3,15 @@ from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
 
 class _SubTabButton(QPushButton):
-    """Single button in the SubTabBar. Uses plain text because QPushButton
-    does not render HTML in setText -- previous rich-text styling was
-    showing up literally in the UI."""
+    """Single button in the SubTabBar."""
 
-    def __init__(self, ordinal: str, label: str, parent=None):
+    def __init__(self, label: str, parent=None):
         super().__init__(parent)
         self.setObjectName("sub_tab_btn")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setProperty("active", "false")
-        self._ordinal = ordinal
-        self._label = label
-        self.setText(f"{self._ordinal}  {self._label}")
+        self.setText(label)
 
     def set_active(self, active: bool) -> None:
         self.setProperty("active", "true" if active else "false")
@@ -25,15 +21,11 @@ class _SubTabButton(QPushButton):
 
 
 class SubTabBar(QFrame):
-    """Horizontal manuscript-style sub-tab bar with roman ordinals."""
+    """Horizontal sub-tab bar for the Playback page."""
 
     tab_changed = Signal(int)
 
-    TABS = [
-        ("I",   "File"),
-        ("II",  "Playback"),
-        ("III", "Humanize"),
-    ]
+    TABS = ["File", "Playback", "Humanize"]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -45,8 +37,8 @@ class SubTabBar(QFrame):
         hbox.setSpacing(0)
 
         self._btns: list[_SubTabButton] = []
-        for i, (ordinal, label) in enumerate(self.TABS):
-            btn = _SubTabButton(ordinal, label)
+        for i, label in enumerate(self.TABS):
+            btn = _SubTabButton(label)
             btn.clicked.connect(lambda checked=False, idx=i: self._on_tab(idx))
             hbox.addWidget(btn)
             self._btns.append(btn)

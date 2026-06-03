@@ -115,14 +115,14 @@ class SettingsTab(QWidget):
         outer.addWidget(grid_widget)
         outer.addSpacing(10)
 
-        # -- Appearance card (full width, bottom row) --------------------------
-        app_card, app_content = make_card("Appearance")
-        app_row = QHBoxLayout()
-        app_row.setSpacing(12)
+        # -- Bottom row: Appearance | Reset (side by side) --------------------
+        bottom_row_widget = QWidget()
+        bottom_row = QHBoxLayout(bottom_row_widget)
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(10)
 
-        # Theme controls (left half)
-        theme_vbox = QVBoxLayout()
-        theme_vbox.setSpacing(6)
+        # Appearance card
+        app_card, app_content = make_card("Appearance")
         theme_row = QHBoxLayout()
         theme_row.setSpacing(8)
         self.theme_combo = QComboBox()
@@ -134,19 +134,24 @@ class SettingsTab(QWidget):
         )
         theme_row.addWidget(self.theme_combo, 1)
         theme_row.addWidget(self.theme_customize_btn)
-        theme_vbox.addLayout(theme_row)
-        theme_vbox.addStretch()
-        app_row.addLayout(theme_vbox, 1)
+        app_content.addLayout(theme_row)
+        app_content.addStretch()
+        bottom_row.addWidget(app_card, 1)
 
-        # Theme preview swatch (right half -- not yet implemented)
-        preview_lbl = QLabel("Not yet implemented")
-        preview_lbl.setProperty("role", "muted")
-        preview_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # TODO: live theme-preview swatch / mock
-        app_row.addWidget(preview_lbl, 1)
+        # Reset card
+        reset_card, reset_content = make_card("Reset")
+        reset_desc = QLabel("Restore all playback and humanization settings to their defaults.")
+        reset_desc.setProperty("role", "muted")
+        reset_desc.setWordWrap(True)
+        self.reset_all_btn = QPushButton("Reset All Settings")
+        self.reset_all_btn.setToolTip("Reset all playback and humanization settings to their default values")
+        reset_content.addWidget(reset_desc)
+        reset_content.addSpacing(8)
+        reset_content.addWidget(self.reset_all_btn)
+        reset_content.addStretch()
+        bottom_row.addWidget(reset_card, 1)
 
-        app_content.addLayout(app_row)
-        outer.addWidget(app_card)
+        outer.addWidget(bottom_row_widget)
 
     def _populate_theme_combo(self) -> None:
         active = ThemeManager.get_active_name()

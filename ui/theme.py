@@ -395,6 +395,9 @@ QScrollArea {
     background-color: transparent;
     border: none;
 }
+QScrollArea > QWidget {
+    background-color: transparent;
+}
 
 /* List widgets */
 QListWidget {
@@ -447,6 +450,17 @@ QToolTip {
 QLabel[role="muted"] {
     color: %(text_secondary)s;
     font-size: 8pt;
+}
+QLabel[role="placeholder"] {
+    color: %(text_secondary)s;
+    font-size: 8pt;
+    font-style: italic;
+}
+QLabel[role="drop_hint"] {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    font-size: 13pt;
+    color: %(text_primary)s;
 }
 QLabel[role="section"] {
     color: %(text_secondary)s;
@@ -527,6 +541,15 @@ QLabel#sidebar_wordmark {
     font-weight: 500;
     color: %(text_primary)s;
     padding: 14px 0 2px 0;
+}
+QLabel#sidebar_logo_text {
+    font-family: "Georgia", serif;
+    font-size: 14pt;
+    font-weight: 500;
+    color: %(text_primary)s;
+    background: transparent;
+    border: none;
+    padding: 0px;
 }
 QLabel#sidebar_version {
     font-family: "JetBrains Mono", "Consolas", monospace;
@@ -752,18 +775,41 @@ QPushButton#collapse_btn[strip_mode="true"] {
 /* -- Card-level reset icon buttons ----------------------------------------- */
 QPushButton[role="card_reset"] {
     background-color: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 4px;
-    padding: 2px 4px;
-    min-height: 0px;
-    min-width: 0px;
+    padding: 0px;
+    margin: 0px;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
 }
 QPushButton[role="card_reset"]:hover {
     background-color: %(btn_hover)s;
-    border-color: %(border)s;
+    border: 1px solid %(border)s;
 }
 QPushButton[role="card_reset"]:pressed {
     background-color: %(btn_pressed)s;
+}
+
+/* -- Theme inspect toggle button ------------------------------------------ */
+QPushButton#inspect_btn {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+}
+QPushButton#inspect_btn:hover {
+    background-color: %(btn_hover)s;
+    border-color: %(border)s;
+}
+QPushButton#inspect_btn:checked {
+    background-color: %(accent_tint)s;
+    border-color: %(accent)s;
 }
 """
 
@@ -793,7 +839,7 @@ def generate_stylesheet(c: ThemeColors) -> str:
     save_dis_bdr  = _mix(save_border, c.bg_primary, 0.65)
 
     # Generic button
-    btn_bg      = _mix(c.bg_primary, c.bg_secondary, 0.55)
+    btn_bg      = c.bg_secondary
     btn_hover   = _mix(c.bg_secondary, c.accent, 0.16)
     btn_pressed = _mix(c.bg_primary, "#000000", 0.06)
 
@@ -805,7 +851,7 @@ def generate_stylesheet(c: ThemeColors) -> str:
     # Misc derived
     accent_light      = _mix(c.accent, "#ffffff", 0.25)
     accent_play_hover = _mix(c.accent_play, "#ffffff", 0.15)
-    text_area_bg  = _mix(c.bg_input, c.bg_primary, 0.45)
+    text_area_bg  = c.bg_input
     scroll_handle = _mix(c.border, c.accent, 0.45)
     tab_bg        = c.bg_secondary
     tab_hover     = _mix(c.bg_secondary, c.accent, 0.10)

@@ -298,8 +298,7 @@ class LoadSaveDialog(QDialog):
 
         if h_row == 0:
             none_lbl = QLabel("None selected")
-            none_lbl.setProperty("role", "muted")
-            none_lbl.setStyleSheet("font-style: italic;")
+            none_lbl.setProperty("role", "placeholder")
             hum_grid.addWidget(none_lbl, 0, 0)
 
         self.details_layout.addLayout(hum_grid)

@@ -1,10 +1,14 @@
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QFrame, QLabel
 from PyQt6.QtCore import Qt, QEvent, QSize, pyqtSignal as Signal
 from PyQt6.QtGui import QPixmap
 
 
 class NavButton(QFrame):
     """Sidebar nav item: Phosphor Duotone icon on the left, label on the right.
+
+    Children use fixed geometry instead of a QHBoxLayout so their positions
+    never change during sidebar width animation. The sidebar clips their
+    rendering at its current boundary, producing a clean slide-in/out effect.
 
     Call update_icon_colors(normal_hex, active_hex, size) after construction
     (and again on every theme change) to supply rendered pixmaps. Until that
@@ -14,6 +18,10 @@ class NavButton(QFrame):
     clicked = Signal()
 
     _ICON_SIZE = 22
+    _ICON_X    = 12
+    _ICON_Y    = 13   # (48 - 22) // 2
+    _LABEL_X   = 44   # _ICON_X + _ICON_SIZE + 10 (gap)
+    _LABEL_W   = 200
 
     def __init__(self, icon_name: str, label: str, parent=None):
         super().__init__(parent)
@@ -28,27 +36,19 @@ class NavButton(QFrame):
         self.setProperty("active",  "false")
         self.setProperty("hovered", "false")
 
-        hbox = QHBoxLayout(self)
-        hbox.setContentsMargins(12, 11, 12, 11)
-        hbox.setSpacing(10)
-
-        self._icon_lbl = QLabel()
+        self._icon_lbl = QLabel(self)
         self._icon_lbl.setObjectName("nav_icon")
         self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon_lbl.setFixedSize(QSize(self._ICON_SIZE, self._ICON_SIZE))
+        self._icon_lbl.setGeometry(self._ICON_X, self._ICON_Y, self._ICON_SIZE, self._ICON_SIZE)
         self._icon_lbl.setScaledContents(True)
         self._icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-        self._text_lbl = QLabel(label)
+        self._text_lbl = QLabel(label, self)
         self._text_lbl.setObjectName("nav_label")
-        self._text_lbl.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
+        self._text_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._text_lbl.setGeometry(self._LABEL_X, 0, self._LABEL_W, 48)
         self._text_lbl.setProperty("highlighted", "false")
         self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-
-        hbox.addWidget(self._icon_lbl)
-        hbox.addWidget(self._text_lbl, 1)
 
     def update_icon_colors(self, normal_hex: str, active_hex: str,
                            size: int | None = None) -> None:
@@ -80,10 +80,9 @@ class NavButton(QFrame):
         if event.type() == QEvent.Type.EnabledChange and not self.isEnabled():
             self.setProperty("active",  "false")
             self.setProperty("hovered", "false")
-            for lbl in (self._text_lbl,):
-                lbl.setProperty("highlighted", "false")
-                lbl.style().unpolish(lbl)
-                lbl.style().polish(lbl)
+            self._text_lbl.setProperty("highlighted", "false")
+            self._text_lbl.style().unpolish(self._text_lbl)
+            self._text_lbl.style().polish(self._text_lbl)
             self.style().unpolish(self)
             self.style().polish(self)
             if self._pix_normal is not None:

@@ -1,10 +1,13 @@
+import os
+import sys
 import webbrowser
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                              QCheckBox, QSlider, QLabel, QStackedWidget, QFrame,
                              QSizePolicy, QScrollArea)
-from PyQt6.QtCore import Qt, QObject, QSize
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
+                          QVariantAnimation, QEasingCurve)
+from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
 
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton
 from ui.widgets.ph_icon import ph_icon
@@ -15,6 +18,16 @@ from ui.VisualizerTab import VisualizerTab
 from ui.DebugTab import DebugTab
 from ui.LicenseTab import LicenseTab
 from ui.theme import ThemeManager, generate_stylesheet
+
+
+_W_SIDEBAR_COLLAPSED = 44   # label geometry starts at x=44; sidebar clips it to zero at this width
+_W_SIDEBAR_EXPANDED  = 124
+
+
+def _project_root() -> str:
+    # Works both in development (ui/MainWindowUI.py -> project root) and
+    # in PyInstaller bundles where sys._MEIPASS is the temp extraction dir.
+    return getattr(sys, "_MEIPASS", os.path.join(os.path.dirname(__file__), ".."))
 
 
 def _wrap_in_scroll(widget: QWidget) -> QScrollArea:
@@ -129,30 +142,47 @@ class MainWindowUI(QObject):
         # -- Body: sidebar + page stack ---------------------------------------
         self._body = QWidget()
         body_layout = QHBoxLayout(self._body)
-        body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
 
-        sidebar = QFrame()
+        sidebar = QFrame(self._body)
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(124)
-        sidebar.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding
-        )
+        sidebar.setFixedWidth(_W_SIDEBAR_COLLAPSED)
         sidebar_vbox = QVBoxLayout(sidebar)
         sidebar_vbox.setContentsMargins(0, 0, 0, 0)
         sidebar_vbox.setSpacing(0)
 
-        # Wordmark at top of sidebar
-        wordmark_lbl = QLabel("Hu<i>Midi</i>")
-        wordmark_lbl.setObjectName("sidebar_wordmark")
-        wordmark_lbl.setTextFormat(Qt.TextFormat.RichText)
-        wordmark_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        sidebar_vbox.addWidget(wordmark_lbl)
+        # Logo row -- same fixed-geometry pattern as NavButton.
+        # Icon at x=12, "HuMidi" text at x=44. Sidebar clips the text when
+        # collapsed; both are fully visible when expanded.
+        # Drop assets/humidi_logo.png into the project root's assets/ folder;
+        # falls back to icon.ico until that file exists.
+        _logo_src = os.path.join(_project_root(), "assets", "humidi_logo.png")
+        if not os.path.exists(_logo_src):
+            _logo_src = os.path.join(_project_root(), "icon.ico")
+        _logo_raw = QPixmap(_logo_src)
+        _logo_pix = _logo_raw.scaled(
+            22, 22,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        logo_row = QFrame(sidebar)
+        logo_row.setFixedHeight(48)
 
-        version_lbl = QLabel("V 2.0")
-        version_lbl.setObjectName("sidebar_version")
-        version_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        sidebar_vbox.addWidget(version_lbl)
+        logo_icon_lbl = QLabel(logo_row)
+        logo_icon_lbl.setPixmap(_logo_pix)
+        logo_icon_lbl.setGeometry(12, 13, 22, 22)
+        logo_icon_lbl.setScaledContents(True)
+        logo_icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        logo_text_lbl = QLabel("Hu<i>Midi</i>", logo_row)
+        logo_text_lbl.setObjectName("sidebar_logo_text")
+        logo_text_lbl.setTextFormat(Qt.TextFormat.RichText)
+        logo_text_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        logo_text_lbl.setGeometry(44, 0, 200, 48)
+        logo_text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        sidebar_vbox.addWidget(logo_row)
 
         self.tabs = QStackedWidget()
         self.tabs.currentChanged.connect(self._on_page_changed)
@@ -163,7 +193,7 @@ class MainWindowUI(QObject):
             ("translate",    "Translator"),
             ("gear-six",     "Settings"),
             ("bug",          "Debug"),
-            ("certificate",  "License"),
+            ("certificate",  "Credits"),
         ]
         self._nav_btns: list[NavButton] = []
         for i, (icon_name, label) in enumerate(_NAV_ITEMS):
@@ -171,7 +201,8 @@ class MainWindowUI(QObject):
             btn.clicked.connect(lambda idx=i: self._switch_page(idx))
             sidebar_vbox.addWidget(btn)
             self._nav_btns.append(btn)
-            if i == 4:  # insert Discord + GitHub links after Debug
+            if i == 5:  # push Discord + GitHub to bottom edge after License
+                sidebar_vbox.addStretch()
                 self._discord_btn = DiscordNavButton("https://discord.gg/bRaXP9gYZN")
                 sidebar_vbox.addWidget(self._discord_btn)
                 self._github_nav = NavButton("github-logo", "GitHub")
@@ -179,11 +210,32 @@ class MainWindowUI(QObject):
                     lambda: webbrowser.open("https://github.com/smyGitt/HuMidi")
                 )
                 sidebar_vbox.addWidget(self._github_nav)
-
-        sidebar_vbox.addStretch()
-        body_layout.addWidget(sidebar)
+        # Sidebar floats over the page stack; reserve its collapsed width as a left margin
+        # so content is never obscured in the collapsed state.
+        body_layout.setContentsMargins(_W_SIDEBAR_COLLAPSED, 0, 0, 0)
         body_layout.addWidget(self.tabs, 1)
         main_layout.addWidget(self._body, 1)
+
+        self._sidebar = sidebar
+        self._sidebar_expanded = False
+
+        # Collapse delay timer -- fires when mouse leaves sidebar;
+        # re-checks cursor position so moving to a child button doesn't collapse.
+        self._sidebar_collapse_timer = QTimer(self)
+        self._sidebar_collapse_timer.setSingleShot(True)
+        self._sidebar_collapse_timer.setInterval(120)
+        self._sidebar_collapse_timer.timeout.connect(self._check_sidebar_collapse)
+
+        # Smooth width animation
+        self._sidebar_anim = QVariantAnimation(self)
+        self._sidebar_anim.setDuration(180)
+        self._sidebar_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._sidebar_anim.valueChanged.connect(
+            lambda v: self._sidebar.setFixedWidth(v)
+        )
+        sidebar.installEventFilter(self)
+        self._body.installEventFilter(self)
+        sidebar.raise_()
 
         # -- Pages ------------------------------------------------------------
         self.playback_tab   = PlaybackTab()
@@ -269,14 +321,10 @@ class MainWindowUI(QObject):
         )
         self.save_button.setObjectName("save_button")
 
-        self.reset_button = HuMidiButton("Reset", tooltip="Reset all settings to their default values")
-        self.reset_button.setObjectName("reset_button")
-
         btn_row.addWidget(self.play_button)
         btn_row.addWidget(self.stop_button)
         btn_row.addStretch()
         btn_row.addWidget(self.save_button)
-        btn_row.addWidget(self.reset_button)
 
         self.collapse_btn = HuMidiButton("▲  Collapse", tooltip="Collapse to mini mode (Ctrl+K)")
         self.collapse_btn.setObjectName("collapse_btn")
@@ -324,6 +372,43 @@ class MainWindowUI(QObject):
 
     def _switch_page(self, index: int) -> None:
         self.tabs.setCurrentIndex(index)
+
+    # -- Sidebar hover expand / collapse --------------------------------------
+
+    def eventFilter(self, obj, event):
+        if obj is self._sidebar:
+            t = event.type()
+            if t == QEvent.Type.Enter:
+                self._sidebar_collapse_timer.stop()
+                if not self._sidebar_expanded:
+                    self._expand_sidebar()
+            elif t == QEvent.Type.Leave:
+                self._sidebar_collapse_timer.start()
+        elif obj is self._body and event.type() == QEvent.Type.Resize:
+            self._sidebar.setFixedHeight(self._body.height())
+        return False
+
+    def _expand_sidebar(self) -> None:
+        self._sidebar_expanded = True
+        self._sidebar.raise_()
+        self._sidebar_anim.stop()
+        self._sidebar_anim.setStartValue(self._sidebar.width())
+        self._sidebar_anim.setEndValue(_W_SIDEBAR_EXPANDED)
+        self._sidebar_anim.start()
+
+    def _collapse_sidebar(self) -> None:
+        self._sidebar_expanded = False
+        self._sidebar_anim.stop()
+        self._sidebar_anim.setStartValue(self._sidebar.width())
+        self._sidebar_anim.setEndValue(_W_SIDEBAR_COLLAPSED)
+        self._sidebar_anim.start()
+
+    def _check_sidebar_collapse(self) -> None:
+        cursor_local = self._sidebar.mapFromGlobal(QCursor.pos())
+        if not self._sidebar.rect().contains(cursor_local):
+            self._collapse_sidebar()
+
+    # -------------------------------------------------------------------------
 
     def _on_page_changed(self, index: int) -> None:
         for i, btn in enumerate(self._nav_btns):
@@ -483,12 +568,11 @@ class MainWindowUI(QObject):
             # Row 4: scrubber then combined time label stacked vertically
             self._cs_scrubber_layout.addWidget(self.scrubber_slider)
             self._cs_scrubber_layout.addWidget(self.time_label)
-            # Row 5: play | stop | [stretch] | save | reset -- same buttons as transport bar
+            # Row 5: play | stop | [stretch] | save -- same buttons as transport bar
             # _cs_playback_layout has a stretch at index 0 from setup_ui
             self._cs_playback_layout.insertWidget(0, self.play_button)
             self._cs_playback_layout.insertWidget(1, self.stop_button)
             self._cs_playback_layout.addWidget(self.save_button)
-            self._cs_playback_layout.addWidget(self.reset_button)
             # Row 6: expand button full width
             self._cs_expand_layout.addWidget(self.collapse_btn)
             self._transport_bar.setVisible(False)
@@ -512,9 +596,8 @@ class MainWindowUI(QObject):
             btn_row_layout = self._btn_row_widget.layout()
             btn_row_layout.insertWidget(0, self.play_button)
             btn_row_layout.insertWidget(1, self.stop_button)
-            # stretch spacer remains at index 2; restore save + reset after it
+            # stretch spacer remains at index 2; restore save after it
             btn_row_layout.insertWidget(3, self.save_button)
-            btn_row_layout.insertWidget(4, self.reset_button)
             btn_row_layout.addWidget(self.collapse_btn)
             self._transport_bar.setVisible(True)
             self.main_window.setMinimumWidth(960)

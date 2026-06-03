@@ -1,8 +1,24 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame
+from PyQt6.QtCore import Qt, QSize
 
 from core.core import KeyMapper
 from ui.widgets.part_card import PartCard
+
+
+class _HScrollArea(QScrollArea):
+    """Horizontal-only scroll area that reports the inner widget's preferred height."""
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        if self.widget():
+            hint.setHeight(self.widget().sizeHint().height())
+        return hint
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        if self.widget():
+            hint.setHeight(self.widget().minimumSizeHint().height())
+        return hint
 
 
 class LoadedRow(QWidget):
@@ -30,14 +46,24 @@ class LoadedRow(QWidget):
         outer.setSpacing(8)
 
         self._loaded_cards_layout = QHBoxLayout()
+        self._loaded_cards_layout.setContentsMargins(0, 0, 0, 0)
         self._loaded_cards_layout.setSpacing(8)
 
         self._tracks_placeholder = QLabel("No file loaded.")
         self._tracks_placeholder.setProperty("role", "muted")
         self._loaded_cards_layout.addWidget(self._tracks_placeholder)
 
-        outer.addLayout(self._loaded_cards_layout)
-        outer.addStretch()
+        cards_container = QWidget()
+        cards_container.setLayout(self._loaded_cards_layout)
+
+        scroll = _HScrollArea()
+        scroll.setWidget(cards_container)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        outer.addWidget(scroll, 1)
 
         self.edit_selection_btn = QPushButton("Edit Selection")
         self.edit_selection_btn.setEnabled(False)

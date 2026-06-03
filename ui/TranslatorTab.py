@@ -157,8 +157,7 @@ class TranslatorTab(QWidget):
         self.export_status_label = QLabel(
             "Load a MIDI file on the Playback tab, then click Generate."
         )
-        self.export_status_label.setProperty("role", "muted")
-        self.export_status_label.setStyleSheet("font-style: italic;")
+        self.export_status_label.setProperty("role", "placeholder")
         out_body.addWidget(self.export_status_label)
         self.export_text = QTextEdit()
         self.export_text.setReadOnly(True)
@@ -225,7 +224,6 @@ class TranslatorTab(QWidget):
             1 for line in text.splitlines() if line.strip() and not line.startswith('#')
         )
         self.export_status_label.setText(f"Generated {note_count} line(s).")
-        self.export_status_label.setStyleSheet("")
         self.export_status_label.setProperty("role", "success")
         self.export_status_label.style().unpolish(self.export_status_label)
         self.export_status_label.style().polish(self.export_status_label)

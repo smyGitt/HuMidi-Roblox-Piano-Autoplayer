@@ -1,17 +1,25 @@
 import webbrowser
 
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor, QFont, QPainter, QPixmap
+from PyQt6.QtWidgets import QFrame, QLabel
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
 
 from ui.widgets.ph_icon import ph_icon
 
 
 _ICON_SIZE = 22
+_ICON_X    = 12
+_ICON_Y    = 13   # (48 - 22) // 2
+_LABEL_X   = 44   # _ICON_X + _ICON_SIZE + 10 (gap)
+_LABEL_W   = 200
 
 
 class DiscordNavButton(QFrame):
-    """Sidebar link button that opens a Discord URL in the browser on click."""
+    """Sidebar link button that opens a Discord URL in the browser on click.
+
+    Uses the same fixed-geometry child layout as NavButton so the icon and
+    label positions never shift during sidebar animation.
+    """
 
     def __init__(self, url: str, parent=None):
         super().__init__(parent)
@@ -27,26 +35,18 @@ class DiscordNavButton(QFrame):
         self.setProperty("active",  "false")
         self.setProperty("hovered", "false")
 
-        hbox = QHBoxLayout(self)
-        hbox.setContentsMargins(12, 11, 12, 11)
-        hbox.setSpacing(10)
-
-        self._icon_lbl = QLabel()
-        self._icon_lbl.setFixedSize(QSize(_ICON_SIZE, _ICON_SIZE))
+        self._icon_lbl = QLabel(self)
+        self._icon_lbl.setGeometry(_ICON_X, _ICON_Y, _ICON_SIZE, _ICON_SIZE)
         self._icon_lbl.setScaledContents(True)
         self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-        self._text_lbl = QLabel("Discord")
+        self._text_lbl = QLabel("Discord", self)
         self._text_lbl.setObjectName("nav_label")
-        self._text_lbl.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
+        self._text_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._text_lbl.setGeometry(_LABEL_X, 0, _LABEL_W, 48)
         self._text_lbl.setProperty("highlighted", "false")
         self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-
-        hbox.addWidget(self._icon_lbl)
-        hbox.addWidget(self._text_lbl, 1)
 
         self._refresh_icon()
 

@@ -39,7 +39,7 @@ class PerformanceCard(QWidget):
 
         self._reset_btn = HuMidiButton(tooltip="Reset performance settings to defaults")
         self._reset_btn.setProperty("role", "card_reset")
-        self._reset_btn.setFixedSize(20, 20)
+        self._reset_btn.setFixedSize(28, 28)
         self._reset_btn.clicked.connect(self.reset_to_default)
 
         card, body = make_card("PERFORMANCE", title_buttons=[self._reset_btn])
@@ -126,6 +126,8 @@ class PerformanceCard(QWidget):
         self.pedal_style_combo.setCurrentText("Auto (Default)")
 
     def update_icon_color(self, color: str) -> None:
-        _sz = 14
-        self._reset_btn.setIcon(ph_icon("arrow-counter-clockwise", color, _sz))
-        self._reset_btn.setIconSize(QSize(_sz, _sz))
+        _logical = 14
+        _pix = ph_icon("arrow-counter-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
+        _pix.setDevicePixelRatio(2.0)
+        self._reset_btn.setIcon(QIcon(_pix))
+        self._reset_btn.setIconSize(QSize(_logical, _logical))

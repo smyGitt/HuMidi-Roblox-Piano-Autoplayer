@@ -41,9 +41,7 @@ class MidiDropZone(QFrame):
 
         drop_hint = QLabel("Drop a .mid file")
         drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_hint.setStyleSheet(
-            'font-family: "Georgia", serif; font-style: italic; font-size: 13pt;'
-        )
+        drop_hint.setProperty("role", "drop_hint")
 
         drop_sub = QLabel("OR BROWSE BELOW")
         drop_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)

@@ -9,15 +9,119 @@ whatever was active when the dialog was opened.
 from __future__ import annotations
 from dataclasses import replace
 
-from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem,
-    QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
-    QDialogButtonBox, QFrame, QMessageBox
-)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
-from PyQt6.QtGui import QColor
+import json
+from pathlib import Path
 
-from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES
+from PyQt6.QtWidgets import (
+    QDialog, QHBoxLayout, QVBoxLayout,
+    QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
+    QDialogButtonBox, QFrame, QMessageBox, QFileDialog,
+    QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
+    QApplication, QColorDialog,
+)
+from PyQt6.QtCore import Qt, QSize, QByteArray, pyqtSignal as Signal, QEvent, QObject
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap, QCursor
+from PyQt6.QtSvg import QSvgRenderer
+
+from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES, _mix
+from ui.widgets.ph_icon import ph_icon
+
+
+# ── Inline SVG icons for export / import ─────────────────────────────────────
+
+_SVG_EXPORT = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<path d="M200,224H56a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h96l56,56V216A8,8,0,0,1,200,224Z"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polyline points="152 32 152 88 208 88"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="128" y1="120" x2="128" y2="184"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polyline points="104 160 128 184 152 160"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+_SVG_IMPORT = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<path d="M200,224H56a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h96l56,56V216A8,8,0,0,1,200,224Z"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polyline points="152 32 152 88 208 88"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polyline points="104 144 128 120 152 144"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="128" y1="184" x2="128" y2="120"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+
+_SVG_NEW = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<rect x="40" y="40" width="176" height="176" rx="8" opacity="0.2"/>'
+    b'<rect x="40" y="40" width="176" height="176" rx="8"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="88" y1="128" x2="168" y2="128"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="128" y1="88" x2="128" y2="168"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+_SVG_DELETE = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56Z" opacity="0.2"/>'
+    b'<line x1="216" y1="56" x2="40" y2="56"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="104" y1="104" x2="104" y2="168"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="152" y1="104" x2="152" y2="168"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<path d="M168,56V40a16,16,0,0,0-16-16H104A16,16,0,0,0,88,40V56"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+
+_SVG_INSPECT = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<circle cx="128" cy="128" r="48" opacity="0.2" fill="currentColor"/>'
+    b'<circle cx="128" cy="128" r="48"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="128" y1="32" x2="128" y2="80"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="16"/>'
+    b'<line x1="128" y1="176" x2="128" y2="224"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="16"/>'
+    b'<line x1="32" y1="128" x2="80" y2="128"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="16"/>'
+    b'<line x1="176" y1="128" x2="224" y2="128"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+
+def _svg_icon(svg_bytes: bytes, color: str, size: int = 16) -> QIcon:
+    """Render an inline SVG (using currentColor) as a QIcon at the given logical size."""
+    data = svg_bytes.replace(b"currentColor", color.encode())
+    renderer = QSvgRenderer(QByteArray(data))
+    phys = size * 2
+    pix = QPixmap(phys, phys)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    renderer.render(painter)
+    painter.end()
+    icon = QIcon()
+    icon.addPixmap(pix)
+    return icon
 
 
 # ── Colour labels (order matters — shown in the editor) ───────────────────
@@ -34,6 +138,76 @@ _COLOR_FIELDS = [
     ("accent_stop",   "Stop / Danger"),
     ("pedal_color",   "Pedal Color"),
 ]
+
+
+def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
+    """Return (ThemeColors field, display label) for a preview widget, or None if unrecognised."""
+    obj_name = widget.objectName()
+    cls_name = type(widget).__name__
+
+    _by_name: dict[str, tuple[str, str]] = {
+        # Buttons and indicators
+        "pedal_swatch":         ("pedal_color",    "Pedal Color"),
+        "play_button":          ("accent_play",    "Play Color"),
+        "stop_button":          ("accent_stop",    "Stop / Danger"),
+        "save_button":          ("accent",         "Accent"),
+        # Window chrome
+        "preview_window":       ("bg_primary",     "Background"),
+        "collapsed_strip":      ("bg_secondary",   "Surface"),
+        "sidebar_logo_text":    ("text_primary",   "Text"),
+        # File strip
+        "file_strip":           ("bg_secondary",   "Surface"),
+        "file_strip_tile":      ("accent",         "Accent"),
+        "file_strip_tile_icon": ("accent",         "Accent"),
+        "file_strip_name":      ("text_primary",   "Text"),
+        "file_strip_meta":      ("text_secondary", "Muted Text"),
+        # Sub-tab bar
+        "sub_tab_bar":          ("bg_primary",     "Background"),
+        # Cards
+        "section_card":         ("bg_secondary",   "Surface"),
+        "part_card":            ("bg_input",       "Input Fields"),
+        "save_card":            ("bg_input",       "Input Fields"),
+        "stats_tile":           ("bg_input",       "Input Fields"),
+        "part_card_title":      ("text_primary",   "Text"),
+        "part_card_meta":       ("text_secondary", "Muted Text"),
+        "stats_tile_value":     ("text_primary",   "Text"),
+        "stats_tile_label":     ("text_secondary", "Muted Text"),
+        # Transport bar
+        "transport_bar":        ("bg_secondary",   "Surface"),
+        "time_start_label":     ("text_primary",   "Text"),
+        "time_end_label":       ("text_secondary", "Muted Text"),
+    }
+    if obj_name in _by_name:
+        return _by_name[obj_name]
+
+    # Sub-tab buttons: active state shows the accent underline; inactive shows muted text color.
+    if obj_name == "sub_tab_btn":
+        if widget.property("active") == "true":
+            return ("accent", "Accent")
+        return ("text_secondary", "Muted Text")
+
+    # Card-reset icon buttons render their glyph in the muted-text color.
+    if widget.property("role") == "card_reset":
+        return ("text_secondary", "Muted Text")
+
+    if cls_name == "QLabel":
+        role = widget.property("role")
+        if role in ("muted", "placeholder", "section"):
+            return ("text_secondary", "Muted Text")
+        return ("text_primary", "Text")
+
+    _by_class: dict[str, tuple[str, str]] = {
+        "QLineEdit":      ("bg_input",     "Input Fields"),
+        "QComboBox":      ("bg_input",     "Input Fields"),
+        "QDoubleSpinBox": ("bg_input",     "Input Fields"),
+        "QSpinBox":       ("bg_input",     "Input Fields"),
+        "QSlider":        ("accent",       "Accent"),
+        "QCheckBox":      ("accent",       "Accent"),
+        "QPushButton":    ("bg_secondary", "Surface"),
+        "QFrame":         ("bg_primary",   "Background"),
+        "QWidget":        ("bg_primary",   "Background"),
+    }
+    return _by_class.get(cls_name)
 
 
 # ── Color swatch widget ────────────────────────────────────────────────────
@@ -89,7 +263,6 @@ class _ColorSwatch(QWidget):
     def _pick_color(self) -> None:
         if not self._editable:
             return
-        from PyQt6.QtWidgets import QColorDialog
         initial = QColor(self._color)
         color = QColorDialog.getColor(initial, self, "Choose colour")
         if color.isValid():
@@ -121,6 +294,42 @@ class _ColorSwatch(QWidget):
         )
 
 
+# ── Inspect mode event filter ─────────────────────────────────────────────
+
+class _InspectFilter(QObject):
+    """App-level event filter: intercepts right-click-release inside the preview panel."""
+
+    widget_right_clicked = Signal(object, object)  # (QWidget, QPoint global)
+
+    def __init__(self, root: QWidget, parent=None):
+        super().__init__(parent)
+        self._root = root
+        self._active = False
+
+    def set_active(self, active: bool) -> None:
+        self._active = active
+
+    def _inside_root(self, widget: QWidget) -> bool:
+        w = widget
+        while w is not None:
+            if w is self._root:
+                return True
+            w = w.parent()
+        return False
+
+    def eventFilter(self, obj, event) -> bool:
+        if not self._active or not isinstance(obj, QWidget):
+            return False
+        if event.type() != QEvent.Type.MouseButtonRelease:
+            return False
+        if event.button() != Qt.MouseButton.RightButton:
+            return False
+        if not self._inside_root(obj):
+            return False
+        self.widget_right_clicked.emit(obj, event.globalPosition().toPoint())
+        return True
+
+
 # ── Theme dialog ───────────────────────────────────────────────────────────
 
 class ThemeDialog(QDialog):
@@ -138,12 +347,19 @@ class ThemeDialog(QDialog):
         self.main_window = main_window
         self._previous_name = ThemeManager.get_active_name()
         self._current_theme: ThemeColors | None = None
-        self._pending_save = False      # True when unsaved edits exist
+        self._pending_save = False
+        self._active_color_dlg: QColorDialog | None = None
 
         self.setWindowTitle("Theme Manager")
-        self.setMinimumSize(520, 520)
-        self._apply_own_stylesheet()
+        self.setMinimumSize(800, 540)
         self._build_ui()
+
+        self._inspect_filter = _InspectFilter(self._preview_panel, self)
+        self._inspect_filter.widget_right_clicked.connect(self._on_widget_picked)
+        QApplication.instance().installEventFilter(self._inspect_filter)
+        self.finished.connect(self._cleanup_inspect)
+
+        self._apply_own_stylesheet()
         self._populate_list()
 
     # ── Layout ────────────────────────────────────────────────────────
@@ -156,67 +372,53 @@ class ThemeDialog(QDialog):
         body = QHBoxLayout()
         body.setSpacing(12)
 
-        # ── Left: theme list ──────────────────────────────────────────
+        # ── Left: theme selector + colour swatches ────────────────────
         left = QWidget()
-        left.setFixedWidth(176)
         left_vbox = QVBoxLayout(left)
         left_vbox.setContentsMargins(0, 0, 0, 0)
         left_vbox.setSpacing(6)
 
-        list_label = QLabel("Themes")
-        list_label.setProperty("role", "section")
-        left_vbox.addWidget(list_label)
-
-        self._list = QListWidget()
-        self._list.currentRowChanged.connect(self._on_row_changed)
-        left_vbox.addWidget(self._list)
-
-        list_btns = QHBoxLayout()
-        list_btns.setSpacing(4)
-        self._new_btn = QPushButton("New")
-        self._new_btn.setToolTip("Duplicate the selected theme as a new custom preset")
+        # Combo + new/del
+        sel_row = QHBoxLayout()
+        sel_row.setSpacing(4)
+        self._combo = QComboBox()
+        self._combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo.currentIndexChanged.connect(self._on_row_changed)
+        sel_row.addWidget(self._combo, 1)
+        self._new_btn = QPushButton()
+        self._new_btn.setFixedSize(28, 28)
+        self._new_btn.setIconSize(QSize(16, 16))
+        self._new_btn.setToolTip("Duplicate selected theme as a new custom preset")
         self._new_btn.clicked.connect(self._on_new)
-        self._del_btn = QPushButton("Delete")
+        self._del_btn = QPushButton()
+        self._del_btn.setFixedSize(28, 28)
+        self._del_btn.setIconSize(QSize(16, 16))
         self._del_btn.setObjectName("reset_button")
         self._del_btn.setToolTip("Delete this custom theme (built-in themes cannot be deleted)")
         self._del_btn.setEnabled(False)
         self._del_btn.clicked.connect(self._on_delete)
-        list_btns.addWidget(self._new_btn)
-        list_btns.addWidget(self._del_btn)
-        left_vbox.addLayout(list_btns)
+        sel_row.addWidget(self._new_btn)
+        sel_row.addWidget(self._del_btn)
+        left_vbox.addLayout(sel_row)
 
-        body.addWidget(left)
-
-        # Thin vertical separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setObjectName("v_sep")
-        body.addWidget(sep)
-
-        # ── Right: editor ─────────────────────────────────────────────
-        right = QWidget()
-        right_vbox = QVBoxLayout(right)
-        right_vbox.setContentsMargins(4, 0, 4, 0)
-        right_vbox.setSpacing(8)
-
-        # Name row
-        name_row = QHBoxLayout()
-        name_lbl = QLabel("Name")
-        name_lbl.setFixedWidth(110)
-        name_lbl.setProperty("role", "muted")
-        self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("Custom theme name…")
-        self._name_edit.textEdited.connect(self._mark_dirty)
-        name_row.addWidget(name_lbl)
-        name_row.addWidget(self._name_edit)
-        right_vbox.addLayout(name_row)
-
-        # Builtin badge
-        self._builtin_label = QLabel("Built-in — read only")
-        self._builtin_label.setProperty("role", "muted")
-        self._builtin_label.setStyleSheet("font-style: italic;")
-        self._builtin_label.setVisible(False)
-        right_vbox.addWidget(self._builtin_label)
+        # Export/import
+        io_row = QHBoxLayout()
+        io_row.setSpacing(4)
+        self._export_btn = QPushButton()
+        self._export_btn.setFixedSize(28, 28)
+        self._export_btn.setIconSize(QSize(16, 16))
+        self._export_btn.setToolTip("Export theme to JSON file")
+        self._export_btn.setEnabled(False)
+        self._export_btn.clicked.connect(self._on_export)
+        self._import_btn = QPushButton()
+        self._import_btn.setFixedSize(28, 28)
+        self._import_btn.setIconSize(QSize(16, 16))
+        self._import_btn.setToolTip("Import theme from JSON file")
+        self._import_btn.clicked.connect(self._on_import)
+        io_row.addWidget(self._export_btn)
+        io_row.addWidget(self._import_btn)
+        io_row.addStretch()
+        left_vbox.addLayout(io_row)
 
         # Scroll area for colour swatches
         scroll = QScrollArea()
@@ -243,9 +445,9 @@ class ThemeDialog(QDialog):
 
         swatch_vbox.addStretch()
         scroll.setWidget(swatch_container)
-        right_vbox.addWidget(scroll)
+        left_vbox.addWidget(scroll)
 
-        # Save/revert row
+        # Save/revert
         action_row = QHBoxLayout()
         self._save_btn = QPushButton("Save Changes")
         self._save_btn.setObjectName("save_button")
@@ -259,9 +461,20 @@ class ThemeDialog(QDialog):
         action_row.addWidget(self._save_btn)
         action_row.addWidget(self._revert_btn)
         action_row.addStretch()
-        right_vbox.addLayout(action_row)
+        left_vbox.addLayout(action_row)
 
-        body.addWidget(right)
+        body.addWidget(left)
+
+        # Thin vertical separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setObjectName("v_sep")
+        body.addWidget(sep)
+
+        # ── Right: preview panel ──────────────────────────────────────
+        self._preview_panel = self._build_preview_panel()
+        body.addWidget(self._preview_panel, 1)
+
         outer.addLayout(body)
 
         # ── Bottom button box ─────────────────────────────────────────
@@ -280,30 +493,351 @@ class ThemeDialog(QDialog):
         bbox.rejected.connect(self._on_cancel)
         outer.addWidget(bbox)
 
+    def _build_preview_panel(self) -> QFrame:
+        panel = QFrame()
+        panel.setObjectName("preview_panel")
+        panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        panel.setMinimumWidth(320)
+
+        outer = QVBoxLayout(panel)
+        outer.setContentsMargins(4, 0, 4, 4)
+        outer.setSpacing(6)
+
+        # Name + inspect button
+        name_row = QHBoxLayout()
+        name_row.setSpacing(6)
+        self._name_edit = QLineEdit()
+        self._name_edit.setPlaceholderText("Custom theme name...")
+        self._name_edit.textEdited.connect(self._mark_dirty)
+        name_row.addWidget(self._name_edit, 1)
+        self._inspect_btn = QPushButton()
+        self._inspect_btn.setCheckable(True)
+        self._inspect_btn.setFixedSize(22, 22)
+        self._inspect_btn.setIconSize(QSize(14, 14))
+        self._inspect_btn.setObjectName("inspect_btn")
+        self._inspect_btn.setToolTip("Inspect: right-click any preview element to pick its color")
+        self._inspect_btn.toggled.connect(self._toggle_inspect)
+        name_row.addWidget(self._inspect_btn)
+        outer.addLayout(name_row)
+
+        # Builtin badge
+        self._builtin_label = QLabel("Built-in (read only)")
+        self._builtin_label.setProperty("role", "placeholder")
+        self._builtin_label.setVisible(False)
+        outer.addWidget(self._builtin_label)
+
+        # PREVIEW section label + inspect hint on the same row
+        hdr_row = QHBoxLayout()
+        hdr_row.setContentsMargins(0, 0, 0, 0)
+        preview_lbl = QLabel("PREVIEW")
+        preview_lbl.setProperty("role", "section")
+        hdr_row.addWidget(preview_lbl)
+        hdr_row.addStretch()
+        self._inspect_hint = QLabel("")
+        self._inspect_hint.setProperty("role", "muted")
+        hdr_row.addWidget(self._inspect_hint)
+        outer.addLayout(hdr_row)
+
+        # Fake app window: simplified PlaybackTab simulation. Right-click any
+        # element in inspect mode to pick the matching ThemeColors field.
+        win = QFrame()
+        win.setObjectName("preview_window")
+        win.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        win_v = QVBoxLayout(win)
+        win_v.setContentsMargins(0, 0, 0, 0)
+        win_v.setSpacing(0)
+
+        win_v.addWidget(self._build_prev_title_bar())
+        win_v.addWidget(self._build_prev_file_strip())
+        win_v.addWidget(self._build_prev_sub_tab_bar())
+        win_v.addWidget(self._build_prev_body(), 1)
+        win_v.addWidget(self._build_prev_transport_bar())
+
+        outer.addWidget(win, 1)
+        return panel
+
+    def _build_prev_title_bar(self) -> QFrame:
+        title_bar = QFrame()
+        title_bar.setObjectName("collapsed_strip")
+        title_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        title_h = QHBoxLayout(title_bar)
+        title_h.setContentsMargins(10, 6, 8, 6)
+        title_h.setSpacing(4)
+        app_name = QLabel("Hu<i>Midi</i>")
+        app_name.setTextFormat(Qt.TextFormat.RichText)
+        app_name.setObjectName("sidebar_logo_text")
+        title_h.addWidget(app_name)
+        title_h.addStretch()
+        # En-dash, square, multiplication sign (NOT em-dash).
+        for sym in ("–", "□", "×"):
+            lbl = QLabel(sym)
+            lbl.setProperty("role", "muted")
+            title_h.addWidget(lbl)
+        return title_bar
+
+    def _build_prev_file_strip(self) -> QFrame:
+        file_strip = QFrame()
+        file_strip.setObjectName("file_strip")
+        file_strip.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        fs_h = QHBoxLayout(file_strip)
+        fs_h.setContentsMargins(10, 6, 10, 6)
+        fs_h.setSpacing(8)
+
+        tile = QFrame()
+        tile.setObjectName("file_strip_tile")
+        tile.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        tile.setFixedSize(28, 28)
+        tile_layout = QVBoxLayout(tile)
+        tile_layout.setContentsMargins(0, 0, 0, 0)
+        self._prev_file_tile_icon = QLabel()
+        self._prev_file_tile_icon.setObjectName("file_strip_tile_icon")
+        self._prev_file_tile_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._prev_file_tile_icon.setFixedSize(QSize(16, 16))
+        self._prev_file_tile_icon.setScaledContents(True)
+        tile_layout.addWidget(self._prev_file_tile_icon,
+                              alignment=Qt.AlignmentFlag.AlignCenter)
+        fs_h.addWidget(tile)
+
+        info_col = QWidget()
+        info_v = QVBoxLayout(info_col)
+        info_v.setContentsMargins(0, 0, 0, 0)
+        info_v.setSpacing(1)
+        fs_name = QLabel("Demo.mid")
+        fs_name.setObjectName("file_strip_name")
+        fs_meta = QLabel("4 TRACKS / 2:34")
+        fs_meta.setObjectName("file_strip_meta")
+        info_v.addWidget(fs_name)
+        info_v.addWidget(fs_meta)
+        fs_h.addWidget(info_col, 1)
+        return file_strip
+
+    def _build_prev_sub_tab_bar(self) -> QFrame:
+        sub_tab_bar = QFrame()
+        sub_tab_bar.setObjectName("sub_tab_bar")
+        sub_tab_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        stb_h = QHBoxLayout(sub_tab_bar)
+        stb_h.setContentsMargins(0, 0, 0, 0)
+        stb_h.setSpacing(0)
+        for i, lbl_txt in enumerate(["File", "Playback", "Humanize"]):
+            btn = QPushButton(lbl_txt)
+            btn.setObjectName("sub_tab_btn")
+            btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            btn.setProperty("active", "true" if i == 1 else "false")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            stb_h.addWidget(btn)
+        stb_h.addStretch(1)
+        return sub_tab_bar
+
+    def _build_prev_body(self) -> QWidget:
+        body = QWidget()
+        body_v = QVBoxLayout(body)
+        body_v.setContentsMargins(10, 10, 10, 6)
+        body_v.setSpacing(8)
+
+        body_v.addWidget(self._build_prev_performance_card())
+        body_v.addWidget(self._build_prev_options_card())
+        body_v.addLayout(self._build_prev_track_row())
+        body_v.addStretch()
+        return body
+
+    def _build_prev_performance_card(self) -> QFrame:
+        card = QFrame()
+        card.setObjectName("section_card")
+        card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(12, 6, 12, 8)
+        v.setSpacing(4)
+
+        # Title row + reset button
+        title_row = QHBoxLayout()
+        title_row.setSpacing(6)
+        title = QLabel("PERFORMANCE")
+        title.setProperty("role", "section")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        self._prev_reset_btn = QPushButton()
+        self._prev_reset_btn.setProperty("role", "card_reset")
+        self._prev_reset_btn.setFixedSize(28, 28)
+        self._prev_reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        title_row.addWidget(self._prev_reset_btn)
+        v.addLayout(title_row)
+
+        # Tempo: label + slider + spinbox
+        tempo_row = QHBoxLayout()
+        tempo_row.setSpacing(8)
+        tempo_labels = QVBoxLayout()
+        tempo_labels.setSpacing(1)
+        tempo_labels.setContentsMargins(0, 0, 0, 0)
+        tempo_lbl = QLabel("Tempo")
+        tempo_desc = QLabel("% of original")
+        tempo_desc.setProperty("role", "muted")
+        tempo_labels.addWidget(tempo_lbl)
+        tempo_labels.addWidget(tempo_desc)
+        tempo_row.addLayout(tempo_labels)
+        self._prev_slider = QSlider(Qt.Orientation.Horizontal)
+        self._prev_slider.setRange(0, 200)
+        self._prev_slider.setValue(100)
+        tempo_row.addWidget(self._prev_slider, 1)
+        self._prev_spin = QDoubleSpinBox()
+        self._prev_spin.setRange(0, 200)
+        self._prev_spin.setValue(100.0)
+        self._prev_spin.setSuffix(" %")
+        self._prev_spin.setFixedWidth(76)
+        tempo_row.addWidget(self._prev_spin)
+        v.addLayout(tempo_row)
+
+        # Pedal: label + combobox
+        pedal_row = QHBoxLayout()
+        pedal_row.setSpacing(8)
+        pedal_labels = QVBoxLayout()
+        pedal_labels.setSpacing(1)
+        pedal_labels.setContentsMargins(0, 0, 0, 0)
+        pedal_lbl = QLabel("Pedal")
+        pedal_desc = QLabel("generation algorithm")
+        pedal_desc.setProperty("role", "muted")
+        pedal_labels.addWidget(pedal_lbl)
+        pedal_labels.addWidget(pedal_desc)
+        pedal_row.addLayout(pedal_labels)
+        self._prev_combo = QComboBox()
+        self._prev_combo.addItems(["Auto (Default)", "PedalAI", "Harmonic"])
+        pedal_row.addWidget(self._prev_combo, 1)
+        v.addLayout(pedal_row)
+        return card
+
+    def _build_prev_options_card(self) -> QFrame:
+        card = QFrame()
+        card.setObjectName("section_card")
+        card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(12, 6, 12, 8)
+        v.setSpacing(4)
+
+        title = QLabel("OPTIONS")
+        title.setProperty("role", "section")
+        v.addWidget(title)
+
+        self._prev_check = QCheckBox("88-Key Layout")
+        self._prev_check.setChecked(True)
+        v.addWidget(self._prev_check)
+        check_desc = QLabel("Map to the full 88-key piano")
+        check_desc.setProperty("role", "muted")
+        check_desc.setContentsMargins(25, 0, 0, 0)
+        v.addWidget(check_desc)
+        return card
+
+    def _build_prev_track_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(8)
+
+        # Part card: simulates a LOADED track entry.
+        part_card = QFrame()
+        part_card.setObjectName("part_card")
+        part_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        pc_v = QVBoxLayout(part_card)
+        pc_v.setContentsMargins(8, 5, 8, 5)
+        pc_v.setSpacing(1)
+        pc_title = QLabel("Track 1")
+        pc_title.setObjectName("part_card_title")
+        pc_meta = QLabel("C4-C6  Right")
+        pc_meta.setObjectName("part_card_meta")
+        pc_v.addWidget(pc_title)
+        pc_v.addWidget(pc_meta)
+        row.addWidget(part_card, 1)
+
+        # Save card: simulates a SAVED SONGS entry.
+        save_card = QFrame()
+        save_card.setObjectName("save_card")
+        save_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        sc_v = QVBoxLayout(save_card)
+        sc_v.setContentsMargins(8, 5, 8, 5)
+        sc_v.setSpacing(1)
+        sc_title = QLabel("Demo.json")
+        sc_title.setObjectName("part_card_title")
+        sc_meta = QLabel("2 days ago")
+        sc_meta.setObjectName("part_card_meta")
+        sc_v.addWidget(sc_title)
+        sc_v.addWidget(sc_meta)
+        row.addWidget(save_card, 1)
+        return row
+
+    def _build_prev_transport_bar(self) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName("transport_bar")
+        bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        v = QVBoxLayout(bar)
+        v.setContentsMargins(12, 8, 12, 8)
+        v.setSpacing(6)
+
+        # Scrubber row
+        scrub_row = QHBoxLayout()
+        scrub_row.setSpacing(8)
+        time_start = QLabel("00:00")
+        time_start.setObjectName("time_start_label")
+        time_end = QLabel("03:42")
+        time_end.setObjectName("time_end_label")
+        self._prev_scrubber = QSlider(Qt.Orientation.Horizontal)
+        self._prev_scrubber.setRange(0, 100)
+        self._prev_scrubber.setValue(35)
+        scrub_row.addWidget(time_start)
+        scrub_row.addWidget(self._prev_scrubber, 1)
+        scrub_row.addWidget(time_end)
+        v.addLayout(scrub_row)
+
+        # Action row: play, stop, save, pedal indicator.
+        action_row = QHBoxLayout()
+        action_row.setSpacing(5)
+        self._prev_play_btn = QPushButton()
+        self._prev_play_btn.setObjectName("play_button")
+        self._prev_play_btn.setIconSize(QSize(22, 22))
+        self._prev_play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._prev_stop_btn = QPushButton()
+        self._prev_stop_btn.setObjectName("stop_button")
+        self._prev_stop_btn.setIconSize(QSize(22, 22))
+        self._prev_stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        action_row.addWidget(self._prev_play_btn)
+        action_row.addWidget(self._prev_stop_btn)
+        action_row.addStretch()
+        self._prev_save_btn = QPushButton()
+        self._prev_save_btn.setObjectName("save_button")
+        self._prev_save_btn.setIconSize(QSize(22, 22))
+        self._prev_save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        action_row.addWidget(self._prev_save_btn)
+        action_row.addSpacing(8)
+        pedal_swatch = QFrame()
+        pedal_swatch.setObjectName("pedal_swatch")
+        pedal_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        pedal_swatch.setFixedSize(18, 18)
+        pedal_lbl = QLabel("PEDAL")
+        pedal_lbl.setProperty("role", "muted")
+        action_row.addWidget(pedal_swatch)
+        action_row.addWidget(pedal_lbl)
+        v.addLayout(action_row)
+        return bar
+
     # ── Population ────────────────────────────────────────────────────
 
     def _populate_list(self, select_name: str | None = None) -> None:
-        self._list.blockSignals(True)
-        self._list.clear()
+        self._combo.blockSignals(True)
+        self._combo.clear()
         themes = ThemeManager.all_themes()
         active = ThemeManager.get_active_name()
         target_row = 0
+        muted = QColor(ThemeManager.get_active().text_secondary)
         for i, (name, t) in enumerate(themes.items()):
-            item = QListWidgetItem(name)
+            self._combo.addItem(name)
             if t.builtin:
-                item.setForeground(QColor(ThemeManager.get_active().text_secondary))
-            self._list.addItem(item)
+                self._combo.model().item(i).setForeground(muted)
             if name == (select_name or active):
                 target_row = i
-        self._list.blockSignals(False)
-        self._list.setCurrentRow(target_row)
+        self._combo.blockSignals(False)
+        self._combo.setCurrentIndex(target_row)
 
     # ── Slots ─────────────────────────────────────────────────────────
 
     def _on_row_changed(self, row: int) -> None:
         if row < 0:
             return
-        name = self._list.item(row).text()
+        name = self._combo.itemText(row)
         themes = ThemeManager.all_themes()
         theme = themes.get(name)
         if theme is None:
@@ -320,6 +854,7 @@ class ThemeDialog(QDialog):
             self._swatches[key].set_editable(not theme.builtin)
 
         self._del_btn.setEnabled(not theme.builtin)
+        self._export_btn.setEnabled(True)
         self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
 
@@ -406,6 +941,47 @@ class ThemeDialog(QDialog):
         self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
 
+    def _on_export(self) -> None:
+        if self._current_theme is None:
+            return
+        safe_name = self._current_theme.name.replace("/", "-").replace("\\", "-")
+        default_path = str(Path.home() / f"{safe_name}.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Theme", default_path, "JSON files (*.json)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self._current_theme.to_dict(), f, indent=2)
+        except OSError as e:
+            QMessageBox.warning(self, "Export Failed", str(e))
+
+    def _on_import(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Theme", str(Path.home()), "JSON files (*.json)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            theme = ThemeColors.from_dict(data)
+        except Exception as e:
+            QMessageBox.warning(self, "Import Failed", f"Could not read theme file:\n{e}")
+            return
+        # Ensure the name is unique among existing themes
+        existing = set(ThemeManager.all_themes().keys())
+        name = theme.name or Path(path).stem
+        candidate = name
+        n = 2
+        while candidate in existing:
+            candidate = f"{name} {n}"
+            n += 1
+        theme = replace(theme, name=candidate, builtin=False)
+        ThemeManager.save_custom(theme)
+        self._populate_list(select_name=candidate)
+
     def _on_accept(self) -> None:
         if self._pending_save:
             reply = QMessageBox.question(
@@ -426,21 +1002,144 @@ class ThemeDialog(QDialog):
         self.accept()
 
     def _on_cancel(self) -> None:
-        # Revert live preview to what was active before we opened
-        prev = ThemeManager.all_themes().get(self._previous_name,
-                                              BUILTIN_THEMES["Dark"])
-        self._preview(prev)
         self.reject()
 
     # ── Helpers ───────────────────────────────────────────────────────
 
+    def _refresh_io_icons(self, color: str) -> None:
+        self._new_btn.setIcon(_svg_icon(_SVG_NEW, color))
+        self._del_btn.setIcon(_svg_icon(_SVG_DELETE, color))
+        self._export_btn.setIcon(_svg_icon(_SVG_EXPORT, color))
+        self._import_btn.setIcon(_svg_icon(_SVG_IMPORT, color))
+        self._inspect_btn.setIcon(_svg_icon(_SVG_INSPECT, color))
+
     def _preview(self, theme: ThemeColors) -> None:
-        """Apply theme stylesheet to the main window immediately."""
+        """Apply the previewed theme to the preview panel only. Dialog chrome and main window are not touched."""
+        play_bg  = _mix(theme.bg_primary, theme.accent_play, 0.15)
+        play_hov = _mix(theme.bg_primary, theme.accent_play, 0.28)
+        play_bdr = _mix(theme.accent_play, theme.bg_secondary, 0.40)
+        stop_bg  = _mix(theme.bg_primary, theme.accent_stop, 0.15)
+        stop_hov = _mix(theme.bg_primary, theme.accent_stop, 0.28)
+        stop_bdr = _mix(theme.accent_stop, theme.bg_secondary, 0.40)
+        save_bg  = _mix(theme.bg_primary, theme.accent, 0.15)
+        save_hov = _mix(theme.bg_primary, theme.accent, 0.28)
+        save_bdr = _mix(theme.accent, theme.bg_secondary, 0.40)
         ss = generate_stylesheet(theme)
-        self.main_window.setStyleSheet(ss)
-        # Re-apply to ourselves too so the dialog stays consistent
-        self.setStyleSheet(ss)
+        self._preview_panel.setStyleSheet(
+            ss
+            + f"\nQFrame#preview_window {{ border: 1px solid {theme.border}; border-radius: 4px; background-color: {theme.bg_primary}; }}"
+            + f"\nQPushButton#play_button {{ background-color: {play_bg}; border-color: {play_bdr}; }}"
+            + f"\nQPushButton#play_button:hover {{ background-color: {play_hov}; }}"
+            + f"\nQPushButton#stop_button {{ background-color: {stop_bg}; border-color: {stop_bdr}; }}"
+            + f"\nQPushButton#stop_button:hover {{ background-color: {stop_hov}; }}"
+            + f"\nQPushButton#save_button {{ background-color: {save_bg}; border-color: {save_bdr}; }}"
+            + f"\nQPushButton#save_button:hover {{ background-color: {save_hov}; }}"
+            + f"\nQFrame#pedal_swatch {{ background-color: {theme.pedal_color}; border-radius: 4px; }}"
+        )
+        _ti = 22
+        self._prev_play_btn.setIcon(ph_icon("play",        theme.accent_play, _ti))
+        self._prev_stop_btn.setIcon(ph_icon("stop",        theme.accent_stop, _ti))
+        self._prev_save_btn.setIcon(ph_icon("floppy-disk", theme.accent,      _ti))
+        # Reset button (card_reset role) renders its glyph in the muted-text color.
+        self._prev_reset_btn.setIcon(
+            ph_icon("arrow-counter-clockwise", theme.text_secondary, 14)
+        )
+        self._prev_reset_btn.setIconSize(QSize(14, 14))
+        # File strip tile uses an accent-colored music-note icon.
+        self._prev_file_tile_icon.setPixmap(
+            ph_icon("music-note", theme.accent, 16).pixmap(32, 32)
+        )
 
     def _apply_own_stylesheet(self) -> None:
         active = ThemeManager.get_active()
         self.setStyleSheet(generate_stylesheet(active))
+        self._refresh_io_icons(active.text_secondary)
+
+    def _cleanup_inspect(self) -> None:
+        QApplication.instance().removeEventFilter(self._inspect_filter)
+        if self._active_color_dlg is not None:
+            self._active_color_dlg.close()
+            self._active_color_dlg = None
+
+    def _toggle_inspect(self, active: bool) -> None:
+        self._inspect_filter.set_active(active)
+        if active:
+            self._inspect_hint.setText("Right-click any element to pick its color")
+            shape = Qt.CursorShape.CrossCursor
+        else:
+            self._inspect_hint.setText("")
+            shape = Qt.CursorShape.ArrowCursor
+            if self._active_color_dlg is not None:
+                self._active_color_dlg.close()
+                self._active_color_dlg = None
+        cursor = QCursor(shape)
+        self._preview_panel.setCursor(cursor)
+        for child in self._preview_panel.findChildren(QWidget):
+            child.setCursor(cursor)
+
+    def _on_widget_picked(self, widget: QWidget, global_pos) -> None:
+        if self._current_theme is None:
+            return
+        if self._current_theme.builtin:
+            base = self._current_theme
+            existing = set(ThemeManager.all_themes().keys())
+            candidate = f"{base.name} Copy"
+            n = 2
+            while candidate in existing:
+                candidate = f"{base.name} Copy {n}"
+                n += 1
+            ThemeManager.save_custom(replace(base, name=candidate, builtin=False))
+            self._populate_list(select_name=candidate)
+            # _on_row_changed fires synchronously; _current_theme is now the duplicate
+            self._inspect_hint.setText(f'Duplicated as "{candidate}" — editing below')
+
+        result = _field_for_widget(widget)
+        if result is None:
+            self._inspect_hint.setText("No color field for this element")
+            return
+
+        field, label = result
+        original_hex = getattr(self._current_theme, field)
+
+        if self._active_color_dlg is not None:
+            self._active_color_dlg.close()
+            self._active_color_dlg = None
+
+        self._inspect_hint.setText(f"Editing: {label}")
+
+        dlg = QColorDialog(QColor(original_hex), self)
+        dlg.setWindowTitle(f"Pick color: {label}")
+        dlg.setOption(QColorDialog.ColorDialogOption.DontUseNativeDialog, True)
+        self._active_color_dlg = dlg
+
+        theme_snapshot = self._current_theme
+
+        def _live(color: QColor) -> None:
+            if self._current_theme is not None:
+                self._preview(replace(self._current_theme, **{field: color.name()}))
+
+        def _accept() -> None:
+            final_hex = dlg.currentColor().name()
+            self._on_color_changed(field, final_hex)
+            self._swatches[field].set_color(final_hex)
+            self._inspect_hint.setText(f"Applied: {label}")
+            self._active_color_dlg = None
+
+        def _reject() -> None:
+            self._current_theme = theme_snapshot
+            self._preview(theme_snapshot)
+            self._inspect_hint.setText("Cancelled")
+            self._active_color_dlg = None
+
+        dlg.currentColorChanged.connect(_live)
+        dlg.accepted.connect(_accept)
+        dlg.rejected.connect(_reject)
+
+        screen = QApplication.screenAt(global_pos) or QApplication.primaryScreen()
+        if screen:
+            sg = screen.availableGeometry()
+            x = min(global_pos.x() + 12, sg.right() - 450)
+            y = min(global_pos.y() + 12, sg.bottom() - 380)
+            dlg.move(max(sg.left(), x), max(sg.top(), y))
+
+        dlg.show()
