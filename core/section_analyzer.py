@@ -35,7 +35,7 @@ class SectionAnalyzer:
 
     def analyze(self) -> List[MusicalSection]:
         if not self.notes:
-            self._debug("[SECTIONS] No notes — returning empty section list")
+            self._debug("[SECTIONS] No notes, returning empty section list")
             return []
         method = "measures (explicit time signatures)" if self.tempo_map.has_explicit_time_signatures else "silence gaps"
         self._debug(f"\n=== SECTION ANALYSIS ({method}) ===")

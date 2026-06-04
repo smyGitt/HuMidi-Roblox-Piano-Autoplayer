@@ -33,7 +33,7 @@ class Humanizer:
         ] if on]
 
         if not active_features:
-            self._log(f"[HUMANIZE] {hand.upper()} hand: No features active — skipping {len(notes)} notes")
+            self._log(f"[HUMANIZE] {hand.upper()} hand: No features active, skipping {len(notes)} notes")
             return
 
         time_groups = get_time_groups(notes)
@@ -117,7 +117,7 @@ class Humanizer:
 
     def apply_tempo_rubato(self, all_notes: List[Note], sections: List[MusicalSection]):
         if not self.config.get('enable_tempo_sway'):
-            self._log("[RUBATO] Tempo sway disabled — skipping")
+            self._log("[RUBATO] Tempo sway disabled, skipping")
             return
 
         base_intensity = self.config.get('tempo_sway_intensity', 0.0)

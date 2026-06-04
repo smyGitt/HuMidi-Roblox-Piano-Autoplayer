@@ -117,7 +117,7 @@ def generate_events(config: dict, final_notes: List[Note], sections: List[Musica
     style = config.get('pedal_style')
     if style == 'none':
         if debug_log is not None:
-            debug_log("[PEDAL] Style: none — no pedal events generated")
+            debug_log("[PEDAL] Style: none | no pedal events generated")
         return []
     events = []
 
@@ -126,7 +126,7 @@ def generate_events(config: dict, final_notes: List[Note], sections: List[Musica
         if ai_events:
             return ai_events
         if debug_log is not None:
-            debug_log("[PEDAL] AI output rejected or unavailable — falling back to adaptive algorithm")
+            debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
         bass_notes = [n for n in final_notes if n.hand == 'left']
         bass_notes.sort(key=lambda n: n.start_time)
         if not bass_notes:
@@ -142,10 +142,10 @@ def generate_events(config: dict, final_notes: List[Note], sections: List[Musica
             if ai_events:
                 return ai_events
             if debug_log is not None:
-                debug_log("[PEDAL] AI output rejected or unavailable — falling back to adaptive algorithm")
+                debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
         else:
             if debug_log is not None:
-                debug_log("[PEDAL] AI disabled by user — using adaptive algorithm")
+                debug_log("[PEDAL] AI disabled by user, using adaptive algorithm")
 
         bass_notes = [n for n in final_notes if n.hand == 'left']
         bass_notes.sort(key=lambda n: n.start_time)
@@ -224,15 +224,17 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
 
     if not os.path.exists(_get_model_path()):
         if debug_log is not None:
-            debug_log("AI generation skipped: Model not found.")
+            debug_log("[PEDAL] AI skipped: model file not found")
         return []
 
     if _weights is None:
         try:
             _weights = _load_weights()
+            if debug_log is not None:
+                debug_log("[PEDAL] AI weights loaded into cache")
         except Exception as e:
             if debug_log is not None:
-                debug_log(f"AI generation aborted: Failed to load weights -> {e}")
+                debug_log(f"[PEDAL] AI aborted: failed to load weights: {e}")
             return []
 
     # 2. Matrix Translation
@@ -254,7 +256,7 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
         preds = _bilstm_forward(input_tensor, _weights)  # (T,)
     except Exception as e:
         if debug_log is not None:
-            debug_log(f"AI execution crashed during forward pass: {e}")
+            debug_log(f"[PEDAL] AI crashed during forward pass: {e}")
         return []
 
     # 5. Silence Masking
@@ -339,11 +341,12 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
     # 8. Quality Assurance Rejection
     if len(events) <= 2:
         if debug_log is not None:
-            debug_log("AI pipeline output rejected (Insufficient mathematical variance).")
+            debug_log(f"[PEDAL] AI rejected: insufficient event variance ({len(events)} events, need > 2)")
         return []
 
     if debug_log is not None:
-        debug_log(f"AI pipeline successful: Queued {len(events)} physical actuations.")
+        downs = sum(1 for e in events if e.key_char == 'down')
+        debug_log(f"[PEDAL] AI accepted: {len(events)} events ({downs} downs, {len(events) - downs} ups)")
 
     return events
 
@@ -353,7 +356,7 @@ def _generate_adaptive_pedal_driver(driver_notes: List[Note], all_notes: List[No
     events = []
     if not driver_notes:
         if debug_log is not None:
-            debug_log("[PEDAL] Adaptive: no driver notes — returning empty")
+            debug_log("[PEDAL] Adaptive: no driver notes, returning empty")
         return events
 
     PEDAL_LAG = 0.05

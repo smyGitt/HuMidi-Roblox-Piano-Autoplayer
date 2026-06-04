@@ -1,7 +1,7 @@
 import mido
 import bisect
 from collections import defaultdict
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Callable
 from core.models import Note, MidiTrack
 from pynput.keyboard import Key
 
@@ -124,7 +124,8 @@ class GlobalTickMap:
 
 class MidiParser:
     @staticmethod
-    def parse_structure(filepath: str, tempo_scale: float = 1.0, debug_log: Optional[List[str]] = None) -> Tuple[List[MidiTrack], TempoMap, int]:
+    def parse_structure(filepath: str, tempo_scale: float = 1.0,
+                        debug_log: Optional[Callable[[str], None]] = None) -> Tuple[List[MidiTrack], TempoMap, int]:
         try:
             try:
                 mid = mido.MidiFile(filepath, charset='utf-8')
@@ -136,12 +137,32 @@ class MidiParser:
         global_map = GlobalTickMap(mid)
         tempo_map_data = [(entry[1], entry[2]) for entry in global_map.tick_map]
         tempo_map = TempoMap(tempo_map_data, global_map.time_signatures)
+
+        if debug_log is not None:
+            initial_bpm = 60_000_000.0 / tempo_map_data[0][1] if tempo_map_data else 120.0
+            ts_summary = (
+                ', '.join(f"{n}/{d}@{t:.2f}s" for t, n, d in global_map.time_signatures[:4])
+                if global_map.time_signatures else 'none (default 4/4)'
+            )
+            if len(global_map.time_signatures) > 4:
+                ts_summary += f", +{len(global_map.time_signatures) - 4} more"
+            debug_log(
+                f"[MIDI] File: {filepath} | format={mid.type} | ticks/beat={mid.ticks_per_beat} | "
+                f"raw tracks={len(mid.tracks)}"
+            )
+            debug_log(
+                f"[MIDI] Tempo events: {len(tempo_map_data)} | initial BPM: {initial_bpm:.1f} | "
+                f"explicit time signatures: {tempo_map.has_explicit_time_signatures} ({ts_summary})"
+            )
+
         tracks = []
         note_id_counter = 0
         # CC 64 = damper / sustain pedal. Count on/off transitions per channel.
         # An on->off pair is one event; threshold matches the GM convention.
         pedal_state_by_channel: Dict[int, bool] = {}
         pedal_event_count = 0
+        skipped_zero_duration = 0
+        total_raw_notes = 0
 
         for i, track in enumerate(mid.tracks):
             track_name = f"Track {i}"
@@ -178,12 +199,30 @@ class MidiParser:
                             scaled_duration = duration / tempo_scale
                             notes.append(Note(note_id_counter, msg.note, note_data['vel'], scaled_start, scaled_duration, 'unknown', i, msg.channel))
                             note_id_counter += 1
+                        else:
+                            skipped_zero_duration += 1
             if any(n.channel == 9 for n in notes): is_drum = True
+            total_raw_notes += len(notes)
             if notes:
                 notes.sort(key=lambda n: n.start_time)
                 tracks.append(MidiTrack(i, track_name, program_change, is_drum, notes))
+                if debug_log is not None:
+                    debug_log(
+                        f"[MIDI] Track {i} ({track_name}): {len(notes)} notes | "
+                        f"program={program_change} | drum={is_drum}"
+                    )
+            elif debug_log is not None:
+                debug_log(f"[MIDI] Track {i} ({track_name}): empty (no notes), skipped")
         # Any pedal still held at EOF counts as one event.
         pedal_event_count += sum(1 for held in pedal_state_by_channel.values() if held)
+
+        if debug_log is not None:
+            debug_log(
+                f"[MIDI] Parse complete: {len(tracks)} note-bearing tracks | "
+                f"{total_raw_notes} notes | source pedal CC events={pedal_event_count} | "
+                f"zero-duration notes skipped={skipped_zero_duration}"
+            )
+
         return tracks, tempo_map, pedal_event_count
 
 class KeyMapper:

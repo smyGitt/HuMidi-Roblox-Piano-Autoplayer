@@ -38,7 +38,9 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     should catch and surface the exception appropriately.
     """
     tempo_scale = config.get('tempo', 100.0) / 100.0
-    tracks, tempo_map, _ = MidiParser.parse_structure(config['midi_file'], tempo_scale, None)
+    if log:
+        log(f"[PREP] Parsing MIDI: tempo_scale={tempo_scale:.3f} ({config.get('tempo', 100.0):.1f}%)")
+    tracks, tempo_map, pedal_cc_count = MidiParser.parse_structure(config['midi_file'], tempo_scale, log)
     selected_indices = [t.index for t, _ in selected_tracks_info]
     role_map = {t.index: r for t, r in selected_tracks_info}
     final_notes = []
@@ -47,7 +49,7 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
         if track.index in selected_indices:
             role = role_map[track.index]
             if log:
-                log(f"Track {track.index} ({track.name}): {len(track.notes)} Notes | Role: {role}")
+                log(f"[PREP] Track {track.index} ({track.name}): {len(track.notes)} notes | Role: {role}")
             for note in track.notes:
                 new_note = copy.deepcopy(note)
                 if role == "Left Hand": new_note.hand = 'left'
@@ -57,12 +59,20 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     final_notes.sort(key=lambda n: n.start_time)
 
     if config.get('simulate_hands'):
-        if log: log("Simulating hands for unassigned notes...")
+        if log: log(f"[PREP] Simulating hands for {sum(1 for n in final_notes if n.hand == 'unknown')} unassigned notes")
         assign_hands(final_notes)
     else:
+        defaulted = sum(1 for n in final_notes if n.hand == 'unknown')
         for note in final_notes:
             if note.hand == 'unknown':
                 note.hand = 'left' if note.pitch < 60 else 'right'
+        if log and defaulted:
+            log(f"[PREP] Hand simulation off: defaulted {defaulted} unassigned notes by pitch threshold (pitch < 60 = left)")
+
+    if log:
+        l_count = sum(1 for n in final_notes if n.hand == 'left')
+        r_count = sum(1 for n in final_notes if n.hand == 'right')
+        log(f"[PREP] Final note set: {len(final_notes)} notes | L={l_count} R={r_count} | source pedal CC events={pedal_cc_count}")
 
     return final_notes, tempo_map
 
@@ -83,14 +93,27 @@ class _SaveWorker(QObject):
     def run(self):
         self.status_updated.emit("Compiling data for serialization...")
 
+        debug_log = self.status_updated.emit if self.config.get('debug_mode') else None
+        if debug_log:
+            debug_log("\n" + "=" * 60)
+            debug_log("=== SAVE SESSION START ===")
+            debug_log("=" * 60)
+            debug_log(f"[SAVE] Source: {self.original_filename}")
+            debug_log(f"[SAVE] Target dir: {self.save_dir}")
+            debug_log(f"[SAVE] Tracks selected: {len(self.selected_tracks_info)}")
+            for t, role in self.selected_tracks_info:
+                debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role}")
+
         try:
-            final_notes, tempo_map = _prepare_notes(self.config, self.selected_tracks_info)
+            final_notes, tempo_map = _prepare_notes(self.config, self.selected_tracks_info, log=debug_log)
         except Exception as e:
+            if debug_log:
+                debug_log(f"[SAVE] FAILED at _prepare_notes: {e}")
             self.save_failed.emit(f"Error preparing save data:\n{e}")
             self.finished.emit()
             return
 
-        analyzer = SectionAnalyzer(final_notes, tempo_map)
+        analyzer = SectionAnalyzer(final_notes, tempo_map, debug_log=debug_log)
         sections = analyzer.analyze()
 
         compiler_player = Player(self.config, final_notes, sections, tempo_map)
@@ -127,11 +150,14 @@ class _SaveWorker(QObject):
             if ev['action'] == 'pedal' and ev['key_char'] == 'down'
         )
 
-        debug = self.config.get('debug_mode')
-        if debug:
-            self.status_updated.emit(
-                f"[DEBUG] Serializing {len(track_details)} track(s), "
-                f"{compiled_pedal_count} compiled pedal event(s)."
+        if debug_log:
+            press_ct = sum(1 for ev in serialized_events if ev['action'] == 'press')
+            release_ct = sum(1 for ev in serialized_events if ev['action'] == 'release')
+            pedal_ct = sum(1 for ev in serialized_events if ev['action'] == 'pedal')
+            debug_log(
+                f"[SAVE] Serializing {len(serialized_events)} events "
+                f"(press={press_ct} release={release_ct} pedal={pedal_ct}) | "
+                f"{len(track_details)} track(s) | {compiled_pedal_count} pedal-down(s)"
             )
 
         # last_accessed mirrors creation_timestamp at save time so a freshly
@@ -156,9 +182,13 @@ class _SaveWorker(QObject):
         try:
             with open(output_path, 'w') as f:
                 json.dump(save_data, f, indent=4)
+            if debug_log:
+                debug_log(f"[SAVE] Write successful: {output_path}")
             self.status_updated.emit(f"Serialization successful: {output_path}")
             self.save_successful.emit(str(output_path), "Playback sequence serialized and saved successfully.")
         except Exception as e:
+            if debug_log:
+                debug_log(f"[SAVE] Write FAILED: {e}")
             self.status_updated.emit(f"Serialization failed: {e}")
             self.save_failed.emit(f"Failed to serialize playback data to Windows file system:\n{e}")
 

@@ -330,10 +330,15 @@ class Player(QObject):
                     self._log_debug(f"\n--- SECTION {next_sec_idx} | Time: {sec.start_time:.2f}s | Style: {sec.articulation_label.upper()} ---")
 
             if self.event_index >= len(self.compiled_events):
-                if playback_time > self.total_duration + 0.1: 
+                if playback_time > self.total_duration + 0.1:
                     if not self.pause_event.is_set():
                         self.last_pause_timestamp = now
                         self.pause_event.set()
+                        self._log_debug(
+                            f"[AUTO-PAUSE] End of timeline reached at {playback_time:.3f}s | "
+                            f"duration={self.total_duration:.3f}s | "
+                            f"events processed={self.event_index}/{len(self.compiled_events)}"
+                        )
                         self.shutdown()
                         self.auto_paused.emit()
                         self.status_updated.emit("Playback finished. Paused.")
@@ -383,8 +388,11 @@ class Player(QObject):
         state_changed = False 
 
         for event in pedal_events:
-            self._log_debug(f"[ACT] {playback_time:.4f}s | PEDAL {event.key_char.upper()} (Delta: {playback_time - event.time:+.4f}s)")
-            self._handle_pedal_event(event)
+            physical = self._handle_pedal_event(event)
+            self._log_debug(
+                f"[ACT] {playback_time:.4f}s | PEDAL {event.key_char.upper():3s} | "
+                f"[PHYSICAL] {physical} (Delta: {playback_time - event.time:+.4f}s)"
+            )
             new_pedal_state = (event.key_char == 'down')
             if new_pedal_state != self._pedal_net_down:
                 self._pedal_net_down = new_pedal_state
@@ -448,20 +456,32 @@ class Player(QObject):
         if state_changed:
             self.visualizer_updated.emit(list(self.active_pitches))
 
-    def _handle_pedal_event(self, event: KeyEvent):
-        if self.stop_event.is_set(): return
-        if event.key_char == 'down' and not self.pedal_is_down:
+    def _handle_pedal_event(self, event: KeyEvent) -> str:
+        """Drive Space for the pedal and return a short physical-status string
+        for the caller's [ACT] log line. Returns one of: 'Pressed Space',
+        'Released Space', 'Already down (no-op)', 'Already up (no-op)',
+        'Stopped (no-op)', or 'FAILED: <err>'."""
+        if self.stop_event.is_set():
+            return "Stopped (no-op)"
+        if event.key_char == 'down':
+            if self.pedal_is_down:
+                return "Already down (no-op)"
             self.pedal_is_down = True
-            try: 
+            try:
                 self.keyboard.press(Key.space)
-                self._log_debug("      [PHYSICAL] Pressing Space (Pedal)")
-            except Exception: pass
-        elif event.key_char == 'up' and self.pedal_is_down:
+                return "Pressed Space"
+            except Exception as e:
+                return f"FAILED: {e}"
+        elif event.key_char == 'up':
+            if not self.pedal_is_down:
+                return "Already up (no-op)"
             self.pedal_is_down = False
-            try: 
+            try:
                 self.keyboard.release(Key.space)
-                self._log_debug("      [PHYSICAL] Releasing Space (Pedal)")
-            except Exception: pass
+                return "Released Space"
+            except Exception as e:
+                return f"FAILED: {e}"
+        return "Unknown action"
 
     def _sync_active_keys_at_resume(self):
         """Re-press any notes/pedal that were physically held at the moment of pause.
