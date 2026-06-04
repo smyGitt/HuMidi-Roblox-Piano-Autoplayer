@@ -20,22 +20,29 @@ class TranslatorTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 0, 16, 16)
-        layout.setSpacing(0)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        # -- Page header -------------------------------------------------------
+        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
+        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(0, 14, 0, 8)
+        hl.setContentsMargins(14, 10, 14, 10)
         hl.setSpacing(8)
         title_lbl = QLabel("Translator")
-        title_lbl.setProperty("role", "title")
+        title_lbl.setObjectName("page_header_title")
         hl.addWidget(title_lbl)
         hl.addStretch()
-        # TODO: meta chips (e.g. format count)
-        layout.addWidget(header)
+        outer.addWidget(header)
+
+        # Body widget restores side margins
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(16, 8, 16, 16)
+        layout.setSpacing(0)
+        outer.addWidget(body, 1)
 
         # -- Toolbar: format dropdown (left) | Import / Export toggle (right) --
         toolbar = QFrame()

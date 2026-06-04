@@ -680,8 +680,8 @@ QLabel#stats_tile_label {
 /* -- Section cards --------------------------------------------------------- */
 QFrame#section_card {
     background-color: %(bg_secondary)s;
-    border: 1px solid %(border)s;
-    border-radius: 10px;
+    border: 1.5px solid %(border)s;
+    border-radius: 5px;
 }
 
 /* -- Loaded-row part cards (one per MIDI part, plus pedal summary) --------- */
@@ -792,16 +792,65 @@ QPushButton[role="card_reset"]:pressed {
     background-color: %(btn_pressed)s;
 }
 
-/* -- Theme inspect toggle button ------------------------------------------ */
+/* -- Icon-only toolbar/panel buttons (no text; size set by Python) ---------- */
+QPushButton[role="icon_btn"] {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0px;
+}
+QPushButton[role="icon_btn"]:hover {
+    background-color: %(btn_hover)s;
+    border-color: %(border)s;
+}
+QPushButton[role="icon_btn"]:pressed {
+    background-color: %(btn_pressed)s;
+}
+QPushButton[role="icon_btn"]:disabled {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+/* -- Page header bars ------------------------------------------------------ */
+QFrame#page_header {
+    background-color: %(bg_secondary)s;
+    border-bottom: 1px solid %(border)s;
+}
+QLabel#page_header_title {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    font-size: 12pt;
+    color: %(text_primary)s;
+}
+
+/* -- Settings page vertical nav tabs --------------------------------------- */
+QPushButton[role="settings_nav"] {
+    background: transparent;
+    border: none;
+    border-left: 2px solid transparent;
+    border-radius: 0;
+    color: %(text_secondary)s;
+    padding: 7px 12px 7px 14px;
+    text-align: left;
+    min-height: 0;
+    font-size: 9pt;
+}
+QPushButton[role="settings_nav"]:hover {
+    color: %(text_primary)s;
+    background-color: %(nav_hover_bg)s;
+}
+QPushButton[role="settings_nav"]:checked {
+    color: %(text_primary)s;
+    border-left-color: %(accent)s;
+    background-color: %(nav_active_bg)s;
+}
+
+/* -- Theme inspect toggle button (size set by Python) ---------------------- */
 QPushButton#inspect_btn {
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
     padding: 0px;
-    min-width: 22px;
-    max-width: 22px;
-    min-height: 22px;
-    max-height: 22px;
 }
 QPushButton#inspect_btn:hover {
     background-color: %(btn_hover)s;

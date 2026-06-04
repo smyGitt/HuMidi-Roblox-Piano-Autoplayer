@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
-    QLabel, QTextEdit, QListWidget, QAbstractItemView
+    QLabel, QPushButton, QTextEdit, QStackedWidget
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -128,74 +128,85 @@ class LicenseTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 0, 16, 16)
-        layout.setSpacing(0)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        # -- Page header -------------------------------------------------------
+        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
+        header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(0, 14, 0, 8)
+        hl.setContentsMargins(14, 10, 14, 10)
         hl.setSpacing(8)
         title_lbl = QLabel("Licenses & Credits")
-        title_lbl.setProperty("role", "title")
+        title_lbl.setObjectName("page_header_title")
         hl.addWidget(title_lbl)
         hl.addStretch()
-        # TODO: meta chips (e.g. component count)
-        layout.addWidget(header)
+        outer.addWidget(header)
 
-        # -- Master-detail grid (~244px : rest) --------------------------------
-        body_row = QHBoxLayout()
-        body_row.setSpacing(10)
+        # Body widget restores side margins
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(16, 8, 16, 16)
+        layout.setSpacing(0)
+        outer.addWidget(body, 1)
 
-        # Left card: Components list (~244px fixed)
-        comp_card, comp_body = make_card("Components")
-        comp_card.setFixedWidth(244)
-        self._list = QListWidget()
-        self._list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        for name in _LICENSE_TEXTS:
-            self._list.addItem(name)
-        self._list.setCurrentRow(0)
-        self._list.currentItemChanged.connect(self._on_list_changed)
-        # TODO: per-row license badge (MIT / CC BY 4.0 / GPL v3)
-        comp_body.addWidget(self._list)
-        body_row.addWidget(comp_card)
+        # -- Nav + stacked content inside a single card ------------------------
+        split = QHBoxLayout()
+        split.setContentsMargins(0, 0, 0, 0)
+        split.setSpacing(0)
 
-        # Right card: License Text (document header + full text)
-        detail_card, detail_body = make_card("License Text")
+        # Left nav panel
+        nav_panel = QWidget()
+        nav_panel.setObjectName("settings_nav_panel")
+        nav_panel.setFixedWidth(170)
+        nav_layout = QVBoxLayout(nav_panel)
+        nav_layout.setContentsMargins(0, 8, 0, 8)
+        nav_layout.setSpacing(0)
 
-        doc_header = QHBoxLayout()
-        doc_header.setSpacing(8)
-        first_name = self._list.item(0).text() if self._list.count() else ""
-        self._doc_title_lbl = QLabel(first_name)
-        self._doc_title_lbl.setProperty("role", "section")
-        doc_header.addWidget(self._doc_title_lbl)
-        doc_header.addStretch()
-        # TODO: license badge label and URL link
-        detail_body.addLayout(doc_header)
+        self._tab_btns = []
+        for i, name in enumerate(_LICENSE_TEXTS):
+            btn = QPushButton(name)
+            btn.setCheckable(True)
+            btn.setProperty("role", "settings_nav")
+            btn.clicked.connect(lambda checked, idx=i: self._switch_tab(idx))
+            nav_layout.addWidget(btn)
+            self._tab_btns.append(btn)
+        nav_layout.addStretch()
 
+        # Vertical divider
         sep = QFrame()
-        sep.setObjectName("h_sep")
-        sep.setFrameShape(QFrame.Shape.HLine)
-        detail_body.addWidget(sep)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setObjectName("settings_nav_sep")
 
-        self._text = QTextEdit()
-        self._text.setReadOnly(True)
-        self._text.setFont(QFont("Courier New", 9))
-        self._text.setPlainText(_LICENSE_TEXTS.get(first_name, ""))
-        detail_body.addWidget(self._text)
+        # Stacked pages -- one QTextEdit per license entry
+        self._stack = QStackedWidget()
+        for text in _LICENSE_TEXTS.values():
+            page = QWidget()
+            page_layout = QVBoxLayout(page)
+            page_layout.setContentsMargins(16, 12, 16, 12)
+            page_layout.setSpacing(0)
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)
+            text_edit.setFont(QFont("Courier New", 9))
+            text_edit.setPlainText(text)
+            page_layout.addWidget(text_edit)
+            self._stack.addWidget(page)
 
-        body_row.addWidget(detail_card, 1)
-        layout.addLayout(body_row, 1)
+        split.addWidget(nav_panel)
+        split.addWidget(sep)
+        split.addWidget(self._stack, 1)
 
-    # ── Slots ─────────────────────────────────────────────────────────────────
+        card, card_body = make_card("", outer_margins=(0, 0, 0, 0))
+        card_body.addLayout(split)
+        layout.addWidget(card, 1)
 
-    def _on_list_changed(self, current, previous) -> None:
-        if current is None:
-            return
-        self._on_changed(current.text())
+        self._switch_tab(0)
 
-    def _on_changed(self, name: str) -> None:
-        self._doc_title_lbl.setText(name)
-        self._text.setPlainText(_LICENSE_TEXTS.get(name, ""))
+    # ── Internal ──────────────────────────────────────────────────────────────
+
+    def _switch_tab(self, idx: int) -> None:
+        self._stack.setCurrentIndex(idx)
+        for i, btn in enumerate(self._tab_btns):
+            btn.setChecked(i == idx)

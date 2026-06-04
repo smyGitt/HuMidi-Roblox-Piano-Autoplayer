@@ -17,9 +17,12 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
     QDialogButtonBox, QFrame, QMessageBox, QFileDialog,
     QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
-    QApplication, QColorDialog,
+    QApplication, QColorDialog, QInputDialog,
 )
-from PyQt6.QtCore import Qt, QSize, QByteArray, pyqtSignal as Signal, QEvent, QObject
+from PyQt6.QtCore import (
+    Qt, QSize, QByteArray, pyqtSignal as Signal, QEvent, QObject,
+    QPropertyAnimation, QEasingCurve,
+)
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap, QCursor
 from PyQt6.QtSvg import QSvgRenderer
 
@@ -105,6 +108,51 @@ _SVG_INSPECT = (
     b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="16"/>'
     b'</svg>'
 )
+
+# Caret-right with end-bar: opens the color-swatch side panel.
+_SVG_EXPAND_PANEL = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<polygon points="112 56 184 128 112 200 112 56" opacity="0.2"/>'
+    b'<line x1="32" y1="128" x2="112" y2="128"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polygon points="112 56 184 128 112 200 112 56"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="216" y1="40" x2="216" y2="216"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+# Caret-left with end-bar: closes the color-swatch side panel.
+_SVG_COLLAPSE_PANEL = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<polygon points="144 56 72 128 144 200 144 56" opacity="0.2"/>'
+    b'<line x1="224" y1="128" x2="144" y2="128"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<polygon points="144 56 72 128 144 200 144 56"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="40" y1="40" x2="40" y2="216"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+# Pencil-on-document: rename the selected theme.
+_SVG_RENAME = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="none"/>'
+    b'<polygon points="128 160 96 160 96 128 168 56 200 88 128 160" opacity="0.2"/>'
+    b'<polygon points="128 160 96 160 96 128 192 32 224 64 128 160"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<line x1="168" y1="56" x2="200" y2="88"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<path d="M216,128v80a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V48a8,8,0,0,1,8-8h80"'
+    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'</svg>'
+)
+
+# Fully-expanded width of the swatch side panel in pixels.
+_SWATCH_WIDTH = 280
 
 
 def _svg_icon(svg_bytes: bytes, color: str, size: int = 16) -> QIcon:
@@ -351,7 +399,7 @@ class ThemeDialog(QDialog):
         self._active_color_dlg: QColorDialog | None = None
 
         self.setWindowTitle("Theme Manager")
-        self.setMinimumSize(800, 540)
+        self.setMinimumSize(600, 540)
         self._build_ui()
 
         self._inspect_filter = _InspectFilter(self._preview_panel, self)
@@ -360,6 +408,7 @@ class ThemeDialog(QDialog):
         self.finished.connect(self._cleanup_inspect)
 
         self._apply_own_stylesheet()
+        self._sync_toolbar_btn_sizes()
         self._populate_list()
 
     # ── Layout ────────────────────────────────────────────────────────
@@ -367,60 +416,183 @@ class ThemeDialog(QDialog):
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 12, 12, 12)
-        outer.setSpacing(10)
+        outer.setSpacing(8)
 
-        body = QHBoxLayout()
-        body.setSpacing(12)
+        # -- Top toolbar: theme selector + action buttons -----------------
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(4)
 
-        # ── Left: theme selector + colour swatches ────────────────────
-        left = QWidget()
-        left_vbox = QVBoxLayout(left)
-        left_vbox.setContentsMargins(0, 0, 0, 0)
-        left_vbox.setSpacing(6)
+        self._expand_panel_btn = QPushButton()
+        self._expand_panel_btn.setFixedSize(28, 28)
+        self._expand_panel_btn.setIconSize(QSize(16, 16))
+        self._expand_panel_btn.setProperty("role", "icon_btn")
+        self._expand_panel_btn.setToolTip("Open color editor")
+        self._expand_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._expand_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(True))
+        toolbar.addWidget(self._expand_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        # Combo + new/del
-        sel_row = QHBoxLayout()
-        sel_row.setSpacing(4)
         self._combo = QComboBox()
-        self._combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
         self._combo.currentIndexChanged.connect(self._on_row_changed)
-        sel_row.addWidget(self._combo, 1)
+        toolbar.addWidget(self._combo, 1, Qt.AlignmentFlag.AlignVCenter)
+
         self._new_btn = QPushButton()
         self._new_btn.setFixedSize(28, 28)
         self._new_btn.setIconSize(QSize(16, 16))
+        self._new_btn.setProperty("role", "icon_btn")
         self._new_btn.setToolTip("Duplicate selected theme as a new custom preset")
         self._new_btn.clicked.connect(self._on_new)
+
         self._del_btn = QPushButton()
         self._del_btn.setFixedSize(28, 28)
         self._del_btn.setIconSize(QSize(16, 16))
-        self._del_btn.setObjectName("reset_button")
+        self._del_btn.setProperty("role", "icon_btn")
         self._del_btn.setToolTip("Delete this custom theme (built-in themes cannot be deleted)")
         self._del_btn.setEnabled(False)
         self._del_btn.clicked.connect(self._on_delete)
-        sel_row.addWidget(self._new_btn)
-        sel_row.addWidget(self._del_btn)
-        left_vbox.addLayout(sel_row)
 
-        # Export/import
-        io_row = QHBoxLayout()
-        io_row.setSpacing(4)
+        self._rename_btn = QPushButton()
+        self._rename_btn.setFixedSize(28, 28)
+        self._rename_btn.setIconSize(QSize(16, 16))
+        self._rename_btn.setProperty("role", "icon_btn")
+        self._rename_btn.setToolTip("Rename this custom theme")
+        self._rename_btn.setEnabled(False)
+        self._rename_btn.clicked.connect(self._on_rename)
+
+        toolbar.addWidget(self._new_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._del_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._rename_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        t_sep = QFrame()
+        t_sep.setFrameShape(QFrame.Shape.VLine)
+        t_sep.setObjectName("v_sep")
+        toolbar.addWidget(t_sep)
+
         self._export_btn = QPushButton()
         self._export_btn.setFixedSize(28, 28)
         self._export_btn.setIconSize(QSize(16, 16))
+        self._export_btn.setProperty("role", "icon_btn")
         self._export_btn.setToolTip("Export theme to JSON file")
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._on_export)
+
         self._import_btn = QPushButton()
         self._import_btn.setFixedSize(28, 28)
         self._import_btn.setIconSize(QSize(16, 16))
+        self._import_btn.setProperty("role", "icon_btn")
         self._import_btn.setToolTip("Import theme from JSON file")
         self._import_btn.clicked.connect(self._on_import)
-        io_row.addWidget(self._export_btn)
-        io_row.addWidget(self._import_btn)
-        io_row.addStretch()
-        left_vbox.addLayout(io_row)
 
-        # Scroll area for colour swatches
+        toolbar.addWidget(self._export_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._import_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(toolbar)
+
+        top_sep = QFrame()
+        top_sep.setObjectName("h_sep")
+        top_sep.setFrameShape(QFrame.Shape.HLine)
+        outer.addWidget(top_sep)
+
+        # -- Body: animated swatch panel + preview panel ------------------
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+
+        self._swatch_panel_widget = self._build_swatch_panel()
+        self._swatch_panel_widget.setMinimumWidth(0)
+        self._swatch_panel_widget.setMaximumWidth(0)  # starts collapsed
+        body.addWidget(self._swatch_panel_widget)
+
+        self._preview_panel = self._build_preview_panel()
+        body.addWidget(self._preview_panel, 1)
+
+        outer.addLayout(body, 1)
+
+        # -- Bottom bar: save/revert + OK/Cancel --------------------------
+        bot_sep = QFrame()
+        bot_sep.setObjectName("h_sep")
+        bot_sep.setFrameShape(QFrame.Shape.HLine)
+        outer.addWidget(bot_sep)
+
+        bottom = QHBoxLayout()
+        bottom.setSpacing(6)
+
+        self._save_btn = QPushButton("Save Changes")
+        self._save_btn.setObjectName("save_button")
+        self._save_btn.setEnabled(False)
+        self._save_btn.setToolTip("Persist edits to this custom theme")
+        self._save_btn.clicked.connect(self._on_save)
+
+        self._revert_btn = QPushButton("Revert")
+        self._revert_btn.setEnabled(False)
+        self._revert_btn.setToolTip("Discard unsaved edits")
+        self._revert_btn.clicked.connect(self._on_revert)
+
+        bottom.addWidget(self._save_btn)
+        bottom.addWidget(self._revert_btn)
+        bottom.addStretch()
+
+        bbox = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        ok_btn = bbox.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_btn:
+            ok_btn.setObjectName("save_button")
+        bbox.accepted.connect(self._on_accept)
+        bbox.rejected.connect(self._on_cancel)
+        bottom.addWidget(bbox)
+
+        outer.addLayout(bottom)
+
+        # -- Animation: slide the swatch panel in/out ---------------------
+        self._swatch_anim = QPropertyAnimation(
+            self._swatch_panel_widget, b"maximumWidth"
+        )
+        self._swatch_anim.setDuration(220)
+        self._swatch_anim.finished.connect(self._on_swatch_anim_finished)
+
+    def _build_swatch_panel(self) -> QWidget:
+        """Slide-in color-swatch panel. Width is animated between 0 and _SWATCH_WIDTH."""
+        # Outer: [content (stretch) | v_sep] so the separator travels with the panel.
+        container = QWidget()
+        outer_h = QHBoxLayout(container)
+        outer_h.setContentsMargins(0, 0, 0, 0)
+        outer_h.setSpacing(0)
+
+        content = QWidget()
+        content_v = QVBoxLayout(content)
+        content_v.setContentsMargins(0, 0, 0, 0)
+        content_v.setSpacing(0)
+
+        # Header: collapse button + COLORS label
+        header = QWidget()
+        header_h = QHBoxLayout(header)
+        header_h.setContentsMargins(8, 6, 8, 6)
+        header_h.setSpacing(6)
+
+        self._collapse_panel_btn = QPushButton()
+        self._collapse_panel_btn.setFixedSize(28, 28)
+        self._collapse_panel_btn.setIconSize(QSize(16, 16))
+        self._collapse_panel_btn.setProperty("role", "icon_btn")
+        self._collapse_panel_btn.setToolTip("Collapse color editor")
+        self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._collapse_panel_btn.clicked.connect(
+            lambda: self._toggle_swatch_panel(False)
+        )
+        header_h.addWidget(self._collapse_panel_btn)
+
+        colors_lbl = QLabel("COLORS")
+        colors_lbl.setProperty("role", "section")
+        header_h.addWidget(colors_lbl, 1)
+        content_v.addWidget(header)
+
+        hdr_sep = QFrame()
+        hdr_sep.setObjectName("h_sep")
+        hdr_sep.setFrameShape(QFrame.Shape.HLine)
+        content_v.addWidget(hdr_sep)
+
+        # Swatch scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -436,7 +608,7 @@ class ThemeDialog(QDialog):
             row = QHBoxLayout()
             row.setSpacing(8)
             row_label = QLabel(label)
-            row_label.setFixedWidth(110)
+            row_label.setFixedWidth(100)
             row_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             row.addWidget(row_label)
             row.addWidget(sw, 1)
@@ -445,53 +617,17 @@ class ThemeDialog(QDialog):
 
         swatch_vbox.addStretch()
         scroll.setWidget(swatch_container)
-        left_vbox.addWidget(scroll)
+        content_v.addWidget(scroll, 1)
 
-        # Save/revert
-        action_row = QHBoxLayout()
-        self._save_btn = QPushButton("Save Changes")
-        self._save_btn.setObjectName("save_button")
-        self._save_btn.setEnabled(False)
-        self._save_btn.setToolTip("Persist edits to this custom theme")
-        self._save_btn.clicked.connect(self._on_save)
-        self._revert_btn = QPushButton("Revert")
-        self._revert_btn.setEnabled(False)
-        self._revert_btn.setToolTip("Discard unsaved edits")
-        self._revert_btn.clicked.connect(self._on_revert)
-        action_row.addWidget(self._save_btn)
-        action_row.addWidget(self._revert_btn)
-        action_row.addStretch()
-        left_vbox.addLayout(action_row)
+        outer_h.addWidget(content, 1)
 
-        body.addWidget(left)
+        # Separator on the right edge (travels with the panel during animation)
+        v_sep = QFrame()
+        v_sep.setObjectName("v_sep")
+        v_sep.setFrameShape(QFrame.Shape.VLine)
+        outer_h.addWidget(v_sep)
 
-        # Thin vertical separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setObjectName("v_sep")
-        body.addWidget(sep)
-
-        # ── Right: preview panel ──────────────────────────────────────
-        self._preview_panel = self._build_preview_panel()
-        body.addWidget(self._preview_panel, 1)
-
-        outer.addLayout(body)
-
-        # ── Bottom button box ─────────────────────────────────────────
-        h_sep = QFrame()
-        h_sep.setObjectName("h_sep")
-        h_sep.setFrameShape(QFrame.Shape.HLine)
-        outer.addWidget(h_sep)
-
-        bbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        ok_btn = bbox.button(QDialogButtonBox.StandardButton.Ok)
-        if ok_btn:
-            ok_btn.setObjectName("save_button")
-        bbox.accepted.connect(self._on_accept)
-        bbox.rejected.connect(self._on_cancel)
-        outer.addWidget(bbox)
+        return container
 
     def _build_preview_panel(self) -> QFrame:
         panel = QFrame()
@@ -503,32 +639,16 @@ class ThemeDialog(QDialog):
         outer.setContentsMargins(4, 0, 4, 4)
         outer.setSpacing(6)
 
-        # Name + inspect button
-        name_row = QHBoxLayout()
-        name_row.setSpacing(6)
-        self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("Custom theme name...")
-        self._name_edit.textEdited.connect(self._mark_dirty)
-        name_row.addWidget(self._name_edit, 1)
-        self._inspect_btn = QPushButton()
-        self._inspect_btn.setCheckable(True)
-        self._inspect_btn.setFixedSize(22, 22)
-        self._inspect_btn.setIconSize(QSize(14, 14))
-        self._inspect_btn.setObjectName("inspect_btn")
-        self._inspect_btn.setToolTip("Inspect: right-click any preview element to pick its color")
-        self._inspect_btn.toggled.connect(self._toggle_inspect)
-        name_row.addWidget(self._inspect_btn)
-        outer.addLayout(name_row)
-
         # Builtin badge
         self._builtin_label = QLabel("Built-in (read only)")
         self._builtin_label.setProperty("role", "placeholder")
         self._builtin_label.setVisible(False)
         outer.addWidget(self._builtin_label)
 
-        # PREVIEW section label + inspect hint on the same row
+        # PREVIEW section label + inspect hint + inspect toggle on the same row
         hdr_row = QHBoxLayout()
         hdr_row.setContentsMargins(0, 0, 0, 0)
+        hdr_row.setSpacing(6)
         preview_lbl = QLabel("PREVIEW")
         preview_lbl.setProperty("role", "section")
         hdr_row.addWidget(preview_lbl)
@@ -536,6 +656,14 @@ class ThemeDialog(QDialog):
         self._inspect_hint = QLabel("")
         self._inspect_hint.setProperty("role", "muted")
         hdr_row.addWidget(self._inspect_hint)
+        self._inspect_btn = QPushButton()
+        self._inspect_btn.setCheckable(True)
+        self._inspect_btn.setFixedSize(28, 28)
+        self._inspect_btn.setIconSize(QSize(16, 16))
+        self._inspect_btn.setObjectName("inspect_btn")
+        self._inspect_btn.setToolTip("Inspect: right-click any preview element to pick its color")
+        self._inspect_btn.toggled.connect(self._toggle_inspect)
+        hdr_row.addWidget(self._inspect_btn)
         outer.addLayout(hdr_row)
 
         # Fake app window: simplified PlaybackTab simulation. Right-click any
@@ -814,6 +942,35 @@ class ThemeDialog(QDialog):
         v.addLayout(action_row)
         return bar
 
+    # ── Panel animation ───────────────────────────────────────────────
+
+    def _toggle_swatch_panel(self, expand: bool) -> None:
+        """Slide the color-swatch panel in (expand=True) or out."""
+        self._swatch_anim.stop()
+        current = self._swatch_panel_widget.maximumWidth()
+        # Guard: if Qt's default QWIDGETSIZE_MAX was never overridden, treat as full.
+        if current > _SWATCH_WIDTH:
+            current = _SWATCH_WIDTH if expand else 0
+        end = _SWATCH_WIDTH if expand else 0
+        if current == end:
+            # Already at the target state; still fire the post-animation logic.
+            if not expand:
+                self._expand_panel_btn.setVisible(True)
+            return
+        self._swatch_anim.setStartValue(current)
+        self._swatch_anim.setEndValue(end)
+        self._swatch_anim.setEasingCurve(
+            QEasingCurve.Type.OutCubic if expand else QEasingCurve.Type.InCubic
+        )
+        if expand:
+            self._expand_panel_btn.setVisible(False)
+        self._swatch_anim.start()
+
+    def _on_swatch_anim_finished(self) -> None:
+        """Show the expand button once the swatch panel has fully collapsed."""
+        if self._swatch_panel_widget.maximumWidth() == 0:
+            self._expand_panel_btn.setVisible(True)
+
     # ── Population ────────────────────────────────────────────────────
 
     def _populate_list(self, select_name: str | None = None) -> None:
@@ -846,14 +1003,13 @@ class ThemeDialog(QDialog):
         self._pending_save = False
 
         # Populate editor
-        self._name_edit.setText(theme.name)
-        self._name_edit.setReadOnly(theme.builtin)
         self._builtin_label.setVisible(theme.builtin)
         for key, _lbl in _COLOR_FIELDS:
             self._swatches[key].set_color(getattr(theme, key))
             self._swatches[key].set_editable(not theme.builtin)
 
         self._del_btn.setEnabled(not theme.builtin)
+        self._rename_btn.setEnabled(not theme.builtin)
         self._export_btn.setEnabled(True)
         self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
@@ -905,14 +1061,40 @@ class ThemeDialog(QDialog):
                 self._preview(BUILTIN_THEMES["Dark"])
             self._populate_list()
 
+    def _on_rename(self) -> None:
+        if self._current_theme is None or self._current_theme.builtin:
+            return
+        current_name = self._current_theme.name
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Theme", "New theme name:", text=current_name
+        )
+        if not ok:
+            return
+        new_name = new_name.strip()
+        if not new_name or new_name == current_name:
+            return
+        existing = set(ThemeManager.all_themes().keys())
+        existing.discard(current_name)
+        if new_name in existing:
+            QMessageBox.warning(
+                self, "Name in Use",
+                f'A theme named "{new_name}" already exists.'
+            )
+            return
+        updated = replace(self._current_theme, name=new_name, builtin=False)
+        ThemeManager.delete_custom(current_name)
+        if ThemeManager.get_active_name() == current_name:
+            ThemeManager.set_active_name(new_name)
+        ThemeManager.save_custom(updated)
+        self._current_theme = updated
+        self._pending_save = False
+        self._populate_list(select_name=new_name)
+
     def _on_save(self) -> None:
         if self._current_theme is None or self._current_theme.builtin:
             return
-        new_name = self._name_edit.text().strip()
-        if not new_name:
-            QMessageBox.warning(self, "Name required", "Please enter a theme name.")
-            return
-        old_name = self._current_theme.name
+        new_name = self._current_theme.name
+        old_name = new_name
         updated = replace(self._current_theme, name=new_name, builtin=False)
         # If renamed, delete old entry first
         if old_name != new_name:
@@ -1009,9 +1191,12 @@ class ThemeDialog(QDialog):
     def _refresh_io_icons(self, color: str) -> None:
         self._new_btn.setIcon(_svg_icon(_SVG_NEW, color))
         self._del_btn.setIcon(_svg_icon(_SVG_DELETE, color))
+        self._rename_btn.setIcon(_svg_icon(_SVG_RENAME, color))
         self._export_btn.setIcon(_svg_icon(_SVG_EXPORT, color))
         self._import_btn.setIcon(_svg_icon(_SVG_IMPORT, color))
         self._inspect_btn.setIcon(_svg_icon(_SVG_INSPECT, color))
+        self._expand_panel_btn.setIcon(_svg_icon(_SVG_EXPAND_PANEL, color))
+        self._collapse_panel_btn.setIcon(_svg_icon(_SVG_COLLAPSE_PANEL, color))
 
     def _preview(self, theme: ThemeColors) -> None:
         """Apply the previewed theme to the preview panel only. Dialog chrome and main window are not touched."""
@@ -1049,6 +1234,14 @@ class ThemeDialog(QDialog):
         self._prev_file_tile_icon.setPixmap(
             ph_icon("music-note", theme.accent, 16).pixmap(32, 32)
         )
+
+    def _sync_toolbar_btn_sizes(self) -> None:
+        h = self._combo.sizeHint().height()
+        for btn in (
+            self._expand_panel_btn, self._new_btn, self._del_btn,
+            self._rename_btn, self._export_btn, self._import_btn,
+        ):
+            btn.setFixedSize(h, h)
 
     def _apply_own_stylesheet(self) -> None:
         active = ThemeManager.get_active()
