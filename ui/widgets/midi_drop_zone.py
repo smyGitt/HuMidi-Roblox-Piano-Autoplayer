@@ -8,10 +8,11 @@ from ui.widgets.ph_icon import ph_icon
 class MidiDropZone(QFrame):
     """File-drop affordance for the Playback page File tab.
 
-    Visually matches the previous REPLACE card content (section title, folder
-    glyph, italic hint, muted sub-caption, Browse / Load Save buttons) and
-    adds a thick dashed border that darkens on drag-over. Accepts .mid and
-    .midi local file drops and emits file_dropped(str) with the absolute path.
+    Handles drag events and emits file_dropped(str). Has no own visual
+    styling - it is placed inside a make_card("REPLACE", dashed_border=True)
+    card, which provides the border and drag-over visual. Drag state is
+    propagated to the parent card frame via _set_drag_active.
+
     The Browse and Load Save buttons are exposed as attributes so callers
     bind them exactly as before.
     """
@@ -22,17 +23,11 @@ class MidiDropZone(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("midi_dropzone")
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setAcceptDrops(True)
-        self.setProperty("drag_active", "false")
 
         vbox = QVBoxLayout(self)
-        vbox.setContentsMargins(14, 12, 14, 14)
+        vbox.setContentsMargins(0, 4, 0, 4)
         vbox.setSpacing(8)
-
-        title_lbl = QLabel("REPLACE")
-        title_lbl.setProperty("role", "section")
 
         self._drop_icon_lbl = QLabel()
         self._drop_icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -58,7 +53,6 @@ class MidiDropZone(QFrame):
         btn_row.addWidget(self.browse_button)
         btn_row.addWidget(self.load_saved_btn)
 
-        vbox.addWidget(title_lbl)
         vbox.addStretch()
         vbox.addWidget(self._drop_icon_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
         vbox.addWidget(drop_hint)
@@ -86,10 +80,9 @@ class MidiDropZone(QFrame):
         return None
 
     def _set_drag_active(self, active: bool) -> None:
-        self.setProperty("drag_active", "true" if active else "false")
-        self.style().unpolish(self)
-        self.style().polish(self)
-        self.update()
+        card = self.parent()
+        if card is not None and hasattr(card, "set_drag_active"):
+            card.set_drag_active(active)
 
     def dragEnterEvent(self, event):
         if self._first_midi_path(event.mimeData()):

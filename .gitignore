@@ -5,6 +5,7 @@ __pycache__/
 !/core
 !/managers
 !/ui
+!/assets
 
 /*.py
 !main.py

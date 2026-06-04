@@ -31,55 +31,34 @@ class SettingsTab(QWidget):
         hl.addStretch()
         outer.addWidget(header)
 
-        # Body widget restores side margins
-        body = QWidget()
-        body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(16, 8, 16, 16)
-        body_layout.setSpacing(0)
-        outer.addWidget(body, 1)
-
-        # Horizontal split: nav | separator | content
-        split = QHBoxLayout()
-        split.setContentsMargins(0, 0, 0, 0)
-        split.setSpacing(0)
-
-        # --- Left nav panel ---
-        nav_panel = QWidget()
-        nav_panel.setObjectName("settings_nav_panel")
-        nav_panel.setFixedWidth(110)
-        nav_layout = QVBoxLayout(nav_panel)
-        nav_layout.setContentsMargins(0, 8, 0, 8)
+        # --- Nav bar (sub_tab_bar / sub_tab_btn -- same style as PlaybackTab) ---
+        nav_bar = QFrame()
+        nav_bar.setObjectName("sub_tab_bar")
+        nav_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        nav_layout = QHBoxLayout(nav_bar)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
         nav_layout.setSpacing(0)
 
         self._tab_btns = []
-        for i, name in enumerate(["Display", "Files", "Shortcut", "System"]):
+        for i, name in enumerate(["Display", "Files", "Hotkey", "System"]):
             btn = QPushButton(name)
-            btn.setCheckable(True)
-            btn.setProperty("role", "settings_nav")
-            btn.clicked.connect(lambda checked, idx=i: self._switch_tab(idx))
+            btn.setObjectName("sub_tab_btn")
+            btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setProperty("active", "false")
+            btn.clicked.connect(lambda checked=False, idx=i: self._switch_tab(idx))
             nav_layout.addWidget(btn)
             self._tab_btns.append(btn)
         nav_layout.addStretch()
+        outer.addWidget(nav_bar)
 
-        # Vertical divider
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setObjectName("settings_nav_sep")
-
-        # --- Content stack ---
+        # --- Content stack (fills remaining space, no card wrapper) ---
         self._stack = QStackedWidget()
         self._stack.addWidget(self._make_display_page())
         self._stack.addWidget(self._make_files_page())
-        self._stack.addWidget(self._make_shortcut_page())
+        self._stack.addWidget(self._make_hotkey_page())
         self._stack.addWidget(self._make_system_page())
-
-        split.addWidget(nav_panel)
-        split.addWidget(sep)
-        split.addWidget(self._stack, 1)
-
-        card, card_body = make_card("", outer_margins=(0, 0, 0, 0))
-        card_body.addLayout(split)
-        body_layout.addWidget(card, 1)
+        outer.addWidget(self._stack, 1)
 
         self._switch_tab(0)
 
@@ -87,15 +66,17 @@ class SettingsTab(QWidget):
 
     def _make_display_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(6)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        page_layout.setSpacing(0)
 
-        layout.addWidget(self._section_label("Window"))
+        card, body = make_card("")
+        body.setSpacing(6)
 
+        body.addWidget(self._section_label("Window"))
         self.always_top_check = QCheckBox("Always on Top")
         self.always_top_check.setToolTip("Keep this window above all other windows")
-        layout.addWidget(self.always_top_check)
+        body.addWidget(self.always_top_check)
 
         opacity_row = QHBoxLayout()
         opacity_row.setSpacing(8)
@@ -105,11 +86,10 @@ class SettingsTab(QWidget):
         self.opacity_slider.setValue(100)
         self.opacity_slider.setToolTip("Adjust window transparency (20-100%)")
         opacity_row.addWidget(self.opacity_slider, 1)
-        layout.addLayout(opacity_row)
+        body.addLayout(opacity_row)
 
-        layout.addSpacing(8)
-        layout.addWidget(self._section_label("Visualizer"))
-
+        body.addSpacing(8)
+        body.addWidget(self._section_label("Visualizer"))
         self.timeline_vis_check = QCheckBox("Timeline")
         self.timeline_vis_check.setChecked(True)
         self.timeline_vis_check.setToolTip(
@@ -119,12 +99,11 @@ class SettingsTab(QWidget):
         self.piano_vis_check = QCheckBox("Piano Keys")
         self.piano_vis_check.setChecked(True)
         self.piano_vis_check.setToolTip("Show the piano key visualizer in the Visualizer tab")
-        layout.addWidget(self.timeline_vis_check)
-        layout.addWidget(self.piano_vis_check)
+        body.addWidget(self.timeline_vis_check)
+        body.addWidget(self.piano_vis_check)
 
-        layout.addSpacing(8)
-        layout.addWidget(self._section_label("Appearance"))
-
+        body.addSpacing(8)
+        body.addWidget(self._section_label("Appearance"))
         theme_row = QHBoxLayout()
         theme_row.setSpacing(8)
         self.theme_combo = QComboBox()
@@ -136,19 +115,21 @@ class SettingsTab(QWidget):
         )
         theme_row.addWidget(self.theme_combo, 1)
         theme_row.addWidget(self.theme_customize_btn)
-        layout.addLayout(theme_row)
+        body.addLayout(theme_row)
 
-        layout.addStretch()
+        page_layout.addWidget(card, 1)
         return page
 
     def _make_files_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(6)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        page_layout.setSpacing(0)
 
-        layout.addWidget(self._section_label("Save Directory"))
+        card, body = make_card("")
+        body.setSpacing(6)
 
+        body.addWidget(self._section_label("Save Directory"))
         save_row = QHBoxLayout()
         save_row.setSpacing(8)
         self.save_path_input = QLineEdit()
@@ -158,19 +139,21 @@ class SettingsTab(QWidget):
         self.save_browse_btn.setToolTip("Choose where to save humanized performance files")
         save_row.addWidget(self.save_path_input, 1)
         save_row.addWidget(self.save_browse_btn)
-        layout.addLayout(save_row)
+        body.addLayout(save_row)
 
-        layout.addStretch()
+        page_layout.addWidget(card, 1)
         return page
 
-    def _make_shortcut_page(self) -> QWidget:
+    def _make_hotkey_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(6)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        page_layout.setSpacing(0)
 
-        layout.addWidget(self._section_label("Playback Toggle"))
+        card, body = make_card("")
+        body.setSpacing(6)
 
+        body.addWidget(self._section_label("Playback Toggle"))
         hk_row = QHBoxLayout()
         hk_row.setSpacing(8)
         self.hk_label = QLabel("Hotkey: ")
@@ -178,35 +161,37 @@ class SettingsTab(QWidget):
         self.hk_btn.setToolTip("Click to bind a new hotkey for toggling playback")
         hk_row.addWidget(self.hk_label, 1)
         hk_row.addWidget(self.hk_btn)
-        layout.addLayout(hk_row)
+        body.addLayout(hk_row)
 
-        layout.addStretch()
+        page_layout.addWidget(card, 1)
         return page
 
     def _make_system_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(6)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        page_layout.setSpacing(0)
 
-        layout.addWidget(self._section_label("Updates"))
+        card, body = make_card("")
+        body.setSpacing(6)
+
+        body.addWidget(self._section_label("Updates"))
         self.check_update_btn = QPushButton("Check for updates")
         self.check_update_btn.setToolTip("Check GitHub for a newer version of HuMidi")
-        layout.addWidget(self.check_update_btn)
+        body.addWidget(self.check_update_btn)
 
-        layout.addSpacing(12)
-        layout.addWidget(self._section_label("Reset"))
-
+        body.addSpacing(12)
+        body.addWidget(self._section_label("Reset"))
         reset_desc = QLabel("Restore all playback and humanization settings to their defaults.")
         reset_desc.setProperty("role", "muted")
         reset_desc.setWordWrap(True)
-        layout.addWidget(reset_desc)
-        layout.addSpacing(4)
+        body.addWidget(reset_desc)
+        body.addSpacing(4)
         self.reset_all_btn = QPushButton("Reset All Settings")
         self.reset_all_btn.setToolTip("Reset all playback and humanization settings to their default values")
-        layout.addWidget(self.reset_all_btn)
+        body.addWidget(self.reset_all_btn)
 
-        layout.addStretch()
+        page_layout.addWidget(card, 1)
         return page
 
     # ── Internal helpers ────────────────────────────────────────────────────────
@@ -220,7 +205,11 @@ class SettingsTab(QWidget):
     def _switch_tab(self, idx: int) -> None:
         self._stack.setCurrentIndex(idx)
         for i, btn in enumerate(self._tab_btns):
-            btn.setChecked(i == idx)
+            active = i == idx
+            btn.setProperty("active", "true" if active else "false")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+            btn.update()
 
     # ── Public API ──────────────────────────────────────────────────────────────
 

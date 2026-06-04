@@ -47,6 +47,9 @@ class ThemeColors:
     accent_play:   str = "#4ecb8d"   # play button
     accent_stop:   str = "#e05c5c"   # stop / danger
     pedal_color:   str = "#e8a020"   # sustain pedal indicator
+    accent_controls: str = "#5b8dee" # sliders and checkboxes
+    bg_button:     str = "#21213a"   # generic button background
+    accent_save:   str = "#5b8dee"   # save button accent
     builtin: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
@@ -57,6 +60,13 @@ class ThemeColors:
     @classmethod
     def from_dict(cls, d: dict) -> "ThemeColors":
         d = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
+        # Derive new fields from existing ones for older saved themes.
+        if "accent_controls" not in d:
+            d["accent_controls"] = d.get("accent", "#5b8dee")
+        if "bg_button" not in d:
+            d["bg_button"] = d.get("bg_secondary", "#21213a")
+        if "accent_save" not in d:
+            d["accent_save"] = d.get("accent", "#5b8dee")
         return cls(**d)
 
 
@@ -69,6 +79,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#c4922c", text_primary="#211a12", text_secondary="#7a6a55",
         border="#e4d7bd", accent_play="#6e8b4e", accent_stop="#a64a3a",
         pedal_color="#b88130",
+        accent_controls="#c4922c", bg_button="#fbf6e8", accent_save="#c4922c",
         builtin=True,
     ),
     "Lacquer": ThemeColors(
@@ -77,6 +88,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#c4922c", text_primary="#ecdfc8", text_secondary="#8a7a64",
         border="#3a3128", accent_play="#6e8b4e", accent_stop="#a64a3a",
         pedal_color="#b88130",
+        accent_controls="#c4922c", bg_button="#28221a", accent_save="#c4922c",
         builtin=True,
     ),
     "Dark": ThemeColors(
@@ -85,6 +97,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#5b8dee", text_primary="#dcdcf0", text_secondary="#7878a0",
         border="#32324a", accent_play="#4ecb8d", accent_stop="#e05c5c",
         pedal_color="#e8a020",
+        accent_controls="#5b8dee", bg_button="#21213a", accent_save="#5b8dee",
         builtin=True,
     ),
     "Light": ThemeColors(
@@ -93,6 +106,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#4a7adb", text_primary="#1a1a2e", text_secondary="#6868a0",
         border="#d0d0e8", accent_play="#2a9a60", accent_stop="#cc3333",
         pedal_color="#d08010",
+        accent_controls="#4a7adb", bg_button="#ffffff", accent_save="#4a7adb",
         builtin=True,
     ),
     "Midnight": ThemeColors(
@@ -101,6 +115,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#58a6ff", text_primary="#e6edf3", text_secondary="#8b949e",
         border="#30363d", accent_play="#3fb950", accent_stop="#f85149",
         pedal_color="#f0a030",
+        accent_controls="#58a6ff", bg_button="#161b22", accent_save="#58a6ff",
         builtin=True,
     ),
     "Mocha": ThemeColors(
@@ -109,6 +124,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         accent="#e6a050", text_primary="#ece0d0", text_secondary="#907060",
         border="#3c3028", accent_play="#7ab860", accent_stop="#e05060",
         pedal_color="#c8901a",
+        accent_controls="#e6a050", bg_button="#26201e", accent_save="#e6a050",
         builtin=True,
     ),
 }
@@ -201,6 +217,21 @@ QPushButton:disabled {
     background-color: %(dis_bg)s;
 }
 
+/* Save button (accent_save tint) */
+QPushButton#save_button {
+    background-color: %(save_btn_bg)s;
+    border-color: %(save_btn_border)s;
+}
+QPushButton#save_button:hover {
+    background-color: %(save_btn_hover)s;
+    border-color: %(save_btn_border)s;
+}
+QPushButton#save_button:disabled {
+    background-color: %(save_btn_dis_bg)s;
+    color: %(save_btn_dis_text)s;
+    border-color: %(save_btn_dis_border)s;
+}
+
 /* Sliders */
 QSlider::groove:horizontal {
     height: 4px;
@@ -208,7 +239,7 @@ QSlider::groove:horizontal {
     border-radius: 2px;
 }
 QSlider::handle:horizontal {
-    background-color: %(accent)s;
+    background-color: %(accent_controls)s;
     width: 14px;
     height: 14px;
     border-radius: 7px;
@@ -216,13 +247,13 @@ QSlider::handle:horizontal {
     border: none;
 }
 QSlider::handle:horizontal:hover {
-    background-color: %(accent_light)s;
+    background-color: %(accent_controls_light)s;
 }
 QSlider::handle:horizontal:disabled {
     background-color: %(dis_border)s;
 }
 QSlider::sub-page:horizontal {
-    background-color: %(accent)s;
+    background-color: %(accent_controls)s;
     border-radius: 2px;
 }
 QSlider::sub-page:horizontal:disabled {
@@ -268,11 +299,11 @@ QCheckBox::indicator {
     background-color: %(bg_input)s;
 }
 QCheckBox::indicator:hover {
-    border-color: %(accent)s;
+    border-color: %(accent_controls)s;
 }
 QCheckBox::indicator:checked {
-    background-color: %(accent)s;
-    border-color: %(accent)s;
+    background-color: %(accent_controls)s;
+    border-color: %(accent_controls)s;
 }
 QCheckBox::indicator:disabled {
     background-color: %(dis_bg)s;
@@ -701,33 +732,23 @@ QLabel#part_card_meta {
     color: %(text_secondary)s;
 }
 
-/* -- Clickable save-row cards (raised at rest, sunken on press) ------------- */
+/* -- Clickable save-row cards (accent left bar, flat) ----------------------- */
 QFrame#save_card {
-    background-color: %(bg_input)s;
-    border-top: 1px solid %(save_card_bevel_hi)s;
-    border-left: 1px solid %(save_card_bevel_hi)s;
-    border-bottom: 1px solid %(save_card_bevel_lo)s;
-    border-right: 1px solid %(save_card_bevel_lo)s;
-    border-radius: 6px;
+    background-color: %(bg_secondary)s;
+    border: 1px solid %(border)s;
+    border-left: 3px solid %(accent)s;
+    border-radius: 4px;
 }
 QFrame#save_card:hover {
     background-color: %(save_card_hover)s;
 }
 QFrame#save_card[pressed="true"] {
     background-color: %(save_card_hover)s;
-    border-top: 1px solid %(save_card_bevel_lo)s;
-    border-left: 1px solid %(save_card_bevel_lo)s;
-    border-bottom: 1px solid %(save_card_bevel_hi)s;
-    border-right: 1px solid %(save_card_bevel_hi)s;
 }
 
 /* -- SAVED SONGS inner panel ---------------------------------------------- */
-/* Sits inside the SAVED SONGS section_card and spans its full width. Uses
-   the window bg so the part_cards stacked on top read as raised, inverting
-   the LOADED row's relationship. Only top and bottom edges carry a border
-   so the panel reads as a horizontal band running through the card. */
 QFrame#saved_songs_list_panel {
-    background-color: %(bg_primary)s;
+    background-color: %(bg_secondary)s;
     border-top: 1px solid %(border)s;
     border-bottom: 1px solid %(border)s;
     border-left: none;
@@ -735,15 +756,11 @@ QFrame#saved_songs_list_panel {
     border-radius: 0;
 }
 
-/* -- MIDI drop zone -------------------------------------------------------- */
-QFrame#midi_dropzone {
+/* -- Animated dashed card (AnimatedDashedCard, e.g. MIDI drop zone) -------- */
+QFrame#section_card_dashed {
     background-color: %(bg_secondary)s;
-    border: 2px dashed %(dropzone_border)s;
-    border-radius: 10px;
-}
-QFrame#midi_dropzone[drag_active="true"] {
-    border-color: %(accent)s;
-    background-color: %(accent_tint)s;
+    border: none;
+    border-radius: 5px;
 }
 
 /* -- Collapsed mini strip -------------------------------------------------- */
@@ -887,19 +904,28 @@ def generate_stylesheet(c: ThemeColors) -> str:
     save_dis_text = _mix(c.accent, c.bg_primary, 0.65)
     save_dis_bdr  = _mix(save_border, c.bg_primary, 0.65)
 
-    # Generic button
-    btn_bg      = c.bg_secondary
-    btn_hover   = _mix(c.bg_secondary, c.accent, 0.16)
+    # Generic button (uses bg_button, separate from bg_secondary)
+    btn_bg      = c.bg_button
+    btn_hover   = _mix(c.bg_button, c.accent, 0.16)
     btn_pressed = _mix(c.bg_primary, "#000000", 0.06)
+
+    # Save button (accent_save-tinted background)
+    save_btn_bg       = _mix(c.bg_primary, c.accent_save, 0.15)
+    save_btn_hover    = _mix(c.bg_primary, c.accent_save, 0.28)
+    save_btn_border   = _mix(c.accent_save, c.bg_secondary, 0.40)
+    save_btn_dis_bg   = _mix(save_btn_bg, c.bg_primary, 0.55)
+    save_btn_dis_text = _mix(c.accent_save, c.bg_primary, 0.65)
+    save_btn_dis_bdr  = _mix(save_btn_border, c.bg_primary, 0.65)
 
     # Disabled generic
     dis_text   = _mix(c.text_primary, c.bg_primary, 0.65)
     dis_bg     = _mix(c.bg_secondary, c.bg_primary, 0.55)
     dis_border = _mix(c.border, c.bg_primary, 0.50)
 
-    # Misc derived
-    accent_light      = _mix(c.accent, "#ffffff", 0.25)
-    accent_play_hover = _mix(c.accent_play, "#ffffff", 0.15)
+    # Controls (sliders, checkboxes) derived colors
+    accent_controls_light = _mix(c.accent_controls, "#ffffff", 0.25)
+    accent_light          = _mix(c.accent, "#ffffff", 0.25)   # kept for compatibility
+    accent_play_hover     = _mix(c.accent_play, "#ffffff", 0.15)
     text_area_bg  = c.bg_input
     scroll_handle = _mix(c.border, c.accent, 0.45)
     tab_bg        = c.bg_secondary
@@ -921,27 +947,25 @@ def generate_stylesheet(c: ThemeColors) -> str:
     # reads consistently across light and dark themes.
     dropzone_border = _mix(c.bg_secondary, "#000000", 0.35)
 
-    # Save card bevel edges: raised = light top-left / dark bottom-right;
-    # swapped on press to produce sunken. 18% toward white / 28% toward black
-    # keep the effect readable without being garish.
-    save_card_bevel_hi = _mix(c.bg_input, "#ffffff", 0.18)
-    save_card_bevel_lo = _mix(c.bg_input, "#000000", 0.28)
-
-    # Save card hover: 10% toward black -- always slightly darker than the
-    # resting bg_input regardless of theme, so the hover reads as "press in".
-    save_card_hover = _mix(c.bg_input, "#000000", 0.10)
+    # Save card hover: faint accent wash so the hover echoes the left accent bar.
+    save_card_hover = _mix(c.bg_secondary, c.accent, 0.10)
 
     d = dict(
         bg_primary=c.bg_primary, bg_secondary=c.bg_secondary, bg_input=c.bg_input,
         accent=c.accent, accent_play=c.accent_play, accent_stop=c.accent_stop,
+        accent_controls=c.accent_controls, accent_save=c.accent_save,
         text_primary=c.text_primary, text_secondary=c.text_secondary, border=c.border,
-        accent_light=accent_light,
+        accent_light=accent_light, accent_controls_light=accent_controls_light,
         play_bg=play_bg, play_hover=play_hover, play_border=play_border,
         play_dis_bg=play_dis_bg, play_dis_text=play_dis_text, play_dis_border=play_dis_bdr,
         stop_bg=stop_bg, stop_hover=stop_hover, stop_border=stop_border,
         stop_dis_bg=stop_dis_bg, stop_dis_text=stop_dis_text, stop_dis_border=stop_dis_bdr,
         save_bg=save_bg, save_hover=save_hover, save_border=save_border,
         save_dis_bg=save_dis_bg, save_dis_text=save_dis_text, save_dis_border=save_dis_bdr,
+        save_btn_bg=save_btn_bg, save_btn_hover=save_btn_hover,
+        save_btn_border=save_btn_border,
+        save_btn_dis_bg=save_btn_dis_bg, save_btn_dis_text=save_btn_dis_text,
+        save_btn_dis_border=save_btn_dis_bdr,
         btn_bg=btn_bg, btn_hover=btn_hover, btn_pressed=btn_pressed,
         dis_text=dis_text, dis_bg=dis_bg, dis_border=dis_border,
         text_area_bg=text_area_bg, scroll_handle=scroll_handle,
@@ -952,7 +976,6 @@ def generate_stylesheet(c: ThemeColors) -> str:
         nav_active_bg=nav_active_bg, nav_hover_bg=nav_hover_bg,
         accent_tint=accent_tint, ink_faint=ink_faint, rule_strong=rule_strong,
         dropzone_border=dropzone_border,
-        save_card_bevel_hi=save_card_bevel_hi, save_card_bevel_lo=save_card_bevel_lo,
         save_card_hover=save_card_hover,
     )
     return _QSS % d

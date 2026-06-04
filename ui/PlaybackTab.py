@@ -87,6 +87,8 @@ class PlaybackTab(QWidget):
         self.drop_zone = MidiDropZone()
         self.browse_button  = self.drop_zone.browse_button
         self.load_saved_btn = self.drop_zone.load_saved_btn
+        self._drop_card, drop_body = make_card("REPLACE", dashed_border=True)
+        drop_body.addWidget(self.drop_zone)
 
         # file_path_label kept for API compat -- stores full path in toolTip.
         self.file_path_label = QLabel("No file selected.")
@@ -99,7 +101,7 @@ class PlaybackTab(QWidget):
         self.all_saves_btn          = self._saved_panel.all_saves_btn
         self.refresh_saved_songs_btn = self._saved_panel.refresh_saved_songs_btn
 
-        cols.addWidget(self.drop_zone, 1)
+        cols.addWidget(self._drop_card, 1)
         cols.addWidget(self._saved_panel, 1)
         layout.addLayout(cols, 1)
         return page
@@ -367,6 +369,7 @@ class PlaybackTab(QWidget):
         self._perf_card.update_icon_color(color)
         self._opts_card.update_icon_color(color)
         self._humanize_master.update_icon_color(color)
+        self._saved_panel.update_icon_color(color)
         self._timing_reset_btn.setIcon(_icon)
         self._timing_reset_btn.setIconSize(_sz)
         self._hands_reset_btn.setIcon(_icon)

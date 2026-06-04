@@ -12,6 +12,7 @@ from ui.widgets.file_strip import FileStrip
 from ui.widgets.section_card import make_card
 from ui.widgets.midi_drop_zone import MidiDropZone
 from ui.widgets.humidi_button import HuMidiButton
+from ui.widgets.elided_label import ElidedLabel
 from ui.widgets.clickable_save_card import ClickableSaveCard
 from ui.widgets.stats_tile import StatsTile
 from ui.widgets.part_card import PartCard
@@ -30,6 +31,7 @@ __all__ = [
     "make_card",
     "MidiDropZone",
     "HuMidiButton",
+    "ElidedLabel",
     "ClickableSaveCard",
     "StatsTile",
     "PartCard",

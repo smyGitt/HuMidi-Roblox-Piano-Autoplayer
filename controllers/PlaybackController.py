@@ -123,7 +123,7 @@ class _SaveWorker(QObject):
             })
 
         compiled_pedal_count = sum(
-            1 for ev in events_to_serialize
+            1 for ev in serialized_events
             if ev['action'] == 'pedal' and ev['key_char'] == 'down'
         )
 

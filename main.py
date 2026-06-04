@@ -25,9 +25,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"HuMidi v{APP_VERSION}")
-        self.setMinimumWidth(720)
-        self.setMinimumHeight(495)
-
         # Set specific Icon base execution path (Required for OS Contexts)
         base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(base_path, 'icon.ico')
@@ -70,7 +67,7 @@ class MainWindow(QMainWindow):
         self._update_checker.update_available.connect(self._on_update_available)
         self._update_checker.start()
 
-        self.resize(self.minimumWidth(), self.minimumHeight())
+        self.resize(self.ui._expanded_size)
 
     def _bind_signals(self):
         # UI controls bound strictly to Execution/Router logic

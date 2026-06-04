@@ -3,11 +3,14 @@ import os
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFrame, QScrollArea, QLabel, QPushButton, QSizePolicy
+    QWidget, QVBoxLayout, QFrame, QScrollArea, QLabel, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
+from PyQt6.QtGui import QIcon
 
 from ui.widgets.clickable_save_card import ClickableSaveCard
+from ui.widgets.humidi_button import HuMidiButton
+from ui.widgets.ph_icon import ph_icon
 from ui.widgets.section_card import make_card
 
 
@@ -34,6 +37,7 @@ class SavedSongsPanel(QWidget):
         super().__init__(parent)
         self._save_dir = None
         self._saves_cache: list = []
+        self._icon_color: str = "#888888"
         self._setup_ui()
 
     def _setup_ui(self):
@@ -43,25 +47,24 @@ class SavedSongsPanel(QWidget):
 
         _SIDE_PAD = 14
 
-        self.refresh_saved_songs_btn = QPushButton("↻")
+        self.refresh_saved_songs_btn = HuMidiButton(tooltip="Refresh saved songs list")
         self.refresh_saved_songs_btn.setObjectName("saved_songs_refresh_btn")
-        self.refresh_saved_songs_btn.setToolTip("Refresh the saved songs list")
+        self.refresh_saved_songs_btn.setProperty("role", "card_reset")
+        self.refresh_saved_songs_btn.setFixedSize(20, 20)
         self.refresh_saved_songs_btn.clicked.connect(
             lambda: self.refresh_saved_songs(self._save_dir)
         )
 
-        self.all_saves_btn = QPushButton("All Saves")
-        self.all_saves_btn.setToolTip(
-            "Open the save browser to rename, delete, or load any save"
+        self.all_saves_btn = HuMidiButton(
+            tooltip="Open the save browser to rename, delete, or load any save"
         )
-        self.all_saves_btn.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
+        self.all_saves_btn.setObjectName("saved_songs_all_saves_btn")
+        self.all_saves_btn.setProperty("role", "card_reset")
+        self.all_saves_btn.setFixedSize(20, 20)
 
         saved_card, saved_layout = make_card(
             "SAVED SONGS",
-            title_buttons=[self.refresh_saved_songs_btn],
-            footer_widgets=[self.all_saves_btn],
+            title_buttons=[self.refresh_saved_songs_btn, self.all_saves_btn],
             outer_margins=(0, 6, 0, 7),
             row_h_pad=_SIDE_PAD,
         )
@@ -139,15 +142,14 @@ class SavedSongsPanel(QWidget):
         for save in self._saves_cache[:self._SAVE_CARD_MAX]:
             created_str = self._format_save_timestamp(save['created'])
             accessed_str = self._format_save_timestamp(save['last_accessed'])
-            # Drop "Opened" when the save has never been re-opened.
-            meta_parts = [save['save_name']]
-            if created_str:
-                meta_parts.append(f"Saved {created_str}")
-            if accessed_str and accessed_str != created_str:
-                meta_parts.append(f"Opened {accessed_str}")
-            meta = "   ".join(meta_parts)
+            time_str = accessed_str or created_str
 
-            card = ClickableSaveCard(save['song_name'], meta)
+            card = ClickableSaveCard(
+                save['save_name'],
+                save['song_name'],
+                time_str=time_str,
+                icon_color=self._icon_color,
+            )
             card.clicked.connect(
                 lambda fp=save['filepath'], sn=save['save_name'], mn=save['song_name']:
                 self.save_card_clicked.emit(fp, sn, mn)
@@ -161,6 +163,23 @@ class SavedSongsPanel(QWidget):
             card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             self._saved_songs_list_layout.addWidget(card)
         self._saved_songs_list_layout.addStretch()
+
+    def update_icon_color(self, color: str) -> None:
+        self._icon_color = color
+        self._render_saved_songs()
+
+        _logical = 12
+        _sz = QSize(_logical, _logical)
+
+        _pix = ph_icon("arrows-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
+        _pix.setDevicePixelRatio(2.0)
+        self.refresh_saved_songs_btn.setIcon(QIcon(_pix))
+        self.refresh_saved_songs_btn.setIconSize(_sz)
+
+        _pix2 = ph_icon("list-magnifying-glass", color, _logical).pixmap(_logical * 2, _logical * 2)
+        _pix2.setDevicePixelRatio(2.0)
+        self.all_saves_btn.setIcon(QIcon(_pix2))
+        self.all_saves_btn.setIconSize(_sz)
 
     @staticmethod
     def _format_save_timestamp(ts: str) -> str:

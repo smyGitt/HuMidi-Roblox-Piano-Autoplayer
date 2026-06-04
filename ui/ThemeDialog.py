@@ -21,9 +21,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, QSize, QByteArray, pyqtSignal as Signal, QEvent, QObject,
-    QPropertyAnimation, QEasingCurve,
+    QPoint, QPropertyAnimation, QEasingCurve, QRect, QTimer,
 )
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap, QCursor
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, QCursor
 from PyQt6.QtSvg import QSvgRenderer
 
 from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES, _mix
@@ -175,16 +175,19 @@ def _svg_icon(svg_bytes: bytes, color: str, size: int = 16) -> QIcon:
 # ── Colour labels (order matters — shown in the editor) ───────────────────
 
 _COLOR_FIELDS = [
-    ("bg_primary",    "Background"),
-    ("bg_secondary",  "Surface"),
-    ("bg_input",      "Input Fields"),
-    ("accent",        "Accent"),
-    ("text_primary",  "Text"),
-    ("text_secondary","Muted Text"),
-    ("border",        "Borders"),
-    ("accent_play",   "Play Color"),
-    ("accent_stop",   "Stop / Danger"),
-    ("pedal_color",   "Pedal Color"),
+    ("bg_primary",      "Background"),
+    ("bg_secondary",    "Surface"),
+    ("bg_input",        "Input Fields"),
+    ("bg_button",       "Button"),
+    ("accent",          "Accent"),
+    ("accent_controls", "Controls"),
+    ("accent_save",     "Save Color"),
+    ("text_primary",    "Text"),
+    ("text_secondary",  "Muted Text"),
+    ("border",          "Borders"),
+    ("accent_play",     "Play Color"),
+    ("accent_stop",     "Stop / Danger"),
+    ("pedal_color",     "Pedal Color"),
 ]
 
 
@@ -198,10 +201,11 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
         "pedal_swatch":         ("pedal_color",    "Pedal Color"),
         "play_button":          ("accent_play",    "Play Color"),
         "stop_button":          ("accent_stop",    "Stop / Danger"),
-        "save_button":          ("accent",         "Accent"),
+        "save_button":          ("accent_save",    "Save Color"),
         # Window chrome
         "preview_window":       ("bg_primary",     "Background"),
         "collapsed_strip":      ("bg_secondary",   "Surface"),
+        "sidebar":              ("bg_secondary",   "Surface"),
         "sidebar_logo_text":    ("text_primary",   "Text"),
         # File strip
         "file_strip":           ("bg_secondary",   "Surface"),
@@ -228,6 +232,23 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
     if obj_name in _by_name:
         return _by_name[obj_name]
 
+    # Nav text labels are always empty in the collapsed preview sidebar -- exclude them.
+    if obj_name == "nav_label":
+        return None
+
+    # Nav buttons: active state has an accent left-border indicator.
+    if obj_name == "nav_btn":
+        if widget.property("active") == "true":
+            return ("accent", "Accent")
+        return ("bg_secondary", "Surface")
+
+    # Nav icon labels: active/hovered = text_primary, otherwise text_secondary.
+    if obj_name == "nav_icon":
+        p = widget.parent()
+        if p and (p.property("active") == "true" or p.property("hovered") == "true"):
+            return ("text_primary", "Text")
+        return ("text_secondary", "Muted Text")
+
     # Sub-tab buttons: active state shows the accent underline; inactive shows muted text color.
     if obj_name == "sub_tab_btn":
         if widget.property("active") == "true":
@@ -245,15 +266,15 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
         return ("text_primary", "Text")
 
     _by_class: dict[str, tuple[str, str]] = {
-        "QLineEdit":      ("bg_input",     "Input Fields"),
-        "QComboBox":      ("bg_input",     "Input Fields"),
-        "QDoubleSpinBox": ("bg_input",     "Input Fields"),
-        "QSpinBox":       ("bg_input",     "Input Fields"),
-        "QSlider":        ("accent",       "Accent"),
-        "QCheckBox":      ("accent",       "Accent"),
-        "QPushButton":    ("bg_secondary", "Surface"),
-        "QFrame":         ("bg_primary",   "Background"),
-        "QWidget":        ("bg_primary",   "Background"),
+        "QLineEdit":      ("bg_input",        "Input Fields"),
+        "QComboBox":      ("bg_input",        "Input Fields"),
+        "QDoubleSpinBox": ("bg_input",        "Input Fields"),
+        "QSpinBox":       ("bg_input",        "Input Fields"),
+        "QSlider":        ("accent_controls", "Controls"),
+        "QCheckBox":      ("accent_controls", "Controls"),
+        "QPushButton":    ("bg_button",       "Button"),
+        "QFrame":         ("bg_primary",      "Background"),
+        "QWidget":        ("bg_primary",      "Background"),
     }
     return _by_class.get(cls_name)
 
@@ -345,9 +366,10 @@ class _ColorSwatch(QWidget):
 # ── Inspect mode event filter ─────────────────────────────────────────────
 
 class _InspectFilter(QObject):
-    """App-level event filter: intercepts right-click-release inside the preview panel."""
+    """App-level event filter: intercepts right-click-release and hover inside the preview panel."""
 
     widget_right_clicked = Signal(object, object)  # (QWidget, QPoint global)
+    widget_hovered = Signal(object)                 # QWidget | None
 
     def __init__(self, root: QWidget, parent=None):
         super().__init__(parent)
@@ -368,7 +390,14 @@ class _InspectFilter(QObject):
     def eventFilter(self, obj, event) -> bool:
         if not self._active or not isinstance(obj, QWidget):
             return False
-        if event.type() != QEvent.Type.MouseButtonRelease:
+        ev_type = event.type()
+        if ev_type == QEvent.Type.Enter and self._inside_root(obj):
+            self.widget_hovered.emit(obj)
+            return False
+        if ev_type == QEvent.Type.Leave and obj is self._root:
+            self.widget_hovered.emit(None)
+            return False
+        if ev_type != QEvent.Type.MouseButtonRelease:
             return False
         if event.button() != Qt.MouseButton.RightButton:
             return False
@@ -376,6 +405,80 @@ class _InspectFilter(QObject):
             return False
         self.widget_right_clicked.emit(obj, event.globalPosition().toPoint())
         return True
+
+
+# ── Hover highlight overlay ────────────────────────────────────────────────
+
+class _HoverOverlay(QWidget):
+    """Transparent overlay drawn over the preview panel in inspect mode.
+
+    Renders animated marching-ants dashed borders around all preview widgets
+    that share the same ThemeColors field as the currently hovered widget.
+    The overlay is mouse-transparent so all events pass through to children.
+    """
+
+    _DASH_PATTERN = [6.0, 4.0]
+    _PATTERN_CYCLE = 10.0
+    _BORDER_RADIUS = 5
+    _PEN_WIDTH = 1.5
+
+    def __init__(self, parent: QWidget, accent: str):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAutoFillBackground(False)
+        self._rects: list[QRect] = []
+        self._accent = QColor(accent)
+        self._dash_offset = 0.0
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(40)
+        self.resize(parent.size())
+        self.raise_()
+
+    def set_accent(self, color: str) -> None:
+        self._accent = QColor(color)
+
+    def set_rects(self, rects: list[QRect]) -> None:
+        self._rects = rects
+        self.update()
+
+    def _tick(self) -> None:
+        p = self.parentWidget()
+        if p and self.size() != p.size():
+            self.resize(p.size())
+            self.raise_()
+        if self._rects:
+            self._dash_offset = (self._dash_offset + 0.5) % self._PATTERN_CYCLE
+            self.update()
+
+    def paintEvent(self, event) -> None:
+        if not self._rects:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        for r in self._rects:
+            ar = r.adjusted(1, 1, -1, -1)
+            sub = QPainterPath()
+            sub.addRoundedRect(
+                float(ar.x()), float(ar.y()), float(ar.width()), float(ar.height()),
+                self._BORDER_RADIUS, self._BORDER_RADIUS,
+            )
+            path = path.united(sub)
+        fill = QColor(self._accent)
+        fill.setAlphaF(0.12)
+        pen = QPen(self._accent)
+        pen.setWidthF(self._PEN_WIDTH)
+        pen.setStyle(Qt.PenStyle.CustomDashLine)
+        pen.setDashPattern(self._DASH_PATTERN)
+        pen.setDashOffset(self._dash_offset)
+        painter.setBrush(fill)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPath(path)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(path)
 
 
 # ── Theme dialog ───────────────────────────────────────────────────────────
@@ -397,6 +500,9 @@ class ThemeDialog(QDialog):
         self._current_theme: ThemeColors | None = None
         self._pending_save = False
         self._active_color_dlg: QColorDialog | None = None
+        self._hover_overlay: _HoverOverlay | None = None
+        self._hover_poll_timer: QTimer | None = None
+        self._last_polled_widget: QWidget | None = None
 
         self.setWindowTitle("Theme Manager")
         self.setMinimumSize(600, 540)
@@ -676,13 +782,87 @@ class ThemeDialog(QDialog):
         win_v.setSpacing(0)
 
         win_v.addWidget(self._build_prev_title_bar())
-        win_v.addWidget(self._build_prev_file_strip())
-        win_v.addWidget(self._build_prev_sub_tab_bar())
-        win_v.addWidget(self._build_prev_body(), 1)
+
+        # Middle: sidebar (44 px) + scrollable content column.
+        middle = QWidget()
+        middle.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        middle_h = QHBoxLayout(middle)
+        middle_h.setContentsMargins(0, 0, 0, 0)
+        middle_h.setSpacing(0)
+        middle_h.addWidget(self._build_prev_sidebar())
+        content_col = QWidget()
+        content_col.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        content_v = QVBoxLayout(content_col)
+        content_v.setContentsMargins(0, 0, 0, 0)
+        content_v.setSpacing(0)
+        content_v.addWidget(self._build_prev_file_strip())
+        content_v.addWidget(self._build_prev_sub_tab_bar())
+        content_v.addWidget(self._build_prev_body(), 1)
+        middle_h.addWidget(content_col, 1)
+        win_v.addWidget(middle, 1)
+
         win_v.addWidget(self._build_prev_transport_bar())
 
+        self._preview_window = win
         outer.addWidget(win, 1)
         return panel
+
+    def _build_prev_sidebar(self) -> QFrame:
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        sidebar.setFixedWidth(44)
+
+        v = QVBoxLayout(sidebar)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(0)
+
+        # Logo row (same height as nav buttons; icon only visible in collapsed width)
+        logo_row = QFrame()
+        logo_row.setFixedHeight(48)
+        logo_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._prev_sidebar_logo = QLabel(logo_row)
+        self._prev_sidebar_logo.setObjectName("nav_icon")
+        self._prev_sidebar_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._prev_sidebar_logo.setGeometry(12, 13, 22, 22)
+        self._prev_sidebar_logo.setScaledContents(True)
+        self._prev_sidebar_logo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        v.addWidget(logo_row)
+
+        # Nav items: (ph_icon name, is_active)
+        _nav_items = [
+            ("music-note",    True),
+            ("waveform",      False),
+            ("gear-six",      False),
+            ("bug",           False),
+        ]
+        self._prev_nav_icon_labels: list[tuple[QLabel, str, bool]] = []
+        for icon_name, is_active in _nav_items:
+            btn_frame = QFrame()
+            btn_frame.setObjectName("nav_btn")
+            btn_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            btn_frame.setFixedHeight(48)
+            btn_frame.setProperty("active",  "true" if is_active else "false")
+            btn_frame.setProperty("hovered", "false")
+
+            icon_lbl = QLabel(btn_frame)
+            icon_lbl.setObjectName("nav_icon")
+            icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            icon_lbl.setGeometry(12, 13, 22, 22)
+            icon_lbl.setScaledContents(True)
+            icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+            text_lbl = QLabel("", btn_frame)
+            text_lbl.setObjectName("nav_label")
+            text_lbl.setGeometry(44, 0, 200, 48)
+            text_lbl.setProperty("highlighted", "true" if is_active else "false")
+            text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+            v.addWidget(btn_frame)
+            self._prev_nav_icon_labels.append((icon_lbl, icon_name, is_active))
+
+        v.addStretch()
+        return sidebar
 
     def _build_prev_title_bar(self) -> QFrame:
         title_bar = QFrame()
@@ -1206,9 +1386,6 @@ class ThemeDialog(QDialog):
         stop_bg  = _mix(theme.bg_primary, theme.accent_stop, 0.15)
         stop_hov = _mix(theme.bg_primary, theme.accent_stop, 0.28)
         stop_bdr = _mix(theme.accent_stop, theme.bg_secondary, 0.40)
-        save_bg  = _mix(theme.bg_primary, theme.accent, 0.15)
-        save_hov = _mix(theme.bg_primary, theme.accent, 0.28)
-        save_bdr = _mix(theme.accent, theme.bg_secondary, 0.40)
         ss = generate_stylesheet(theme)
         self._preview_panel.setStyleSheet(
             ss
@@ -1217,14 +1394,12 @@ class ThemeDialog(QDialog):
             + f"\nQPushButton#play_button:hover {{ background-color: {play_hov}; }}"
             + f"\nQPushButton#stop_button {{ background-color: {stop_bg}; border-color: {stop_bdr}; }}"
             + f"\nQPushButton#stop_button:hover {{ background-color: {stop_hov}; }}"
-            + f"\nQPushButton#save_button {{ background-color: {save_bg}; border-color: {save_bdr}; }}"
-            + f"\nQPushButton#save_button:hover {{ background-color: {save_hov}; }}"
             + f"\nQFrame#pedal_swatch {{ background-color: {theme.pedal_color}; border-radius: 4px; }}"
         )
         _ti = 22
         self._prev_play_btn.setIcon(ph_icon("play",        theme.accent_play, _ti))
         self._prev_stop_btn.setIcon(ph_icon("stop",        theme.accent_stop, _ti))
-        self._prev_save_btn.setIcon(ph_icon("floppy-disk", theme.accent,      _ti))
+        self._prev_save_btn.setIcon(ph_icon("floppy-disk", theme.accent_save, _ti))
         # Reset button (card_reset role) renders its glyph in the muted-text color.
         self._prev_reset_btn.setIcon(
             ph_icon("arrow-counter-clockwise", theme.text_secondary, 14)
@@ -1234,6 +1409,16 @@ class ThemeDialog(QDialog):
         self._prev_file_tile_icon.setPixmap(
             ph_icon("music-note", theme.accent, 16).pixmap(32, 32)
         )
+        # Sidebar logo and nav icons.
+        _ni = 18
+        self._prev_sidebar_logo.setPixmap(
+            ph_icon("music-note", theme.text_primary, _ni).pixmap(_ni * 2, _ni * 2)
+        )
+        for icon_lbl, icon_name, is_active in self._prev_nav_icon_labels:
+            color = theme.text_primary if is_active else theme.text_secondary
+            icon_lbl.setPixmap(ph_icon(icon_name, color, _ni).pixmap(_ni * 2, _ni * 2))
+        if self._hover_overlay is not None:
+            self._hover_overlay.set_accent(theme.accent)
 
     def _sync_toolbar_btn_sizes(self) -> None:
         h = self._combo.sizeHint().height()
@@ -1250,25 +1435,96 @@ class ThemeDialog(QDialog):
 
     def _cleanup_inspect(self) -> None:
         QApplication.instance().removeEventFilter(self._inspect_filter)
+        if self._hover_poll_timer is not None:
+            self._hover_poll_timer.stop()
+            self._hover_poll_timer = None
         if self._active_color_dlg is not None:
             self._active_color_dlg.close()
             self._active_color_dlg = None
+        if self._hover_overlay is not None:
+            self._hover_overlay.deleteLater()
+            self._hover_overlay = None
 
     def _toggle_inspect(self, active: bool) -> None:
         self._inspect_filter.set_active(active)
         if active:
             self._inspect_hint.setText("Right-click any element to pick its color")
             shape = Qt.CursorShape.CrossCursor
+            accent = self._current_theme.accent if self._current_theme else "#5b8dee"
+            self._hover_overlay = _HoverOverlay(self._preview_panel, accent)
+            self._hover_overlay.show()
+            self._last_polled_widget = None
+            self._hover_poll_timer = QTimer(self)
+            self._hover_poll_timer.timeout.connect(self._poll_inspect_hover)
+            self._hover_poll_timer.start(40)
         else:
             self._inspect_hint.setText("")
             shape = Qt.CursorShape.ArrowCursor
+            if self._hover_poll_timer is not None:
+                self._hover_poll_timer.stop()
+                self._hover_poll_timer = None
+            self._last_polled_widget = None
             if self._active_color_dlg is not None:
                 self._active_color_dlg.close()
                 self._active_color_dlg = None
+            if self._hover_overlay is not None:
+                self._hover_overlay.deleteLater()
+                self._hover_overlay = None
         cursor = QCursor(shape)
         self._preview_panel.setCursor(cursor)
         for child in self._preview_panel.findChildren(QWidget):
             child.setCursor(cursor)
+
+    def _poll_inspect_hover(self) -> None:
+        widget = QApplication.widgetAt(QCursor.pos())
+        if widget is self._last_polled_widget:
+            return
+        self._last_polled_widget = widget
+        self._on_widget_hovered(widget)
+
+    def _is_in_preview_window(self, widget: QWidget) -> bool:
+        w = widget
+        while w is not None:
+            if w is self._preview_window:
+                return True
+            w = w.parent()
+        return False
+
+    def _on_widget_hovered(self, widget: QWidget | None) -> None:
+        if self._hover_overlay is None:
+            return
+        if widget is None or not self._is_in_preview_window(widget):
+            self._hover_overlay.set_rects([])
+            return
+        # Walk up the parent chain until we find a widget with a known field.
+        # Unnamed intermediate containers return None; their nearest named
+        # ancestor carries the correct field for the visual region.
+        result = None
+        w: QWidget | None = widget
+        while w is not None and self._is_in_preview_window(w):
+            result = _field_for_widget(w)
+            if result is not None:
+                break
+            w = w.parent()
+        if result is None:
+            self._hover_overlay.set_rects([])
+            return
+        field = result[0]
+        panel = self._preview_panel
+        rects: list[QRect] = []
+        candidates = [self._preview_window, *self._preview_window.findChildren(QWidget)]
+        for child in candidates:
+            if isinstance(child, _HoverOverlay):
+                continue
+            cls_name = type(child).__name__
+            if cls_name in ("QFrame", "QWidget") and not child.objectName():
+                continue
+            child_result = _field_for_widget(child)
+            if child_result is not None and child_result[0] == field:
+                if child.isVisible() and child.width() > 0 and child.height() > 0:
+                    mapped = child.mapTo(panel, QPoint(0, 0))
+                    rects.append(QRect(mapped, child.size()))
+        self._hover_overlay.set_rects(rects)
 
     def _on_widget_picked(self, widget: QWidget, global_pos) -> None:
         if self._current_theme is None:

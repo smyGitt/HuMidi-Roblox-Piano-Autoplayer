@@ -82,7 +82,9 @@ class MainWindowUI(QObject):
         main_layout.setSpacing(0)
 
         self._is_collapsed = False
-        self._expanded_size = QSize(960, 660)
+        self._expanded_size = QSize(700, 600)
+        self.main_window.setMinimumWidth(700)
+        self.main_window.setMinimumHeight(600)
 
         # -- Collapsed mini strip ---------------------------------------------
         self._collapsed_strip = QFrame()
@@ -442,7 +444,7 @@ class MainWindowUI(QObject):
         self._icon_play  = ph_icon("play",       theme.accent_play,  _ti)
         self._icon_pause = ph_icon("pause",      theme.accent_play,  _ti)
         self._icon_stop  = ph_icon("stop",       theme.accent_stop,  _ti)
-        self._icon_save  = ph_icon("floppy-disk", theme.text_primary, _ti)
+        self._icon_save  = ph_icon("floppy-disk", theme.accent_save,   _ti)
         self.play_button.setIconSize(QSize(_ti, _ti))
         self.play_button.setIcon(self._icon_play)
         self.stop_button.setIconSize(QSize(_ti, _ti))
@@ -453,6 +455,7 @@ class MainWindowUI(QObject):
         # File strip, drop-zone, and card-level reset button icons
         self.playback_tab.file_strip.update_icon_color(theme.text_secondary)
         self.playback_tab.drop_zone.update_icon_color(theme.text_secondary)
+        self.playback_tab._drop_card.set_colors(theme.border, theme.accent)
         self.playback_tab.update_icon_color(theme.text_secondary)
 
         self.timeline_widget.left_hand_color.setNamedColor(theme.accent)
@@ -600,8 +603,8 @@ class MainWindowUI(QObject):
             btn_row_layout.insertWidget(3, self.save_button)
             btn_row_layout.addWidget(self.collapse_btn)
             self._transport_bar.setVisible(True)
-            self.main_window.setMinimumWidth(960)
-            self.main_window.setMinimumHeight(660)
+            self.main_window.setMinimumWidth(700)
+            self.main_window.setMinimumHeight(600)
             self.main_window.resize(self._expanded_size)
 
     # -- Collapsed-strip humanize sync ----------------------------------------
