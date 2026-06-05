@@ -9,7 +9,7 @@ from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
 from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
 
-from ui.widgets import NavButton, DiscordNavButton, HuMidiButton
+from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
 from ui.widgets.ph_icon import ph_icon
 from ui.PlaybackTab import PlaybackTab
 from ui.SettingsTab import SettingsTab
@@ -195,7 +195,7 @@ class MainWindowUI(QObject):
             ("translate",    "Translator"),
             ("gear-six",     "Settings"),
             ("bug",          "Debug"),
-            ("certificate",  "Credits"),
+            ("certificate",  "About"),
         ]
         self._nav_btns: list[NavButton] = []
         for i, (icon_name, label) in enumerate(_NAV_ITEMS):
@@ -205,6 +205,8 @@ class MainWindowUI(QObject):
             self._nav_btns.append(btn)
             if i == 5:  # push Discord + GitHub to bottom edge after License
                 sidebar_vbox.addStretch()
+                self._status_indicator = StatusIndicator(sidebar)
+                sidebar_vbox.addWidget(self._status_indicator)
                 self._discord_btn = DiscordNavButton("https://discord.gg/bRaXP9gYZN")
                 sidebar_vbox.addWidget(self._discord_btn)
                 self._github_nav = NavButton("github-logo", "GitHub")
@@ -431,6 +433,7 @@ class MainWindowUI(QObject):
         for btn in self._nav_btns:
             btn.update_icon_colors(theme.text_secondary, theme.text_primary)
         self._github_nav.update_icon_colors(theme.text_secondary, theme.text_primary)
+        self._status_indicator.update_colors(theme.text_secondary, theme.accent_play, "#c44b4b")
 
         # Collapsed strip load buttons
         _px = self._collapsed_load_btn.fontMetrics().height()

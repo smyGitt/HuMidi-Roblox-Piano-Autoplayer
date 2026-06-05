@@ -31,10 +31,10 @@ def _extract_pedal_intervals(pedal_events) -> list:
 def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     """Parse MIDI, apply track role assignments, and run hand simulation.
 
-    Shared by PlaybackController.play() and _SaveWorker.run() to eliminate the
+    Shared by _PrepareWorker.run() and _SaveWorker.run() to eliminate the
     duplicated note-preparation pipeline that previously existed in both places.
 
-    Returns (final_notes, tempo_map). Raises on MIDI parse failure — callers
+    Returns (final_notes, tempo_map). Raises on MIDI parse failure -- callers
     should catch and surface the exception appropriately.
     """
     tempo_scale = config.get('tempo', 100.0) / 100.0
@@ -75,6 +75,64 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
         log(f"[PREP] Final note set: {len(final_notes)} notes | L={l_count} R={r_count} | source pedal CC events={pedal_cc_count}")
 
     return final_notes, tempo_map
+
+
+class _PrepareWorker(QObject):
+    """Runs _prepare_notes + SectionAnalyzer + pedal_generator on a QThread.
+
+    Emits prepare_finished with all data needed to start the Player, or
+    error_occurred on failure. Always emits finished last for thread cleanup.
+    """
+    status_updated  = Signal(str)
+    prepare_finished = Signal(object, object, object, float, object)  # notes, sections, tempo_map, total_dur, pedal_intervals
+    error_occurred  = Signal(str)
+    finished        = Signal()
+
+    def __init__(self, config: Dict, selected_tracks_info: List):
+        super().__init__()
+        self.config = config
+        self.selected_tracks_info = selected_tracks_info
+
+    def run(self):
+        debug_log = self.status_updated.emit if self.config.get('debug_mode') else None
+        if debug_log:
+            debug_log("\n" + "=" * 60)
+            debug_log("=== PLAYBACK SESSION START (MIDI file) ===")
+            debug_log("=" * 60)
+            debug_log("[CONFIG] " + " | ".join(
+                f"{k}={v}" for k, v in sorted(self.config.items())
+                if k not in ('midi_file',)
+            ))
+            debug_log(f"[CONFIG] midi_file: {self.config.get('midi_file', 'N/A')}")
+            debug_log(f"[CONFIG] Tracks selected: {len(self.selected_tracks_info)}")
+            for t, role in self.selected_tracks_info:
+                debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role} | Instrument: {t.instrument_name}")
+            debug_log("\n=== RAW MIDI DATA (Selected Tracks) ===")
+
+        try:
+            final_notes, tempo_map = _prepare_notes(
+                self.config, self.selected_tracks_info, log=debug_log
+            )
+        except Exception as e:
+            self.error_occurred.emit(f"Error preparing playback:\n{e}")
+            self.finished.emit()
+            return
+
+        self.status_updated.emit("Analyzing musical structure...")
+        analyzer = SectionAnalyzer(final_notes, tempo_map, debug_log=debug_log)
+        sections = analyzer.analyze()
+
+        total_dur = max(n.end_time for n in final_notes) if final_notes else 1.0
+
+        self.status_updated.emit("Generating pedal events...")
+        try:
+            _pedal_evs = pedal_generator.generate_events(self.config, final_notes, sections)
+            pedal_intervals = _extract_pedal_intervals(_pedal_evs)
+        except Exception:
+            pedal_intervals = []
+
+        self.prepare_finished.emit(final_notes, sections, tempo_map, total_dur, pedal_intervals)
+        self.finished.emit()
 
 
 class _SaveWorker(QObject):
@@ -122,7 +180,7 @@ class _SaveWorker(QObject):
 
         if not events_to_serialize:
             self.save_failed.emit(
-                "Compilation produced zero events — nothing to save.\n"
+                "Compilation produced zero events -- nothing to save.\n"
                 "Verify that the selected tracks contain notes within the keyboard's playable range."
             )
             self.finished.emit()
@@ -197,32 +255,48 @@ class _SaveWorker(QObject):
 
 class PlaybackController(QObject):
     # Signals to communicate back to the GUI
-    status_updated = Signal(str)
-    progress_updated = Signal(float)
+    status_updated    = Signal(str)
+    progress_updated  = Signal(float)
     playback_finished = Signal()
     visualizer_updated = Signal(list)
-    auto_paused = Signal()
-    error_occurred = Signal(str)
-    
+    auto_paused       = Signal()
+    error_occurred    = Signal(str)
+
     pedal_updated = Signal(bool)          # Bridged from Player: True=down, False=up
     # Custom signals for specific orchestration events
-    timeline_data_ready = Signal(list, float, object) # notes, total_duration, tempo_map
-    pedal_data_ready = Signal(list)       # List of (start_sec, end_sec) pedal intervals
-    save_successful = Signal(str, str) # filepath, success message
-    save_failed = Signal(str) # error message
+    timeline_data_ready = Signal(list, float, object)  # notes, total_duration, tempo_map
+    pedal_data_ready    = Signal(list)                 # List of (start_sec, end_sec) pedal intervals
+    save_successful     = Signal(str, str)             # filepath, success message
+    save_failed         = Signal(str)                  # error message
+
+    # Status indicator lifecycle signals
+    preparation_started = Signal()   # emitted when heavy preparation begins (any play path)
+    playback_started    = Signal()   # emitted just before the Player QThread starts
 
     def __init__(self):
         super().__init__()
-        self.player = None
-        self.player_thread = None
-        self._save_worker = None
-        self._save_thread = None
+        self.player         = None
+        self.player_thread  = None
+        self._save_worker   = None
+        self._save_thread   = None
+        self._prepare_worker = None
+        self._prepare_thread = None
+        self._pending_config: Dict | None = None
+
+    # -- State queries --------------------------------------------------------
+
+    def is_preparing(self) -> bool:
+        """True while the _PrepareWorker thread is running (before Player starts)."""
+        return self._prepare_thread is not None and self._prepare_thread.isRunning()
 
     def is_playing(self) -> bool:
+        """True while the Player QThread is running."""
         return self.player_thread is not None and self.player_thread.isRunning()
 
     def is_paused(self) -> bool:
         return self.player is not None and self.player.pause_event.is_set()
+
+    # -- Playback controls ----------------------------------------------------
 
     def toggle_pause(self):
         if self.player:
@@ -237,9 +311,14 @@ class PlaybackController(QObject):
             self.player.seek(target_time)
 
     def shutdown(self):
+        if self._prepare_thread and self._prepare_thread.isRunning():
+            self._prepare_thread.quit()
+            self._prepare_thread.wait(2000)
         if self.player and self.player_thread and self.player_thread.isRunning():
             self.player.stop()
             self.player_thread.wait(1000)
+
+    # -- Playback finished ----------------------------------------------------
 
     def _on_playback_finished(self):
         if self.player_thread:
@@ -248,6 +327,8 @@ class PlaybackController(QObject):
         self.player = None
         self.player_thread = None
         self.playback_finished.emit()
+
+    # -- Save -----------------------------------------------------------------
 
     def save(self, config: Dict, selected_tracks_info: List, save_dir: str, original_filename: str):
         if self._save_thread and self._save_thread.isRunning():
@@ -271,52 +352,45 @@ class PlaybackController(QObject):
         self._save_worker = None
         self._save_thread = None
 
+    # -- Play (MIDI file) -----------------------------------------------------
+
     def play(self, config: Dict, selected_tracks_info: List):
-        self.status_updated.emit("Preparing playback...")
+        """Start async preparation then playback for a MIDI file.
 
-        debug_log = self.status_updated.emit if config.get('debug_mode') else None
-        if debug_log:
-            debug_log("\n" + "=" * 60)
-            debug_log("=== PLAYBACK SESSION START (MIDI file) ===")
-            debug_log("=" * 60)
-            debug_log("[CONFIG] " + " | ".join(
-                f"{k}={v}" for k, v in sorted(config.items())
-                if k not in ('midi_file',)
-            ))
-            debug_log(f"[CONFIG] midi_file: {config.get('midi_file', 'N/A')}")
-            debug_log(f"[CONFIG] Tracks selected: {len(selected_tracks_info)}")
-            for t, role in selected_tracks_info:
-                debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role} | Instrument: {t.instrument_name}")
-            debug_log("\n=== RAW MIDI DATA (Selected Tracks) ===")
-
-        try:
-            final_notes, tempo_map = _prepare_notes(config, selected_tracks_info, log=debug_log)
-        except Exception as e:
-            self.error_occurred.emit(f"Error preparing playback:\n{e}")
+        _prepare_notes, SectionAnalyzer, and pedal_generator all run on a
+        _PrepareWorker QThread so the main thread (and its animation timers)
+        remain responsive during the blocking work.
+        """
+        if self.is_preparing() or self.is_playing():
             return
 
-        self.status_updated.emit("Analyzing musical structure...")
-        analyzer = SectionAnalyzer(final_notes, tempo_map, debug_log=debug_log)
-        sections = analyzer.analyze()
+        self.status_updated.emit("Preparing playback...")
+        self.preparation_started.emit()
 
-        total_dur = max(n.end_time for n in final_notes) if final_notes else 1.0
+        self._pending_config = config
+        self._prepare_thread = QThread()
+        self._prepare_worker = _PrepareWorker(config, selected_tracks_info)
+        self._prepare_worker.moveToThread(self._prepare_thread)
 
-        # Pass the processed timeline metrics back to the GUI
+        self._prepare_thread.started.connect(self._prepare_worker.run)
+        self._prepare_worker.status_updated.connect(self.status_updated)
+        self._prepare_worker.prepare_finished.connect(self._on_prepare_finished)
+        self._prepare_worker.error_occurred.connect(self._on_prepare_error)
+        self._prepare_worker.finished.connect(self._on_prepare_cleanup)
+
+        self._prepare_thread.start()
+
+    def _on_prepare_finished(self, final_notes, sections, tempo_map, total_dur, pedal_intervals):
+        config = self._pending_config
+
         self.timeline_data_ready.emit(final_notes, total_dur, tempo_map)
-
-        try:
-            _pedal_evs = pedal_generator.generate_events(config, final_notes, sections)
-            self.pedal_data_ready.emit(_extract_pedal_intervals(_pedal_evs))
-        except Exception:
-            self.pedal_data_ready.emit([])
+        self.pedal_data_ready.emit(pedal_intervals)
 
         self.player_thread = QThread()
         self.player = Player(config, final_notes, sections, tempo_map)
         self.player.moveToThread(self.player_thread)
-
         self.player_thread.started.connect(self.player.play)
 
-        # Bridge Player signals through the Orchestrator
         self.player.playback_finished.connect(self._on_playback_finished)
         self.player.status_updated.connect(self.status_updated.emit)
         self.player.progress_updated.connect(self.progress_updated.emit)
@@ -325,7 +399,21 @@ class PlaybackController(QObject):
         self.player.auto_paused.connect(self.auto_paused.emit)
         self.player.error_occurred.connect(self.error_occurred.emit)
 
+        self.playback_started.emit()
         self.player_thread.start()
+
+    def _on_prepare_error(self, error_msg: str):
+        self.error_occurred.emit(error_msg)
+
+    def _on_prepare_cleanup(self):
+        if self._prepare_thread:
+            self._prepare_thread.quit()
+            self._prepare_thread.wait()
+        self._prepare_worker = None
+        self._prepare_thread = None
+        self._pending_config = None
+
+    # -- Play (translator notes) ----------------------------------------------
 
     def play_from_notes(self, config: Dict, notes: List[Note], tempo_map: TempoMap):
         """Start playback from pre-built Note objects, bypassing MIDI file parsing.
@@ -334,6 +422,8 @@ class PlaybackController(QObject):
         the normal humanization and playback pipeline.
         """
         self.status_updated.emit("Preparing playback from imported sheet...")
+        self.preparation_started.emit()
+
         debug_log = self.status_updated.emit if config.get('debug_mode') else None
 
         if config.get('simulate_hands'):
@@ -368,10 +458,15 @@ class PlaybackController(QObject):
         self.player.auto_paused.connect(self.auto_paused.emit)
         self.player.error_occurred.connect(self.error_occurred.emit)
 
+        self.playback_started.emit()
         self.player_thread.start()
+
+    # -- Play (pre-compiled save) ---------------------------------------------
 
     def play_from_save(self, loaded_save_data: Dict):
         self.status_updated.emit("Initializing playback from pre-compiled serialization...")
+        self.preparation_started.emit()
+
         config = loaded_save_data.get('metadata', {}).get('playback_settings', {})
         events_data = loaded_save_data.get('compiled_events', [])
 
@@ -384,18 +479,18 @@ class PlaybackController(QObject):
             debug_log(f"[SAVE] Source: {metadata.get('source_midi_filename', 'unknown')}")
             debug_log(f"[SAVE] Created: {metadata.get('creation_timestamp', 'unknown')}")
             debug_log(f"[SAVE] Raw events in file: {len(events_data)}")
-        
+
         reconstructed_events = []
         reconstructed_notes = []
         active_presses = {}
         note_id_counter = 0
-        
+
         for ev in events_data:
             pitch_val = ev.get('pitch')
             # Strictly typecast properties to prevent silent pynput failure
             if pitch_val is not None:
                 pitch_val = int(pitch_val)
-                
+
             reconstructed_events.append(KeyEvent(
                 time=float(ev['time']),
                 priority=int(ev['priority']),
@@ -403,7 +498,7 @@ class PlaybackController(QObject):
                 key_char=str(ev['key_char']),
                 pitch=pitch_val
             ))
-            
+
             # Reconstruct basic note bounds for visualizer tracking.
             if ev['action'] == 'press' and pitch_val is not None:
                 active_presses[pitch_val] = float(ev['time'])
@@ -413,13 +508,13 @@ class PlaybackController(QObject):
                     dur = max(0.01, float(ev['time']) - start)
                     # Assign a basic hand based on pitch threshold so visualizer isn't gray
                     hand = 'left' if pitch_val < 60 else 'right'
-                    
+
                     reconstructed_notes.append(Note(
                         id=note_id_counter, pitch=pitch_val, velocity=64,
                         start_time=start, duration=dur, hand=hand
                     ))
                     note_id_counter += 1
-                    
+
         reconstructed_notes = sorted(reconstructed_notes, key=lambda n: n.start_time)
 
         # Enforce chronological ordering on the compiled execution events to prevent instant loop exiting
@@ -458,4 +553,5 @@ class PlaybackController(QObject):
         self.player.auto_paused.connect(self.auto_paused.emit)
         self.player.error_occurred.connect(self.error_occurred.emit)
 
+        self.playback_started.emit()
         self.player_thread.start()

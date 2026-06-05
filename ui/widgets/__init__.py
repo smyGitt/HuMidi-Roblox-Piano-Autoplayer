@@ -22,6 +22,7 @@ from ui.widgets.performance_card import PerformanceCard
 from ui.widgets.options_card import OptionsCard
 from ui.widgets.humanize_master_row import HumanizeMasterRow
 from ui.widgets.hum_row import HumRow
+from ui.widgets.status_indicator import StatusIndicator
 
 __all__ = [
     "NavButton",
@@ -41,4 +42,5 @@ __all__ = [
     "OptionsCard",
     "HumanizeMasterRow",
     "HumRow",
+    "StatusIndicator",
 ]

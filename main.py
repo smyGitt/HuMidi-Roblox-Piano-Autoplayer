@@ -18,6 +18,7 @@ from managers.ConfigManager import ConfigManager
 from ui.MainWindowUI import MainWindowUI
 from ui.TrackSelectionDialog import TrackSelectionDialog
 from ui.LoadSaveDialog import LoadSaveDialog
+from ui.widgets import StatusIndicator
 
 APP_VERSION = "2.0"
 
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
 
         # System Logic bridging to the View representations
         self.playback_controller.status_updated.connect(self.ui.log_output.append)
+        self.playback_controller.status_updated.connect(self._on_status_for_indicator)
         self.playback_controller.progress_updated.connect(self.update_progress)
         self.playback_controller.playback_finished.connect(self.on_playback_finished)
         self.playback_controller.visualizer_updated.connect(lambda p: self.ui.piano_widget.set_active_pitches(p))
@@ -127,6 +129,8 @@ class MainWindow(QMainWindow):
         self.playback_controller.pedal_data_ready.connect(self._on_pedal_data_ready)
         self.playback_controller.save_successful.connect(self._on_save_successful)
         self.playback_controller.save_failed.connect(self._on_save_failed)
+        self.playback_controller.preparation_started.connect(self._on_preparation_started)
+        self.playback_controller.playback_started.connect(self._on_playback_started)
 
     # --- Windows Specific GUI Modifications ---
     def _toggle_always_on_top(self, checked):
@@ -187,6 +191,8 @@ class MainWindow(QMainWindow):
                 self.ui.play_button.setToolTip("Start playback.")
 
     def toggle_playback_state(self):
+        if self.playback_controller.is_preparing():
+            return  # no-op while the prepare worker is running
         if not self.playback_controller.is_paused():
             self.ui.piano_widget.clear()
 
@@ -227,6 +233,7 @@ class MainWindow(QMainWindow):
         self.total_song_duration_sec = total_dur
         self.ui.timeline_widget.set_data(notes, total_dur, tempo_map)
         self.ui.reset_timeline_position()
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
 
     def _on_pedal_data_ready(self, intervals: list):
         self.current_pedal_intervals = intervals
@@ -324,6 +331,7 @@ class MainWindow(QMainWindow):
         self.ui.scrubber_slider.setEnabled(True)
         self.ui.log_output.append(f"Loaded save file: {self.loaded_save_filename}")
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
 
     def open_load_dialog(self):
         dialog = LoadSaveDialog(self.config_manager.save_dir, self)
@@ -354,10 +362,12 @@ class MainWindow(QMainWindow):
 
     def _parse_and_select_tracks(self, filepath):
         self.ui.log_output.append("Parsing MIDI structure...")
+        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "Reading MIDI...")
         try:
             tracks, tempo_map, pedal_count = MidiParser.parse_structure(filepath, 1.0, None)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to parse MIDI:\n{e}")
+            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "No file loaded")
             return
 
         self._parsed_tracks = tracks
@@ -374,6 +384,7 @@ class MainWindow(QMainWindow):
             self.ui.play_button.setEnabled(True)
             self.ui.scrubber_slider.setEnabled(True)
             self.ui._set_save_enabled(True)
+            self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
         else:
             self.ui.log_output.append("Track selection cancelled.")
             self.selected_tracks_info = None
@@ -381,6 +392,7 @@ class MainWindow(QMainWindow):
             self.ui.play_button.setEnabled(False)
             self.ui.scrubber_slider.setEnabled(False)
             self.ui._set_save_enabled(False)
+            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "No file loaded")
 
     def _edit_track_selection(self) -> None:
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
@@ -478,6 +490,33 @@ class MainWindow(QMainWindow):
         self.ui.log_output.append("ERROR: Playback thread terminated unexpectedly due to an execution failure.")
         QMessageBox.critical(self, "Hardware/Execution Failure", error_message)
 
+    # --- Status Indicator Slots ---
+
+    def _on_preparation_started(self):
+        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "Preparing...")
+
+    def _on_playback_started(self):
+        self.ui.play_button.setEnabled(True)
+        self.ui.stop_button.setEnabled(True)
+        self._sync_play_button()
+
+    _STATUS_SHORT = [
+        ("Preparing playback",                          "Preparing..."),
+        ("Analyzing musical structure",                 "Analyzing..."),
+        ("Generating pedal events",                     "Generating pedal..."),
+        ("Preparing playback from imported sheet",      "Preparing..."),
+        ("Initializing playback from pre-compiled",     "Loading save..."),
+        ("Compiling data for serialization",            "Saving..."),
+    ]
+
+    def _on_status_for_indicator(self, text: str) -> None:
+        if self.ui._status_indicator.state != StatusIndicator.LOADING:
+            return
+        for prefix, short in self._STATUS_SHORT:
+            if text.startswith(prefix):
+                self.ui._status_indicator.set_text(short)
+                return
+
     # --- Core Executions ---
     def handle_save(self):
         config = self.ui.gather_playback_config()
@@ -497,10 +536,12 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Save Error", error_message)
 
     def handle_play(self):
-        if self.playback_controller.is_playing() or self.playback_controller.is_paused(): 
+        if self.playback_controller.is_playing() or self.playback_controller.is_paused():
             self.toggle_playback_state()
             return
-            
+        if self.playback_controller.is_preparing():
+            return  # silently ignore while preparation is in progress
+
         if self.loaded_save_data:
             try:
                 self.playback_controller.play_from_save(self.loaded_save_data)
@@ -516,11 +557,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "No Tracks", "Please select a MIDI file and choose tracks first.")
                 return
             self.playback_controller.play(config, self.selected_tracks_info)
-            
+
         self.ui.set_controls_enabled(False, bool(self.loaded_save_data))
-        self.ui.play_button.setEnabled(True)
-        self.ui.stop_button.setEnabled(True)
-        self._sync_play_button()
+        # Stop button is enabled in _on_playback_started once the Player thread is live.
+        self.ui.stop_button.setEnabled(False)
+        self.ui.play_button.setEnabled(False)
         if self.ui._nav_btns[1].isEnabled():
             self.ui.tabs.setCurrentIndex(1)
 
@@ -533,6 +574,7 @@ class MainWindow(QMainWindow):
         self.ui.stop_button.setEnabled(False)
         self._sync_play_button()
         self.ui.piano_widget.set_pedal_active(False)
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
 
     # --- Update ---
     def _manual_check_update(self):
