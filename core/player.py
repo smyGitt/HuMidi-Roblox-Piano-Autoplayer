@@ -3,16 +3,13 @@ from pynput.keyboard import Key, Controller
 import time
 import threading
 import traceback
-import heapq
-import random
 import bisect
-import copy
 from typing import List, Dict, Optional, Tuple
 
 from core.models import Note, KeyEvent, MusicalSection, KeyState
 from core.core import TempoMap, KeyMapper
-from core.humanizer import Humanizer
-import core.pedal_generator as pedal_generator
+from core.keyboard_driver import KeyboardDriver
+from core.compiler import compile_events
 
 class Player(QObject):
     status_updated = Signal(str)
@@ -23,13 +20,20 @@ class Player(QObject):
     auto_paused = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, config: Dict, notes: List[Note], sections: List[MusicalSection], tempo_map: TempoMap):
+    def __init__(
+        self,
+        config: Dict,
+        notes: List[Note],
+        sections: List[MusicalSection],
+        tempo_map: TempoMap,
+        keyboard_driver: Optional[KeyboardDriver] = None,
+    ):
         super().__init__()
         self.config = config
         self.notes = notes
         self.sections = sections
         self.tempo_map = tempo_map
-        self.keyboard = Controller()
+        self.keyboard: KeyboardDriver = keyboard_driver if keyboard_driver is not None else Controller()
         self.mapper = KeyMapper(use_88_key_layout=self.config.get('use_88_key_layout', False))
         
         self.compiled_events: List[KeyEvent] = []
@@ -58,48 +62,19 @@ class Player(QObject):
         self.current_section_idx = -1
     
     def _log_debug(self, msg: str):
-        if self.debug_log is not None: 
+        if self.debug_log is not None:
             self.debug_log.append(msg)
             self.status_updated.emit(msg)
 
     def _apply_humanization_and_compile(self):
-        self._log_debug("\n=== HUMANIZATION PIPELINE ===")
-        self.humanizer = Humanizer(self.config, self.debug_log)
-        humanized_notes = copy.deepcopy(self.notes)
-        left_hand_notes = [n for n in humanized_notes if n.hand == 'left']
-        right_hand_notes = [n for n in humanized_notes if n.hand == 'right']
-        unknown_notes = [n for n in humanized_notes if n.hand == 'unknown']
-        self._log_debug(
-            f"[PIPELINE] Input: {len(humanized_notes)} notes total | "
-            f"L={len(left_hand_notes)} R={len(right_hand_notes)} Unknown={len(unknown_notes)}"
-        )
-        resync_points = {round(n.start_time, 2) for n in left_hand_notes}.intersection(
-            {round(n.start_time, 2) for n in right_hand_notes}
-        )
-        self._log_debug(f"[PIPELINE] Resync points (both hands simultaneous): {len(resync_points)}")
-
-        # Track list length so we can emit humanizer-only entries afterward
-        pre_len = len(self.debug_log) if self.debug_log is not None else 0
-        self.humanizer.apply_to_hand(left_hand_notes, 'left', resync_points)
-        self.humanizer.apply_to_hand(right_hand_notes, 'right', resync_points)
-        all_notes = sorted(left_hand_notes + right_hand_notes, key=lambda n: n.start_time)
-        self.humanizer.apply_tempo_rubato(all_notes, self.sections)
-        # Humanizer._log() appends to the shared list but doesn't emit — flush those entries now
-        if self.debug_log is not None:
-            for msg in self.debug_log[pre_len:]:
-                self.status_updated.emit(msg)
-
-        self._log_debug("\n=== COMPILATION ===")
-        self._compile_event_list(all_notes, self.sections)
-
-    def export_compiled_events(self) -> List[KeyEvent]:
-        """
-        Standalone compilation pipeline for generating serialization data
-        without modifying or interrupting the hardware execution loop in play().
-        """
-        self.status_updated.emit("Compiling playback events for saving...")
-        self._apply_humanization_and_compile()
-        return self.compiled_events
+        """Delegate compilation to core.compiler.compile_events and populate runtime state."""
+        log_fn = self.status_updated.emit if self.debug_log is not None else None
+        self.compiled_events = compile_events(self.config, self.notes, self.sections, log=log_fn)
+        self.total_duration = self.compiled_events[-1].time if self.compiled_events else 0.0
+        self.key_states.clear()
+        for ev in self.compiled_events:
+            if ev.action in ('press', 'release') and ev.key_char not in self.key_states:
+                self.key_states[ev.key_char] = KeyState(ev.key_char)
 
     def load_compiled_events(self, events: List[KeyEvent], total_duration: float):
         """Load pre-compiled events for saved playback, bypassing the compilation pipeline.
@@ -219,83 +194,6 @@ class Player(QObject):
             if self.stop_event.is_set(): return
             self.status_updated.emit(f"{i}...")
             time.sleep(1)
-
-    def _compile_event_list(self, notes_to_play: List[Note], sections: List[MusicalSection]):
-        self.key_states.clear()
-        use_mistakes   = self.config.get('enable_mistakes', False)
-        mistake_chance = self.config.get('mistake_chance', 0) / 100.0
-        temp_heap      = []
-        mistakes_injected = 0
-        notes_unmapped = 0
-
-        self._log_debug(f"[COMPILE] Notes to compile: {len(notes_to_play)} | Mistakes: {'ON' if use_mistakes else 'OFF'}"
-                        + (f" ({mistake_chance*100:.1f}%)" if use_mistakes else ""))
-
-        for note in notes_to_play:
-            scheduled = False
-            if use_mistakes and random.random() < mistake_chance:
-                mistake_pitch = self._get_mistake_pitch(note.pitch)
-                if mistake_pitch:
-                    key_data = self.mapper.get_key_data(mistake_pitch)
-                    if key_data:
-                        mk_char = key_data['key']
-                        heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', mk_char, pitch=mistake_pitch))
-                        heapq.heappush(temp_heap, KeyEvent(note.start_time + note.duration, 4, 'release', mk_char, pitch=mistake_pitch))
-                        scheduled = True
-                        mistakes_injected += 1
-
-            if not scheduled:
-                key_data = self.mapper.get_key_data(note.pitch)
-                if key_data:
-                    key_char = key_data['key']
-                    heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', key_char, pitch=note.pitch))
-                    heapq.heappush(temp_heap, KeyEvent(note.end_time, 4, 'release', key_char, pitch=note.pitch))
-                    if key_char not in self.key_states:
-                        self.key_states[key_char] = KeyState(key_char)
-                else:
-                    notes_unmapped += 1
-
-        self._log_debug(f"[COMPILE] Pedal style: {self.config.get('pedal_style', 'none')}")
-        for event in pedal_generator.generate_events(self.config, notes_to_play, sections, self._log_debug):
-            heapq.heappush(temp_heap, event)
-        self.compiled_events = []
-        while temp_heap:
-            self.compiled_events.append(heapq.heappop(temp_heap))
-
-        self.total_duration = self.compiled_events[-1].time if self.compiled_events else 0.0
-
-        # Compilation summary
-        press_count = sum(1 for e in self.compiled_events if e.action == 'press')
-        release_count = sum(1 for e in self.compiled_events if e.action == 'release')
-        pedal_down = sum(1 for e in self.compiled_events if e.action == 'pedal' and e.key_char == 'down')
-        pedal_up = sum(1 for e in self.compiled_events if e.action == 'pedal' and e.key_char == 'up')
-
-        pitches = [e.pitch for e in self.compiled_events if e.pitch is not None]
-        pitch_range_str = f"{KeyMapper.pitch_to_name(min(pitches))}–{KeyMapper.pitch_to_name(max(pitches))}" if pitches else "none"
-
-        self._log_debug(
-            f"[COMPILE] Result: {len(self.compiled_events)} events | "
-            f"press={press_count} release={release_count} pedal_down={pedal_down} pedal_up={pedal_up}"
-        )
-        self._log_debug(
-            f"[COMPILE] Duration: {self.total_duration:.2f}s | Pitch range: {pitch_range_str} | "
-            f"Unique keys: {len(self.key_states)} | Mistakes: {mistakes_injected} | Unmapped: {notes_unmapped}"
-        )
-        if self.total_duration > 0:
-            self._log_debug(
-                f"[COMPILE] Density: {press_count / self.total_duration:.1f} presses/sec | "
-                f"{pedal_down / self.total_duration:.2f} pedal-downs/sec"
-            )
-            
-    def _get_mistake_pitch(self, original_pitch: int) -> Optional[int]:
-        candidates = [original_pitch + d for d in (-2, -1, 1, 2)]
-        if KeyMapper.is_black_key(original_pitch):
-            black_pool = [p for p in candidates if KeyMapper.is_black_key(p)]
-            white_pool = [p for p in candidates if not KeyMapper.is_black_key(p)]
-            pool = (black_pool if random.random() < 0.5 else white_pool) or black_pool or white_pool
-            return random.choice(pool) if pool else None
-        valid = [p for p in candidates if not KeyMapper.is_black_key(p)]
-        return random.choice(valid) if valid else None
 
     def _run_cursor_loop(self):
         self._log_debug("\n=== ENTERING CURSOR LOOP ===")

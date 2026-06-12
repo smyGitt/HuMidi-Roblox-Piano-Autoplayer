@@ -2,15 +2,42 @@ import os
 import sys
 import bisect
 import numpy as np
-from typing import List, Optional, Callable
+from typing import Callable, Dict, List, Optional, Protocol
 
 from core.models import Note, MusicalSection, KeyEvent
 from core.core import get_time_groups
+from core.config import PedalConfig
 
-# Cached weights — loaded once on first AI pedal call.
+# Cached weights -- loaded once on first AI pedal call.
 _weights = None
 MIN_CONFIDENCE_GATE = 0.3
 
+
+# ---------------------------------------------------------------------------
+# Strategy Protocol
+# ---------------------------------------------------------------------------
+
+class PedalStrategy(Protocol):
+    """Contract for all pedal generation strategies.
+
+    Each strategy takes the full config, the flat note list, and the section
+    list, and returns a sorted list of pedal KeyEvents. To add a new strategy:
+    define a function with this signature and register it in _STRATEGY_MAP.
+    generate_events never needs to change.
+    """
+
+    def __call__(
+        self,
+        config: PedalConfig,
+        notes: List[Note],
+        sections: List[MusicalSection],
+        debug_log: Optional[Callable[[str], None]] = None,
+    ) -> List[KeyEvent]: ...
+
+
+# ---------------------------------------------------------------------------
+# Low-level generators (private, no Protocol signature requirement)
+# ---------------------------------------------------------------------------
 
 def _get_model_path() -> str:
     base = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,7 +93,7 @@ def _bilstm_layer(x_seq: np.ndarray, W: np.ndarray, R: np.ndarray,
 
 
 def _bilstm_chunk(seq: np.ndarray, weights: dict) -> np.ndarray:
-    """Run 2-layer BiLSTM + linear head on a single chunk. seq: (T, 140) → (T,)."""
+    """Run 2-layer BiLSTM + linear head on a single chunk. seq: (T, 140) -> (T,)."""
     out1 = _bilstm_layer(seq,  weights['lstm1_W'], weights['lstm1_R'], weights['lstm1_B'], 256)
     out2 = _bilstm_layer(out1, weights['lstm2_W'], weights['lstm2_R'], weights['lstm2_B'], 256)
     logits = out2 @ weights['linear_W'] + weights['linear_B']  # (T, 1)
@@ -75,7 +102,7 @@ def _bilstm_chunk(seq: np.ndarray, weights: dict) -> np.ndarray:
 
 def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
     """Full 2-layer BiLSTM + linear head with overlapping chunks.
-    x: (1, T, 140) → preds: (T,).
+    x: (1, T, 140) -> preds: (T,).
     Uses 1024-frame chunks with 512-frame stride. Each frame's prediction
     comes from the chunk where it is closest to the center."""
     seq = x[0]  # (T, 140)
@@ -93,7 +120,6 @@ def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
         end = min(start + CHUNK, T)
         chunk_seq = seq[start:end]
 
-        # Pad if the last chunk is too short
         if len(chunk_seq) < CHUNK:
             pad_len = CHUNK - len(chunk_seq)
             chunk_seq = np.pad(chunk_seq, ((0, pad_len), (0, 0)))
@@ -101,7 +127,6 @@ def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
         else:
             chunk_preds = _bilstm_chunk(chunk_seq, weights)
 
-        # Weight by distance from chunk center — middle frames get higher weight
         chunk_len = len(chunk_preds)
         center = chunk_len / 2.0
         weight = np.array([1.0 - abs(i - center) / center for i in range(chunk_len)], dtype=np.float32)
@@ -110,88 +135,6 @@ def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
         counts[start:end] += weight
 
     return preds / counts
-
-
-def generate_events(config: dict, final_notes: List[Note], sections: List[MusicalSection],
-                    debug_log: Optional[Callable[[str], None]] = None) -> List[KeyEvent]:
-    style = config.get('pedal_style')
-    if style == 'none':
-        if debug_log is not None:
-            debug_log("[PEDAL] Style: none | no pedal events generated")
-        return []
-    events = []
-
-    if style == 'ai':
-        ai_events = _generate_ai_pedal(final_notes, debug_log)
-        if ai_events:
-            return ai_events
-        if debug_log is not None:
-            debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
-        bass_notes = [n for n in final_notes if n.hand == 'left']
-        bass_notes.sort(key=lambda n: n.start_time)
-        if not bass_notes:
-            treble_notes = [n for n in final_notes if n.hand == 'right']
-            treble_notes.sort(key=lambda n: n.start_time)
-            return _generate_adaptive_pedal_driver(treble_notes, final_notes, debug_log)
-        return _generate_adaptive_pedal_driver(bass_notes, final_notes, debug_log)
-
-    if style == 'hybrid':
-        # TODO: re-enable when Pedal AI is integrated
-        if config.get('use_ai_pedal', True):
-            ai_events = _generate_ai_pedal(final_notes, debug_log)
-            if ai_events:
-                return ai_events
-            if debug_log is not None:
-                debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
-        else:
-            if debug_log is not None:
-                debug_log("[PEDAL] AI disabled by user, using adaptive algorithm")
-
-        bass_notes = [n for n in final_notes if n.hand == 'left']
-        bass_notes.sort(key=lambda n: n.start_time)
-        if not bass_notes:
-            treble_notes = [n for n in final_notes if n.hand == 'right']
-            treble_notes.sort(key=lambda n: n.start_time)
-            if debug_log is not None:
-                debug_log(f"[PEDAL] Adaptive driver: using {len(treble_notes)} RIGHT-hand notes (no bass notes)")
-            result = _generate_adaptive_pedal_driver(treble_notes, final_notes, debug_log)
-            return result
-        if debug_log is not None:
-            debug_log(f"[PEDAL] Adaptive driver: using {len(bass_notes)} LEFT-hand bass notes")
-        return _generate_adaptive_pedal_driver(bass_notes, final_notes, debug_log)
-
-    if debug_log is not None:
-        debug_log(f"[PEDAL] Style: {style} | Sections: {len(sections)}")
-
-    sections_no_lh = 0
-    for section in sections:
-        lh_notes = [n for n in section.notes if n.hand == 'left']
-        lh_notes.sort(key=lambda n: n.start_time)
-        if not lh_notes:
-            start = section.notes[0].start_time
-            end = max(n.end_time for n in section.notes)
-            events.append(KeyEvent(start, 1, 'pedal', 'down'))
-            events.append(KeyEvent(end, 0, 'pedal', 'up'))
-            sections_no_lh += 1
-            continue
-
-        if style == 'rhythmic':
-            groups = get_time_groups(lh_notes)
-            for g in groups:
-                start = g[0].start_time
-                end = max(n.end_time for n in g)
-                events.append(KeyEvent(start, 1, 'pedal', 'down'))
-                events.append(KeyEvent(end, 0, 'pedal', 'up'))
-        else:
-            _generate_harmonic_pedal(events, lh_notes)
-
-    if debug_log is not None:
-        downs = sum(1 for e in events if e.key_char == 'down')
-        debug_log(
-            f"[PEDAL] {style} result: {len(events)} events ({downs} downs, {len(events) - downs} ups) | "
-            f"sections_without_LH={sections_no_lh}"
-        )
-    return events
 
 
 def _otsu_threshold(preds: np.ndarray) -> float:
@@ -218,7 +161,8 @@ def _otsu_threshold(preds: np.ndarray) -> float:
     return float(bin_edges[best_idx + 1])
 
 
-def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], None]]) -> List[KeyEvent]:
+def _generate_ai_pedal(notes: List[Note],
+                       debug_log: Optional[Callable[[str], None]]) -> List[KeyEvent]:
     global _weights
     fps = 50.0
 
@@ -237,7 +181,6 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
                 debug_log(f"[PEDAL] AI aborted: failed to load weights: {e}")
             return []
 
-    # 2. Matrix Translation
     max_time = max(note.end_time for note in notes)
     total_steps = int(np.ceil(max_time * fps)) + 1
     input_tensor = np.zeros((1, total_steps, 128), dtype=np.float32)
@@ -247,19 +190,16 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
         e_idx = int(note.end_time * fps)
         input_tensor[0, s_idx:e_idx, note.pitch] = 1.0
 
-    # 3. Chroma Augmentation
-    chroma = np.stack([input_tensor[0, :, c::12].sum(axis=1) for c in range(12)], axis=1)  # (T, 12)
-    input_tensor = np.concatenate([input_tensor[0], chroma], axis=1)[np.newaxis]  # (1, T, 140)
+    chroma = np.stack([input_tensor[0, :, c::12].sum(axis=1) for c in range(12)], axis=1)
+    input_tensor = np.concatenate([input_tensor[0], chroma], axis=1)[np.newaxis]
 
-    # 4. NumPy BiLSTM Forward Pass
     try:
-        preds = _bilstm_forward(input_tensor, _weights)  # (T,)
+        preds = _bilstm_forward(input_tensor, _weights)
     except Exception as e:
         if debug_log is not None:
             debug_log(f"[PEDAL] AI crashed during forward pass: {e}")
         return []
 
-    # 5. Silence Masking
     is_silent = np.ones(total_steps, dtype=bool)
     for note in notes:
         s_idx = int(note.start_time * fps)
@@ -268,7 +208,6 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
 
     preds[is_silent] = 0.0
 
-    # 6. Adaptive Threshold via Otsu's Method
     active_preds = preds[preds > 0.0]
 
     if len(active_preds) == 0 or np.max(active_preds) < MIN_CONFIDENCE_GATE:
@@ -276,7 +215,6 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
             debug_log(f"[PEDAL] AI rejected: max prediction {np.max(preds) if len(preds) > 0 else 0.0:.3f} below gate {MIN_CONFIDENCE_GATE}")
         return []
 
-    # Normalize active predictions to [0, 1] so Otsu has full range to work with
     ap_min = float(np.min(active_preds))
     ap_max = float(np.max(active_preds))
     ap_range = ap_max - ap_min
@@ -287,38 +225,36 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
     normed = (active_preds - ap_min) / ap_range
 
     otsu_split = _otsu_threshold(normed)
-    on_group = normed[normed > otsu_split]
+    on_group  = normed[normed >  otsu_split]
     off_group = normed[normed <= otsu_split]
     if len(on_group) > 0 and len(off_group) > 0:
-        on_min = float(np.min(on_group))
-        on_max = float(np.max(on_group))
+        on_min  = float(np.min(on_group));  on_max  = float(np.max(on_group))
         on_median = float(np.median(on_group))
         on_spread = on_max - on_min
-        on_ratio = (on_median - on_min) / on_spread if on_spread > 0 else 0.0
-        on_pct = on_ratio * 10.45
+        on_ratio  = (on_median - on_min) / on_spread if on_spread > 0 else 0.0
+        on_pct    = on_ratio * 10.45
 
-        off_min = float(np.min(off_group))
-        off_max = float(np.max(off_group))
+        off_min = float(np.min(off_group)); off_max = float(np.max(off_group))
         off_median = float(np.median(off_group))
         off_spread = off_max - off_min
-        off_ratio = (off_median - off_min) / off_spread if off_spread > 0 else 0.0
-        off_pct = 100 - off_ratio * 6
+        off_ratio  = (off_median - off_min) / off_spread if off_spread > 0 else 0.0
+        off_pct    = 100 - off_ratio * 6
 
-        # Compute thresholds in normalized space, then map back to original scale
-        norm_on = float(np.percentile(on_group, on_pct))
+        norm_on  = float(np.percentile(on_group,  on_pct))
         norm_off = float(np.percentile(off_group, off_pct))
-        threshold_on = norm_on * ap_range + ap_min
+        threshold_on  = norm_on  * ap_range + ap_min
         threshold_off = norm_off * ap_range + ap_min
     else:
-        on_pct = 0.0
-        off_pct = 100.0
-        threshold_on = otsu_split * ap_range + ap_min
+        on_pct = 0.0; off_pct = 100.0
+        threshold_on  = otsu_split * ap_range + ap_min
         threshold_off = threshold_on
     if debug_log is not None:
-        debug_log(f"[PEDAL] range: [{ap_min:.4f}, {ap_max:.4f}], Otsu (normed): {otsu_split:.4f}, on (P{on_pct:.1f}): {threshold_on:.4f}, off (P{off_pct:.1f}): {threshold_off:.4f} (active frames: {len(active_preds)})")
+        debug_log(
+            f"[PEDAL] range: [{ap_min:.4f}, {ap_max:.4f}], Otsu (normed): {otsu_split:.4f}, "
+            f"on (P{on_pct:.1f}): {threshold_on:.4f}, off (P{off_pct:.1f}): {threshold_off:.4f} "
+            f"(active frames: {len(active_preds)})"
+        )
 
-    # 7. Event Generation — confident to start, holds until clearly non-pedal
-    #    Skip silence-masked frames (0.0) — they aren't model opinions
     events = []
     pedal_is_down = False
     for i in range(1, len(preds)):
@@ -326,11 +262,9 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
         if curr_val == 0.0:
             continue
         curr_time = i / fps
-
         if not pedal_is_down and curr_val > threshold_on:
             pedal_is_down = True
             events.append(KeyEvent(curr_time, 1, 'pedal', 'down'))
-
         elif pedal_is_down and curr_val <= threshold_off:
             pedal_is_down = False
             events.append(KeyEvent(curr_time, 0, 'pedal', 'up'))
@@ -338,7 +272,6 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
     if pedal_is_down:
         events.append(KeyEvent(max_time, 0, 'pedal', 'up'))
 
-    # 8. Quality Assurance Rejection
     if len(events) <= 2:
         if debug_log is not None:
             debug_log(f"[PEDAL] AI rejected: insufficient event variance ({len(events)} events, need > 2)")
@@ -351,8 +284,11 @@ def _generate_ai_pedal(notes: List[Note], debug_log: Optional[Callable[[str], No
     return events
 
 
-def _generate_adaptive_pedal_driver(driver_notes: List[Note], all_notes: List[Note],
-                                    debug_log: Optional[Callable[[str], None]] = None) -> List[KeyEvent]:
+def _generate_adaptive_pedal_driver(
+    driver_notes: List[Note],
+    all_notes: List[Note],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
     events = []
     if not driver_notes:
         if debug_log is not None:
@@ -423,16 +359,26 @@ def _generate_adaptive_pedal_driver(driver_notes: List[Note], all_notes: List[No
     return events
 
 
-def _generate_harmonic_pedal(events: List[KeyEvent], bass_notes: List[Note]):
-    if not bass_notes: return
+def _generate_harmonic_pedal(bass_notes: List[Note]) -> List[KeyEvent]:
+    """Return pedal events for a section's bass notes.
+
+    Refactored to return a list rather than mutating a shared accumulator.
+    Behaviour is identical to the original: current_bass_pitch initialises to
+    -1, so the first note always triggers the 'new harmony' branch and produces
+    an extra up+down pair at its start_time alongside the initial down.
+    """
+    events: List[KeyEvent] = []
+    if not bass_notes:
+        return events
     current_bass_pitch = -1
+    has_gap = False
     for i, note in enumerate(bass_notes):
         is_new_harmony = (note.pitch != current_bass_pitch)
         if i == 0:
             events.append(KeyEvent(note.start_time, 1, 'pedal', 'down'))
         else:
-            prev_end = bass_notes[i-1].end_time
-            has_gap = (note.start_time - prev_end) > 0.15
+            prev_end = bass_notes[i - 1].end_time
+            has_gap  = (note.start_time - prev_end) > 0.15
         if i > 0 and has_gap:
             events.append(KeyEvent(prev_end, 0, 'pedal', 'up'))
             events.append(KeyEvent(note.start_time, 1, 'pedal', 'down'))
@@ -442,3 +388,151 @@ def _generate_harmonic_pedal(events: List[KeyEvent], bass_notes: List[Note]):
         current_bass_pitch = note.pitch
     final_end = max(n.end_time for n in bass_notes)
     events.append(KeyEvent(final_end, 0, 'pedal', 'up'))
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Strategy implementations (match PedalStrategy Protocol)
+# ---------------------------------------------------------------------------
+
+def _rhythmic_strategy(
+    config: PedalConfig,
+    notes: List[Note],
+    sections: List[MusicalSection],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    events: List[KeyEvent] = []
+    sections_no_lh = 0
+    for section in sections:
+        lh_notes = sorted([n for n in section.notes if n.hand == 'left'], key=lambda n: n.start_time)
+        if not lh_notes:
+            start = section.notes[0].start_time
+            end   = max(n.end_time for n in section.notes)
+            events.append(KeyEvent(start, 1, 'pedal', 'down'))
+            events.append(KeyEvent(end,   0, 'pedal', 'up'))
+            sections_no_lh += 1
+            continue
+        for g in get_time_groups(lh_notes):
+            start = g[0].start_time
+            end   = max(n.end_time for n in g)
+            events.append(KeyEvent(start, 1, 'pedal', 'down'))
+            events.append(KeyEvent(end,   0, 'pedal', 'up'))
+    if debug_log is not None:
+        downs = sum(1 for e in events if e.key_char == 'down')
+        debug_log(
+            f"[PEDAL] rhythmic result: {len(events)} events ({downs} downs, {len(events) - downs} ups) | "
+            f"sections_without_LH={sections_no_lh}"
+        )
+    return events
+
+
+def _harmonic_strategy(
+    config: PedalConfig,
+    notes: List[Note],
+    sections: List[MusicalSection],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    events: List[KeyEvent] = []
+    sections_no_lh = 0
+    for section in sections:
+        lh_notes = sorted([n for n in section.notes if n.hand == 'left'], key=lambda n: n.start_time)
+        if not lh_notes:
+            start = section.notes[0].start_time
+            end   = max(n.end_time for n in section.notes)
+            events.append(KeyEvent(start, 1, 'pedal', 'down'))
+            events.append(KeyEvent(end,   0, 'pedal', 'up'))
+            sections_no_lh += 1
+            continue
+        events.extend(_generate_harmonic_pedal(lh_notes))
+    if debug_log is not None:
+        downs = sum(1 for e in events if e.key_char == 'down')
+        debug_log(
+            f"[PEDAL] harmonic result: {len(events)} events ({downs} downs, {len(events) - downs} ups) | "
+            f"sections_without_LH={sections_no_lh}"
+        )
+    return events
+
+
+def _ai_strategy(
+    config: PedalConfig,
+    notes: List[Note],
+    sections: List[MusicalSection],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    ai_events = _generate_ai_pedal(notes, debug_log)
+    if ai_events:
+        return ai_events
+    if debug_log is not None:
+        debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
+    bass_notes = sorted([n for n in notes if n.hand == 'left'], key=lambda n: n.start_time)
+    if not bass_notes:
+        treble_notes = sorted([n for n in notes if n.hand == 'right'], key=lambda n: n.start_time)
+        return _generate_adaptive_pedal_driver(treble_notes, notes, debug_log)
+    return _generate_adaptive_pedal_driver(bass_notes, notes, debug_log)
+
+
+def _hybrid_strategy(
+    config: PedalConfig,
+    notes: List[Note],
+    sections: List[MusicalSection],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    if config.get('use_ai_pedal', True):
+        ai_events = _generate_ai_pedal(notes, debug_log)
+        if ai_events:
+            return ai_events
+        if debug_log is not None:
+            debug_log("[PEDAL] AI output rejected or unavailable, falling back to adaptive algorithm")
+    elif debug_log is not None:
+        debug_log("[PEDAL] AI disabled by user, using adaptive algorithm")
+
+    bass_notes = sorted([n for n in notes if n.hand == 'left'], key=lambda n: n.start_time)
+    if not bass_notes:
+        treble_notes = sorted([n for n in notes if n.hand == 'right'], key=lambda n: n.start_time)
+        if debug_log is not None:
+            debug_log(f"[PEDAL] Adaptive driver: using {len(treble_notes)} RIGHT-hand notes (no bass notes)")
+        return _generate_adaptive_pedal_driver(treble_notes, notes, debug_log)
+    if debug_log is not None:
+        debug_log(f"[PEDAL] Adaptive driver: using {len(bass_notes)} LEFT-hand bass notes")
+    return _generate_adaptive_pedal_driver(bass_notes, notes, debug_log)
+
+
+# ---------------------------------------------------------------------------
+# Strategy registry
+# ---------------------------------------------------------------------------
+
+_STRATEGY_MAP: Dict[str, PedalStrategy] = {
+    'rhythmic': _rhythmic_strategy,
+    'harmonic': _harmonic_strategy,
+    'legato':   _harmonic_strategy,   # backward-compat alias for pre-v2.1 saves
+    'ai':       _ai_strategy,
+    'hybrid':   _hybrid_strategy,
+}
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def generate_events(
+    config: PedalConfig,
+    final_notes: List[Note],
+    sections: List[MusicalSection],
+    debug_log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    """Dispatch to the registered PedalStrategy for config['pedal_style'].
+
+    To add a new strategy: implement a function matching PedalStrategy and
+    add it to _STRATEGY_MAP. This function never needs to change.
+    """
+    style = config.get('pedal_style', 'none')
+    if style == 'none':
+        if debug_log is not None:
+            debug_log("[PEDAL] Style: none | no pedal events generated")
+        return []
+    fn = _STRATEGY_MAP.get(style)
+    if fn is None:
+        if debug_log is not None:
+            debug_log(f"[PEDAL] Unknown pedal style '{style}', no events generated")
+        return []
+    return fn(config, final_notes, sections, debug_log)

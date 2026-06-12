@@ -14,6 +14,7 @@ from managers.HotkeyManager import HotkeyManager
 import webbrowser
 from managers.UpdateManager import UpdateChecker
 from controllers.PlaybackController import PlaybackController
+from controllers.app_state import AppState
 from managers.ConfigManager import ConfigManager
 from ui.MainWindowUI import MainWindowUI
 from ui.TrackSelectionDialog import TrackSelectionDialog
@@ -21,6 +22,29 @@ from ui.LoadSaveDialog import LoadSaveDialog
 from ui.widgets import StatusIndicator
 
 APP_VERSION = "2.0"
+
+
+def _validate_save_data(data: dict) -> tuple[bool, str]:
+    """Return (ok, reason). reason is empty when ok is True."""
+    metadata = data.get('metadata')
+    events   = data.get('compiled_events')
+    if not isinstance(metadata, dict):
+        return False, "Missing or invalid metadata block."
+    if not isinstance(events, list) or len(events) == 0:
+        return False, "Missing or empty compiled_events list."
+    ev0 = events[0]
+    try:
+        float(ev0['time']); int(ev0['priority']); str(ev0['action']); str(ev0['key_char'])
+    except (KeyError, TypeError, ValueError):
+        return False, "Compiled events have an unrecognised format."
+    if 'track_details' not in metadata or 'compiled_pedal_count' not in metadata:
+        return False, (
+            "This save was created with an older version of HuMidi and is missing "
+            "required fields (track_details, compiled_pedal_count).\n\n"
+            "Please re-save your MIDI file with the current version."
+        )
+    return True, ''
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -39,16 +63,7 @@ class MainWindow(QMainWindow):
         self.hotkey_manager = HotkeyManager()
         
         # Global Application States
-        self.loaded_save_data = None
-        self.loaded_save_filename = None
-        self.selected_tracks_info = None
-        self._parsed_tracks = None
-        self._loaded_pedal_count = 0
-        self.current_notes = []
-        self._note_start_times = []
-        self.total_song_duration_sec = 1.0
-        self._max_note_duration = 0.0
-        self.current_pedal_intervals = []
+        self.state = AppState()
 
         self._bind_signals()
 
@@ -216,31 +231,31 @@ class MainWindow(QMainWindow):
     
     def _on_visual_scrub(self, time):
         active_pitches = set()
-        lo = bisect.bisect_left(self._note_start_times, time - self._max_note_duration)
-        hi = bisect.bisect_right(self._note_start_times, time)
-        for note in self.current_notes[lo:hi]:
+        lo = bisect.bisect_left(self.state.note_start_times, time - self.state.max_note_duration)
+        hi = bisect.bisect_right(self.state.note_start_times, time)
+        for note in self.state.current_notes[lo:hi]:
             if note.end_time > time:
                 active_pitches.add(note.pitch)
         self.ui.piano_widget.set_active_pitches(list(active_pitches))
-        pedal_down = any(s <= time < e for s, e in self.current_pedal_intervals)
+        pedal_down = any(s <= time < e for s, e in self.state.current_pedal_intervals)
         self.ui.piano_widget.set_pedal_active(pedal_down)
-        self.ui.update_time_label(time, self.total_song_duration_sec)
+        self.ui.update_time_label(time, self.state.total_song_duration_sec)
 
     def _on_timeline_data_ready(self, notes, total_dur, tempo_map):
-        self.current_notes = notes
-        self._note_start_times = [n.start_time for n in notes]
-        self._max_note_duration = max((n.duration for n in notes), default=0.0)
-        self.total_song_duration_sec = total_dur
+        self.state.current_notes = notes
+        self.state.note_start_times = [n.start_time for n in notes]
+        self.state.max_note_duration = max((n.duration for n in notes), default=0.0)
+        self.state.total_song_duration_sec = total_dur
         self.ui.timeline_widget.set_data(notes, total_dur, tempo_map)
         self.ui.reset_timeline_position()
-        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
 
     def _on_pedal_data_ready(self, intervals: list):
-        self.current_pedal_intervals = intervals
+        self.state.current_pedal_intervals = intervals
         self.ui.timeline_widget.set_pedal_intervals(intervals)
 
     def update_progress(self, current_time):
-        self.ui.update_progress(current_time, self.total_song_duration_sec)
+        self.ui.update_progress(current_time, self.state.total_song_duration_sec)
 
     # --- Loading & File State Dialogs ---
     def _reveal_in_explorer(self) -> None:
@@ -260,10 +275,10 @@ class MainWindow(QMainWindow):
             return
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
             return
-        self.loaded_save_data = None
-        self.loaded_save_filename = None
-        self._parsed_tracks = None
-        self._loaded_pedal_count = 0
+        self.state.loaded_save_data = None
+        self.state.loaded_save_filename = None
+        self.state.parsed_tracks = None
+        self.state.loaded_pedal_count = 0
         self.ui.playback_tab.clear_loaded_summary()
         self.ui.playback_tab.set_groups_enabled(True)
         self.ui.update_file_label(os.path.basename(filepath), filepath)
@@ -272,31 +287,7 @@ class MainWindow(QMainWindow):
             
     def _apply_save(self, filepath: str, data: dict) -> None:
         """Apply a loaded save dict to UI state and stamp last_accessed on disk."""
-        def _check_save(d):
-            """Return (ok: bool, reason: str). reason is '' when ok is True."""
-            metadata = d.get('metadata')
-            events = d.get('compiled_events')
-            if not isinstance(metadata, dict):
-                return False, "Missing or invalid metadata block."
-            if not isinstance(events, list) or len(events) == 0:
-                return False, "Missing or empty compiled_events list."
-            ev0 = events[0]
-            try:
-                float(ev0['time'])
-                int(ev0['priority'])
-                str(ev0['action'])
-                str(ev0['key_char'])
-            except (KeyError, TypeError, ValueError):
-                return False, "Compiled events have an unrecognised format."
-            if 'track_details' not in metadata or 'compiled_pedal_count' not in metadata:
-                return False, (
-                    "This save was created with an older version of HuMidi and is missing "
-                    "required fields (track_details, compiled_pedal_count).\n\n"
-                    "Please re-save your MIDI file with the current version."
-                )
-            return True, ''
-
-        ok, reason = _check_save(data)
+        ok, reason = _validate_save_data(data)
         if not ok:
             QMessageBox.critical(
                 self,
@@ -312,10 +303,10 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        self.loaded_save_data = data
-        self.loaded_save_filename = os.path.basename(filepath)
-        self._parsed_tracks = None
-        self._loaded_pedal_count = 0
+        self.state.loaded_save_data = data
+        self.state.loaded_save_filename = os.path.basename(filepath)
+        self.state.parsed_tracks = None
+        self.state.loaded_pedal_count = 0
         track_details = data.get('metadata', {}).get('track_details', [])
         compiled_pedal_count = data.get('metadata', {}).get('compiled_pedal_count', 0)
         self.ui.playback_tab.update_loaded_summary_from_save(track_details, compiled_pedal_count)
@@ -324,14 +315,14 @@ class MainWindow(QMainWindow):
                 f"[DEBUG] Loaded save with {len(track_details)} track(s), "
                 f"{compiled_pedal_count} compiled pedal event(s)."
             )
-        self.ui.update_file_label(self.loaded_save_filename, filepath)
+        self.ui.update_file_label(self.state.loaded_save_filename, filepath)
         self.ui.playback_tab.set_groups_enabled(False)
         self.ui._set_save_enabled(False)
         self.ui.play_button.setEnabled(True)
         self.ui.scrubber_slider.setEnabled(True)
-        self.ui.log_output.append(f"Loaded save file: {self.loaded_save_filename}")
+        self.ui.log_output.append(f"Loaded save file: {self.state.loaded_save_filename}")
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
-        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
 
     def open_load_dialog(self):
         dialog = LoadSaveDialog(self.config_manager.save_dir, self)
@@ -362,55 +353,55 @@ class MainWindow(QMainWindow):
 
     def _parse_and_select_tracks(self, filepath):
         self.ui.log_output.append("Parsing MIDI structure...")
-        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "Reading MIDI...")
+        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "LOADING MIDI")
         try:
             tracks, tempo_map, pedal_count = MidiParser.parse_structure(filepath, 1.0, None)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to parse MIDI:\n{e}")
-            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "No file loaded")
+            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "NO FILE")
             return
 
-        self._parsed_tracks = tracks
-        self._loaded_pedal_count = pedal_count
-        self.parsed_tempo_map = tempo_map
+        self.state.parsed_tracks = tracks
+        self.state.loaded_pedal_count = pedal_count
+        self.state.parsed_tempo_map = tempo_map
 
         dialog = TrackSelectionDialog(tracks, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.selected_tracks_info = dialog.get_selection()
-            self.ui.log_output.append(f"Tracks selected: {len(self.selected_tracks_info)}")
+            self.state.selected_tracks_info = dialog.get_selection()
+            self.ui.log_output.append(f"Tracks selected: {len(self.state.selected_tracks_info)}")
             self.ui.playback_tab.update_loaded_summary(
-                self.selected_tracks_info, self._loaded_pedal_count
+                self.state.selected_tracks_info, self.state.loaded_pedal_count
             )
             self.ui.play_button.setEnabled(True)
             self.ui.scrubber_slider.setEnabled(True)
             self.ui._set_save_enabled(True)
-            self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
+            self.ui._status_indicator.set_state(StatusIndicator.LOADED, "FILE LOADED")
         else:
             self.ui.log_output.append("Track selection cancelled.")
-            self.selected_tracks_info = None
+            self.state.selected_tracks_info = None
             self.ui.playback_tab.clear_loaded_summary()
             self.ui.play_button.setEnabled(False)
             self.ui.scrubber_slider.setEnabled(False)
             self.ui._set_save_enabled(False)
-            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "No file loaded")
+            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "NO FILE")
 
     def _edit_track_selection(self) -> None:
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
             return
-        if not self._parsed_tracks:
+        if not self.state.parsed_tracks:
             return
-        dialog = TrackSelectionDialog(self._parsed_tracks, self)
+        dialog = TrackSelectionDialog(self.state.parsed_tracks, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        self.selected_tracks_info = dialog.get_selection()
+        self.state.selected_tracks_info = dialog.get_selection()
         self.ui.log_output.append(
-            f"Track selection updated: {len(self.selected_tracks_info)}"
+            f"Track selection updated: {len(self.state.selected_tracks_info)}"
         )
         self.ui.playback_tab.update_loaded_summary(
-            self.selected_tracks_info, self._loaded_pedal_count
+            self.state.selected_tracks_info, self.state.loaded_pedal_count
         )
-        self.ui._set_save_enabled(bool(self.selected_tracks_info))
-        self.ui.play_button.setEnabled(bool(self.selected_tracks_info))
+        self.ui._set_save_enabled(bool(self.state.selected_tracks_info))
+        self.ui.play_button.setEnabled(bool(self.state.selected_tracks_info))
 
     # --- Translator ---
     def _on_play_sheet(self, text: str, format_name: str, bpm: int, humanize: bool):
@@ -463,7 +454,7 @@ class MainWindow(QMainWindow):
             self.ui.tabs.setCurrentIndex(1)  # Switch to Visualizer
 
     def _on_export_sheet(self, format_name: str):
-        if not self.current_notes:
+        if not self.state.current_notes:
             QMessageBox.warning(self, "No MIDI Loaded",
                                 "Load and prepare a MIDI file on the Playback tab first.")
             return
@@ -475,10 +466,10 @@ class MainWindow(QMainWindow):
 
         use_88 = self.ui.playback_tab.use_88_key_check.isChecked()
         key_mapper = KeyMapper(use_88_key_layout=use_88)
-        tempo_map = getattr(self, 'parsed_tempo_map', TempoMap([(0, 500000)], []))
+        tempo_map = self.state.parsed_tempo_map or TempoMap([(0, 500000)], [])
 
         try:
-            text = fmt.serialize(self.current_notes, key_mapper, tempo_map)
+            text = fmt.serialize(self.state.current_notes, key_mapper, tempo_map)
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to generate sheet:\n{e}")
             return
@@ -493,7 +484,7 @@ class MainWindow(QMainWindow):
     # --- Status Indicator Slots ---
 
     def _on_preparation_started(self):
-        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "Preparing...")
+        self.ui._status_indicator.set_state(StatusIndicator.LOADING, "PREPPING")
 
     def _on_playback_started(self):
         self.ui.play_button.setEnabled(True)
@@ -501,12 +492,12 @@ class MainWindow(QMainWindow):
         self._sync_play_button()
 
     _STATUS_SHORT = [
-        ("Preparing playback",                          "Preparing..."),
-        ("Analyzing musical structure",                 "Analyzing..."),
-        ("Generating pedal events",                     "Generating pedal..."),
-        ("Preparing playback from imported sheet",      "Preparing..."),
-        ("Initializing playback from pre-compiled",     "Loading save..."),
-        ("Compiling data for serialization",            "Saving..."),
+        ("Preparing playback",                          "PREPPING"),
+        ("Analyzing musical structure",                 "ANALYZING"),
+        ("Generating pedal events",                     "GEN. PEDAL"),
+        ("Preparing playback from imported sheet",      "PREPPING"),
+        ("Initializing playback from pre-compiled",     "LOADING SAVE"),
+        ("Compiling data for serialization",            "SAVING"),
     ]
 
     def _on_status_for_indicator(self, text: str) -> None:
@@ -520,13 +511,13 @@ class MainWindow(QMainWindow):
     # --- Core Executions ---
     def handle_save(self):
         config = self.ui.gather_playback_config()
-        if not self.selected_tracks_info:
+        if not self.state.selected_tracks_info:
             QMessageBox.warning(self, "No Tracks", "Please select a MIDI file and choose tracks first.")
             return
-            
+
         self._save_config()
         original_filename = os.path.basename(self.ui.playback_tab.file_path_label.toolTip())
-        self.playback_controller.save(config, self.selected_tracks_info, self.config_manager.save_dir, original_filename)
+        self.playback_controller.save(config, self.state.selected_tracks_info, self.config_manager.save_dir, original_filename)
 
     def _on_save_successful(self, filepath: str, message: str):
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
@@ -542,23 +533,23 @@ class MainWindow(QMainWindow):
         if self.playback_controller.is_preparing():
             return  # silently ignore while preparation is in progress
 
-        if self.loaded_save_data:
+        if self.state.loaded_save_data:
             try:
-                self.playback_controller.play_from_save(self.loaded_save_data)
+                self.playback_controller.play_from_save(self.state.loaded_save_data)
             except Exception as e:
                 QMessageBox.critical(self, "Incompatible Save", f"This save file could not be played:\n{e}")
-                self.loaded_save_data = None
-                self.loaded_save_filename = None
+                self.state.loaded_save_data = None
+                self.state.loaded_save_filename = None
                 self.ui.play_button.setEnabled(False)
                 return
         else:
             config = self.ui.gather_playback_config()
-            if not self.selected_tracks_info:
+            if not self.state.selected_tracks_info:
                 QMessageBox.warning(self, "No Tracks", "Please select a MIDI file and choose tracks first.")
                 return
-            self.playback_controller.play(config, self.selected_tracks_info)
+            self.playback_controller.play(config, self.state.selected_tracks_info)
 
-        self.ui.set_controls_enabled(False, bool(self.loaded_save_data))
+        self.ui.set_controls_enabled(False, bool(self.state.loaded_save_data))
         # Stop button is enabled in _on_playback_started once the Player thread is live.
         self.ui.stop_button.setEnabled(False)
         self.ui.play_button.setEnabled(False)
@@ -570,11 +561,11 @@ class MainWindow(QMainWindow):
 
     def on_playback_finished(self):
         self.ui.log_output.append("Playback process finished.\n" + "="*50 + "\n")
-        self.ui.set_controls_enabled(True, bool(self.loaded_save_data))
+        self.ui.set_controls_enabled(True, bool(self.state.loaded_save_data))
         self.ui.stop_button.setEnabled(False)
         self._sync_play_button()
         self.ui.piano_widget.set_pedal_active(False)
-        self.ui._status_indicator.set_state(StatusIndicator.READY, "Ready")
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
 
     # --- Update ---
     def _manual_check_update(self):

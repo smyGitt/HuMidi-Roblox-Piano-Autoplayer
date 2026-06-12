@@ -103,6 +103,7 @@ class StatusIndicator(QFrame):
 
     UNLOADED = "unloaded"
     LOADING  = "loading"
+    LOADED   = "loaded"
     READY    = "ready"
 
     _ANIM_MS = 350
@@ -112,10 +113,11 @@ class StatusIndicator(QFrame):
         self.setObjectName("status_indicator")
         self.setFixedHeight(48)
 
-        self._state       = self.UNLOADED
-        self._icon_color  = "#888888"
-        self._ready_color = "#52b752"
+        self._state        = self.UNLOADED
+        self._icon_color   = "#888888"
+        self._ready_color  = "#52b752"
         self._unload_color = "#c44b4b"
+        self._loaded_color = "#c9a535"
 
         self._frames: list[QPixmap] = []
         self._frame_idx = 0
@@ -131,7 +133,7 @@ class StatusIndicator(QFrame):
         self._icon_lbl.setScaledContents(True)
         self._icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-        self._text_lbl = QLabel("No file loaded", self)
+        self._text_lbl = QLabel("NO FILE", self)
         self._text_lbl.setObjectName("status_label")
         self._text_lbl.setGeometry(44, 0, 200, 48)
         self._text_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -145,11 +147,12 @@ class StatusIndicator(QFrame):
     def state(self) -> str:
         return self._state
 
-    def update_colors(self, icon_hex: str, ready_hex: str, unload_hex: str) -> None:
+    def update_colors(self, icon_hex: str, ready_hex: str, unload_hex: str, loaded_hex: str = "#c9a535") -> None:
         """Rebuild animation frames and re-render the current state dot/icon."""
         self._icon_color   = icon_hex
         self._ready_color  = ready_hex
         self._unload_color = unload_hex
+        self._loaded_color = loaded_hex
         self._text_lbl.setStyleSheet(f"color: {icon_hex};")
         self._frames = self._build_frames(icon_hex)
         # Refresh displayed pixmap for the current state
@@ -157,6 +160,8 @@ class StatusIndicator(QFrame):
             self._icon_lbl.setPixmap(self._frames[self._frame_idx])
         elif self._state == self.READY:
             self._icon_lbl.setPixmap(_dot_pixmap(ready_hex))
+        elif self._state == self.LOADED:
+            self._icon_lbl.setPixmap(_dot_pixmap(loaded_hex))
         else:
             self._icon_lbl.setPixmap(_dot_pixmap(unload_hex))
 
@@ -175,6 +180,9 @@ class StatusIndicator(QFrame):
         elif state == self.READY:
             self._timer.stop()
             self._icon_lbl.setPixmap(_dot_pixmap(self._ready_color))
+        elif state == self.LOADED:
+            self._timer.stop()
+            self._icon_lbl.setPixmap(_dot_pixmap(self._loaded_color))
         else:  # UNLOADED
             self._timer.stop()
             self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color))

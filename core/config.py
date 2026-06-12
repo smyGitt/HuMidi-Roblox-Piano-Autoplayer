@@ -1,21 +1,19 @@
 from typing import TypedDict
 
 
-class PlaybackConfig(TypedDict, total=False):
-    """Typed schema for the playback configuration dict.
-
-    All keys are optional (total=False) to match the .get(key, default) access
-    pattern used throughout the codebase. This is a pure type annotation — at
-    runtime the dict is still a plain dict and no existing code needs changing.
-    Import it for type annotations on function signatures to get IDE autocomplete
-    and static analysis coverage over config key names.
-    """
+class MidiConfig(TypedDict, total=False):
+    """Keys consumed by the MIDI parsing and key-mapping layer."""
     midi_file: str
     tempo: float
-    pedal_style: str
+    transpose: int
     use_88_key_layout: bool
+
+
+class HumanizationConfig(TypedDict, total=False):
+    """Keys consumed by Humanizer and the hand-simulation step."""
     simulate_hands: bool
     humanization_on: bool
+    vary_velocity: bool
     vary_timing: bool
     timing_variance: float
     vary_articulation: bool
@@ -23,12 +21,35 @@ class PlaybackConfig(TypedDict, total=False):
     enable_drift_correction: bool
     drift_decay_factor: float
     enable_chord_roll: bool
+    enable_mistakes: bool
+    mistake_chance: float
     enable_tempo_sway: bool
     tempo_sway_intensity: float
     invert_tempo_sway: bool
-    enable_mistakes: bool
-    mistake_chance: float
+
+
+class PedalConfig(TypedDict, total=False):
+    """Keys consumed by pedal_generator.generate_events."""
+    pedal_style: str
+    use_ai_pedal: bool
+
+
+class PlaybackOptions(TypedDict, total=False):
+    """Keys consumed by the Player execution loop."""
     countdown: bool
     auto_pause: bool
     debug_mode: bool
-    use_ai_pedal: bool
+
+
+class PlaybackConfig(MidiConfig, HumanizationConfig, PedalConfig, PlaybackOptions):
+    """Full playback configuration dict.
+
+    Inherits from the four domain-specific sub-configs so that consumers can
+    be typed against only the subset they actually read:
+
+        def apply_to_hand(self, notes, config: HumanizationConfig): ...
+        def generate_events(config: PedalConfig, ...): ...
+
+    At runtime this is still a plain dict -- total=False on each base means all
+    keys remain optional and no runtime enforcement is added.
+    """

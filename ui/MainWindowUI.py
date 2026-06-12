@@ -4,7 +4,7 @@ import webbrowser
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                              QCheckBox, QSlider, QLabel, QStackedWidget, QFrame,
-                             QSizePolicy, QScrollArea)
+                             QSizePolicy, QScrollArea, QApplication)
 from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
 from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
@@ -156,17 +156,26 @@ class MainWindowUI(QObject):
         # Logo row -- same fixed-geometry pattern as NavButton.
         # Icon at x=12, "HuMidi" text at x=44. Sidebar clips the text when
         # collapsed; both are fully visible when expanded.
-        # Drop assets/humidi_logo.png into the project root's assets/ folder;
-        # falls back to icon.ico until that file exists.
-        _logo_src = os.path.join(_project_root(), "assets", "humidi_logo.png")
-        if not os.path.exists(_logo_src):
-            _logo_src = os.path.join(_project_root(), "icon.ico")
+        # Probe candidates in priority order; first match wins.
+        _root = _project_root()
+        for _candidate in (
+            os.path.join(_root, "assets", "humidi_logo.png"),
+            os.path.join(_root, "icon.png"),
+            os.path.join(_root, "icon.ico"),
+        ):
+            if os.path.exists(_candidate):
+                _logo_src = _candidate
+                break
+        else:
+            _logo_src = os.path.join(_root, "icon.ico")
         _logo_raw = QPixmap(_logo_src)
+        _dpr = QApplication.primaryScreen().devicePixelRatio()
         _logo_pix = _logo_raw.scaled(
-            22, 22,
+            int(22 * _dpr), int(22 * _dpr),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
+        _logo_pix.setDevicePixelRatio(_dpr)
         logo_row = QFrame(sidebar)
         logo_row.setFixedHeight(48)
 
@@ -454,6 +463,12 @@ class MainWindowUI(QObject):
         self.stop_button.setIcon(self._icon_stop)
         self.save_button.setIconSize(QSize(_ti, _ti))
         self.save_button.setIcon(self._icon_save)
+        self._icon_collapse = ph_icon("resize-collapse", theme.text_secondary, _ti)
+        self._icon_expand   = ph_icon("resize-expand",   theme.text_secondary, _ti)
+        self.collapse_btn.setIconSize(QSize(_ti, _ti))
+        self.collapse_btn.setText("")
+        icon = self._icon_expand if self._is_collapsed else self._icon_collapse
+        self.collapse_btn.setIcon(icon)
 
         # File strip, drop-zone, and card-level reset button icons
         self.playback_tab.file_strip.update_icon_color(theme.text_secondary)
@@ -560,7 +575,7 @@ class MainWindowUI(QObject):
             self._expanded_size = self.main_window.size()
             self._body.setVisible(False)
             self._collapsed_strip.setVisible(True)
-            self.collapse_btn.setText("▼  Expand")
+            self.collapse_btn.setIcon(self._icon_expand)
             self.collapse_btn.setToolTip("Restore full window (Ctrl+K)")
             self.collapse_btn.setMinimumWidth(0)
             self.collapse_btn.setMaximumWidth(16777215)
@@ -588,7 +603,7 @@ class MainWindowUI(QObject):
         else:
             self._body.setVisible(True)
             self._collapsed_strip.setVisible(False)
-            self.collapse_btn.setText("▲  Collapse")
+            self.collapse_btn.setIcon(self._icon_collapse)
             self.collapse_btn.setToolTip("Collapse to mini mode (Ctrl+K)")
             self.collapse_btn.setProperty("strip_mode", False)
             self.collapse_btn.style().unpolish(self.collapse_btn)

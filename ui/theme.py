@@ -542,7 +542,7 @@ QLabel#file_path_label {
 /* Transport bar */
 QFrame#transport_bar {
     background-color: %(bg_secondary)s;
-    border-top: 1px solid %(border)s;
+    border: none;
 }
 
 /* Separators */
@@ -562,6 +562,7 @@ QFrame#v_sep {
 /* -- Sidebar navigation ---------------------------------------------------- */
 QFrame#sidebar {
     background-color: %(bg_secondary)s;
+    border: none;
     border-right: 1px solid %(border)s;
     padding: 0px;
     margin: 0px;
@@ -645,7 +646,7 @@ QFrame#nav_btn:disabled {
 /* -- File strip ------------------------------------------------------------ */
 QFrame#file_strip {
     background-color: %(bg_secondary)s;
-    border-bottom: 1px solid %(border)s;
+    border: none;
 }
 QFrame#file_strip_tile {
     background-color: %(accent_tint)s;
@@ -667,13 +668,14 @@ QLabel#file_strip_meta {
 
 /* -- Sub-tab bar ----------------------------------------------------------- */
 QFrame#sub_tab_bar {
-    border-bottom: 1px solid %(border)s;
+    border: none;
     background-color: %(bg_primary)s;
 }
 QPushButton#sub_tab_btn {
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
+    border-radius: 0;
     font-family: "Georgia", serif;
     font-size: 11pt;
     color: %(text_secondary)s;
@@ -691,7 +693,7 @@ QPushButton#sub_tab_btn:hover {
 /* -- Stats tiles ----------------------------------------------------------- */
 QFrame#stats_tile {
     background-color: %(bg_input)s;
-    border: 1px solid %(border)s;
+    border: 0.5px solid %(border)s;
     border-radius: 6px;
     padding: 6px 10px;
 }
@@ -711,14 +713,14 @@ QLabel#stats_tile_label {
 /* -- Section cards --------------------------------------------------------- */
 QFrame#section_card {
     background-color: %(bg_secondary)s;
-    border: 1.5px solid %(border)s;
+    border: 0.75px solid %(border)s;
     border-radius: 5px;
 }
 
 /* -- Loaded-row part cards (one per MIDI part, plus pedal summary) --------- */
 QFrame#part_card {
     background-color: %(bg_input)s;
-    border: 1px solid %(border)s;
+    border: 0.5px solid %(border)s;
     border-radius: 6px;
     padding: 6px 10px;
 }
@@ -735,8 +737,8 @@ QLabel#part_card_meta {
 /* -- Clickable save-row cards (accent left bar, flat) ----------------------- */
 QFrame#save_card {
     background-color: %(bg_secondary)s;
-    border: 1px solid %(border)s;
-    border-left: 3px solid %(accent)s;
+    border: 0.5px solid %(border)s;
+    border-left: 1.5px solid %(accent)s;
     border-radius: 4px;
 }
 QFrame#save_card:hover {
@@ -749,10 +751,7 @@ QFrame#save_card[pressed="true"] {
 /* -- SAVED SONGS inner panel ---------------------------------------------- */
 QFrame#saved_songs_list_panel {
     background-color: %(bg_secondary)s;
-    border-top: 1px solid %(border)s;
-    border-bottom: 1px solid %(border)s;
-    border-left: none;
-    border-right: none;
+    border: none;
     border-radius: 0;
 }
 
@@ -766,7 +765,7 @@ QFrame#section_card_dashed {
 /* -- Collapsed mini strip -------------------------------------------------- */
 QFrame#collapsed_strip {
     background-color: %(bg_secondary)s;
-    border-bottom: 1px solid %(border)s;
+    border: none;
 }
 
 /* -- Collapsed strip icon buttons ------------------------------------------ */
@@ -782,10 +781,6 @@ QPushButton#collapse_btn:hover {
     color: %(text_primary)s;
 }
 QPushButton#collapse_btn[strip_mode="true"] {
-    font-size: 8pt;
-    font-family: "JetBrains Mono", "Consolas", monospace;
-    letter-spacing: 1px;
-    padding: 5px 16px;
     color: %(text_primary)s;
 }
 
@@ -831,7 +826,7 @@ QPushButton[role="icon_btn"]:disabled {
 /* -- Page header bars ------------------------------------------------------ */
 QFrame#page_header {
     background-color: %(bg_secondary)s;
-    border-bottom: 1px solid %(border)s;
+    border: none;
 }
 QLabel#page_header_title {
     font-family: "Georgia", serif;

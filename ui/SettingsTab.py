@@ -116,6 +116,7 @@ class SettingsTab(QWidget):
         theme_row.addWidget(self.theme_combo, 1)
         theme_row.addWidget(self.theme_customize_btn)
         body.addLayout(theme_row)
+        body.addStretch()
 
         page_layout.addWidget(card, 1)
         return page
@@ -140,6 +141,7 @@ class SettingsTab(QWidget):
         save_row.addWidget(self.save_path_input, 1)
         save_row.addWidget(self.save_browse_btn)
         body.addLayout(save_row)
+        body.addStretch()
 
         page_layout.addWidget(card, 1)
         return page
@@ -162,6 +164,7 @@ class SettingsTab(QWidget):
         hk_row.addWidget(self.hk_label, 1)
         hk_row.addWidget(self.hk_btn)
         body.addLayout(hk_row)
+        body.addStretch()
 
         page_layout.addWidget(card, 1)
         return page
@@ -190,6 +193,7 @@ class SettingsTab(QWidget):
         self.reset_all_btn = QPushButton("Reset All Settings")
         self.reset_all_btn.setToolTip("Reset all playback and humanization settings to their default values")
         body.addWidget(self.reset_all_btn)
+        body.addStretch()
 
         page_layout.addWidget(card, 1)
         return page

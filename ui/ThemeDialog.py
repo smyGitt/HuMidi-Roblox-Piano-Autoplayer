@@ -15,7 +15,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout,
     QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
-    QDialogButtonBox, QFrame, QMessageBox, QFileDialog,
+    QFrame, QMessageBox, QFileDialog,
     QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
     QApplication, QColorDialog, QInputDialog,
 )
@@ -109,31 +109,34 @@ _SVG_INSPECT = (
     b'</svg>'
 )
 
-# Caret-right with end-bar: opens the color-swatch side panel.
-_SVG_EXPAND_PANEL = (
+# Mouse icon with right-button highlight: used for the right-click edit mode toggle.
+_SVG_INSPECT_MODE = (
     b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
     b'<rect width="256" height="256" fill="none"/>'
-    b'<polygon points="112 56 184 128 112 200 112 56" opacity="0.2"/>'
-    b'<line x1="32" y1="128" x2="112" y2="128"'
+    b'<path d="M200,112V80a56,56,0,0,0-56-56H128v88Z" opacity="0.2" fill="currentColor"/>'
+    b'<rect x="56" y="24" width="144" height="208" rx="56"'
     b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
-    b'<polygon points="112 56 184 128 112 200 112 56"'
+    b'<line x1="128" y1="112" x2="128" y2="24"'
     b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
-    b'<line x1="216" y1="40" x2="216" y2="216"'
+    b'<line x1="56" y1="112" x2="200" y2="112"'
     b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
     b'</svg>'
 )
 
-# Caret-left with end-bar: closes the color-swatch side panel.
-_SVG_COLLAPSE_PANEL = (
+# Palette icon: used for both expand and collapse panel buttons.
+_SVG_PALETTE = (
     b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
     b'<rect width="256" height="256" fill="none"/>'
-    b'<polygon points="144 56 72 128 144 200 144 56" opacity="0.2"/>'
-    b'<line x1="224" y1="128" x2="144" y2="128"'
+    b'<path d="M128,192a24,24,0,0,1,24-24h46.21a24,24,0,0,0,23.4-18.65A96.48,96.48,0,0,0,224,127.17'
+    b'c-.45-52.82-44.16-95.7-97-95.17a96,96,0,0,0-95,96c0,41.81,26.73,73.44,64,86.61A24,24,0,0,0,128,192Z"'
+    b' opacity="0.2" fill="currentColor"/>'
+    b'<path d="M128,192a24,24,0,0,1,24-24h46.21a24,24,0,0,0,23.4-18.65A96.48,96.48,0,0,0,224,127.17'
+    b'c-.45-52.82-44.16-95.7-97-95.17a96,96,0,0,0-95,96c0,41.81,26.73,73.44,64,86.61A24,24,0,0,0,128,192Z"'
     b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
-    b'<polygon points="144 56 72 128 144 200 144 56"'
-    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
-    b'<line x1="40" y1="40" x2="40" y2="216"'
-    b' fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>'
+    b'<circle cx="128" cy="76" r="12" fill="currentColor"/>'
+    b'<circle cx="84" cy="100" r="12" fill="currentColor"/>'
+    b'<circle cx="84" cy="156" r="12" fill="currentColor"/>'
+    b'<circle cx="172" cy="100" r="12" fill="currentColor"/>'
     b'</svg>'
 )
 
@@ -153,6 +156,9 @@ _SVG_RENAME = (
 
 # Fully-expanded width of the swatch side panel in pixels.
 _SWATCH_WIDTH = 280
+
+# Scale factor applied to all fixed dimensions inside the preview window (1/2).
+_PREV_SCALE = 1 / 2
 
 
 def _svg_icon(svg_bytes: bytes, color: str, size: int = 16) -> QIcon:
@@ -199,6 +205,7 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
     _by_name: dict[str, tuple[str, str]] = {
         # Buttons and indicators
         "pedal_swatch":         ("pedal_color",    "Pedal Color"),
+        "border_swatch":        ("border",         "Borders"),
         "play_button":          ("accent_play",    "Play Color"),
         "stop_button":          ("accent_stop",    "Stop / Danger"),
         "save_button":          ("accent_save",    "Save Color"),
@@ -505,7 +512,7 @@ class ThemeDialog(QDialog):
         self._last_polled_widget: QWidget | None = None
 
         self.setWindowTitle("Theme Manager")
-        self.setMinimumSize(600, 540)
+        self.setMinimumSize(550, 580)
         self._build_ui()
 
         self._inspect_filter = _InspectFilter(self._preview_panel, self)
@@ -536,6 +543,16 @@ class ThemeDialog(QDialog):
         self._expand_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._expand_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(True))
         toolbar.addWidget(self._expand_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self._collapse_panel_btn = QPushButton()
+        self._collapse_panel_btn.setFixedSize(28, 28)
+        self._collapse_panel_btn.setIconSize(QSize(16, 16))
+        self._collapse_panel_btn.setProperty("role", "icon_btn")
+        self._collapse_panel_btn.setToolTip("Collapse color editor")
+        self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._collapse_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(False))
+        self._collapse_panel_btn.setVisible(False)
+        toolbar.addWidget(self._collapse_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self._combo = QComboBox()
         self._combo.setSizeAdjustPolicy(
@@ -624,30 +641,23 @@ class ThemeDialog(QDialog):
         bottom = QHBoxLayout()
         bottom.setSpacing(6)
 
-        self._save_btn = QPushButton("Save Changes")
-        self._save_btn.setObjectName("save_button")
-        self._save_btn.setEnabled(False)
-        self._save_btn.setToolTip("Persist edits to this custom theme")
-        self._save_btn.clicked.connect(self._on_save)
-
         self._revert_btn = QPushButton("Revert")
         self._revert_btn.setEnabled(False)
         self._revert_btn.setToolTip("Discard unsaved edits")
         self._revert_btn.clicked.connect(self._on_revert)
-
-        bottom.addWidget(self._save_btn)
         bottom.addWidget(self._revert_btn)
+
         bottom.addStretch()
 
-        bbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        ok_btn = bbox.button(QDialogButtonBox.StandardButton.Ok)
-        if ok_btn:
-            ok_btn.setObjectName("save_button")
-        bbox.accepted.connect(self._on_accept)
-        bbox.rejected.connect(self._on_cancel)
-        bottom.addWidget(bbox)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self._on_cancel)
+        bottom.addWidget(cancel_btn)
+
+        self._save_btn = QPushButton("Save")
+        self._save_btn.setObjectName("save_button")
+        self._save_btn.setToolTip("Save edits and apply theme")
+        self._save_btn.clicked.connect(self._on_accept)
+        bottom.addWidget(self._save_btn)
 
         outer.addLayout(bottom)
 
@@ -671,26 +681,16 @@ class ThemeDialog(QDialog):
         content_v.setContentsMargins(0, 0, 0, 0)
         content_v.setSpacing(0)
 
-        # Header: collapse button + COLORS label
+        # Header: COLORS label
         header = QWidget()
         header_h = QHBoxLayout(header)
         header_h.setContentsMargins(8, 6, 8, 6)
         header_h.setSpacing(6)
 
-        self._collapse_panel_btn = QPushButton()
-        self._collapse_panel_btn.setFixedSize(28, 28)
-        self._collapse_panel_btn.setIconSize(QSize(16, 16))
-        self._collapse_panel_btn.setProperty("role", "icon_btn")
-        self._collapse_panel_btn.setToolTip("Collapse color editor")
-        self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._collapse_panel_btn.clicked.connect(
-            lambda: self._toggle_swatch_panel(False)
-        )
-        header_h.addWidget(self._collapse_panel_btn)
-
         colors_lbl = QLabel("COLORS")
         colors_lbl.setProperty("role", "section")
-        header_h.addWidget(colors_lbl, 1)
+        header_h.addWidget(colors_lbl)
+        header_h.addStretch()
         content_v.addWidget(header)
 
         hdr_sep = QFrame()
@@ -762,9 +762,8 @@ class ThemeDialog(QDialog):
         self._inspect_hint = QLabel("")
         self._inspect_hint.setProperty("role", "muted")
         hdr_row.addWidget(self._inspect_hint)
-        self._inspect_btn = QPushButton()
+        self._inspect_btn = QPushButton("  Right click edit mode")
         self._inspect_btn.setCheckable(True)
-        self._inspect_btn.setFixedSize(28, 28)
         self._inspect_btn.setIconSize(QSize(16, 16))
         self._inspect_btn.setObjectName("inspect_btn")
         self._inspect_btn.setToolTip("Inspect: right-click any preview element to pick its color")
@@ -805,13 +804,41 @@ class ThemeDialog(QDialog):
 
         self._preview_window = win
         outer.addWidget(win, 1)
+
+        # Color swatches below the preview window for fields that are hard to click in inspect mode.
+        swatch_strip = QHBoxLayout()
+        swatch_strip.setContentsMargins(0, 4, 0, 0)
+        swatch_strip.setSpacing(8)
+
+        pedal_swatch = QFrame()
+        pedal_swatch.setObjectName("pedal_swatch")
+        pedal_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        pedal_swatch.setFixedSize(14, 14)
+        pedal_lbl = QLabel("Pedal Color")
+        pedal_lbl.setProperty("role", "muted")
+        swatch_strip.addWidget(pedal_swatch)
+        swatch_strip.addWidget(pedal_lbl)
+
+        swatch_strip.addSpacing(12)
+
+        border_swatch = QFrame()
+        border_swatch.setObjectName("border_swatch")
+        border_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        border_swatch.setFixedSize(14, 14)
+        border_lbl = QLabel("Borders")
+        border_lbl.setProperty("role", "muted")
+        swatch_strip.addWidget(border_swatch)
+        swatch_strip.addWidget(border_lbl)
+
+        swatch_strip.addStretch()
+        outer.addLayout(swatch_strip)
         return panel
 
     def _build_prev_sidebar(self) -> QFrame:
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
         sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        sidebar.setFixedWidth(44)
+        sidebar.setFixedWidth(22)
 
         v = QVBoxLayout(sidebar)
         v.setContentsMargins(0, 0, 0, 0)
@@ -819,12 +846,12 @@ class ThemeDialog(QDialog):
 
         # Logo row (same height as nav buttons; icon only visible in collapsed width)
         logo_row = QFrame()
-        logo_row.setFixedHeight(48)
+        logo_row.setFixedHeight(24)
         logo_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._prev_sidebar_logo = QLabel(logo_row)
         self._prev_sidebar_logo.setObjectName("nav_icon")
         self._prev_sidebar_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._prev_sidebar_logo.setGeometry(12, 13, 22, 22)
+        self._prev_sidebar_logo.setGeometry(6, 7, 11, 11)
         self._prev_sidebar_logo.setScaledContents(True)
         self._prev_sidebar_logo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         v.addWidget(logo_row)
@@ -841,20 +868,20 @@ class ThemeDialog(QDialog):
             btn_frame = QFrame()
             btn_frame.setObjectName("nav_btn")
             btn_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-            btn_frame.setFixedHeight(48)
+            btn_frame.setFixedHeight(24)
             btn_frame.setProperty("active",  "true" if is_active else "false")
             btn_frame.setProperty("hovered", "false")
 
             icon_lbl = QLabel(btn_frame)
             icon_lbl.setObjectName("nav_icon")
             icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            icon_lbl.setGeometry(12, 13, 22, 22)
+            icon_lbl.setGeometry(6, 7, 11, 11)
             icon_lbl.setScaledContents(True)
             icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
             text_lbl = QLabel("", btn_frame)
             text_lbl.setObjectName("nav_label")
-            text_lbl.setGeometry(44, 0, 200, 48)
+            text_lbl.setGeometry(22, 0, 100, 24)
             text_lbl.setProperty("highlighted", "true" if is_active else "false")
             text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
@@ -869,8 +896,8 @@ class ThemeDialog(QDialog):
         title_bar.setObjectName("collapsed_strip")
         title_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         title_h = QHBoxLayout(title_bar)
-        title_h.setContentsMargins(10, 6, 8, 6)
-        title_h.setSpacing(4)
+        title_h.setContentsMargins(5, 3, 4, 3)
+        title_h.setSpacing(2)
         app_name = QLabel("Hu<i>Midi</i>")
         app_name.setTextFormat(Qt.TextFormat.RichText)
         app_name.setObjectName("sidebar_logo_text")
@@ -888,19 +915,19 @@ class ThemeDialog(QDialog):
         file_strip.setObjectName("file_strip")
         file_strip.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         fs_h = QHBoxLayout(file_strip)
-        fs_h.setContentsMargins(10, 6, 10, 6)
-        fs_h.setSpacing(8)
+        fs_h.setContentsMargins(5, 3, 5, 3)
+        fs_h.setSpacing(4)
 
         tile = QFrame()
         tile.setObjectName("file_strip_tile")
         tile.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        tile.setFixedSize(28, 28)
+        tile.setFixedSize(14, 14)
         tile_layout = QVBoxLayout(tile)
         tile_layout.setContentsMargins(0, 0, 0, 0)
         self._prev_file_tile_icon = QLabel()
         self._prev_file_tile_icon.setObjectName("file_strip_tile_icon")
         self._prev_file_tile_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._prev_file_tile_icon.setFixedSize(QSize(16, 16))
+        self._prev_file_tile_icon.setFixedSize(QSize(8, 8))
         self._prev_file_tile_icon.setScaledContents(True)
         tile_layout.addWidget(self._prev_file_tile_icon,
                               alignment=Qt.AlignmentFlag.AlignCenter)
@@ -939,8 +966,8 @@ class ThemeDialog(QDialog):
     def _build_prev_body(self) -> QWidget:
         body = QWidget()
         body_v = QVBoxLayout(body)
-        body_v.setContentsMargins(10, 10, 10, 6)
-        body_v.setSpacing(8)
+        body_v.setContentsMargins(5, 5, 5, 3)
+        body_v.setSpacing(4)
 
         body_v.addWidget(self._build_prev_performance_card())
         body_v.addWidget(self._build_prev_options_card())
@@ -953,19 +980,19 @@ class ThemeDialog(QDialog):
         card.setObjectName("section_card")
         card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         v = QVBoxLayout(card)
-        v.setContentsMargins(12, 6, 12, 8)
-        v.setSpacing(4)
+        v.setContentsMargins(6, 3, 6, 4)
+        v.setSpacing(2)
 
         # Title row + reset button
         title_row = QHBoxLayout()
-        title_row.setSpacing(6)
+        title_row.setSpacing(3)
         title = QLabel("PERFORMANCE")
         title.setProperty("role", "section")
         title_row.addWidget(title)
         title_row.addStretch()
         self._prev_reset_btn = QPushButton()
         self._prev_reset_btn.setProperty("role", "card_reset")
-        self._prev_reset_btn.setFixedSize(28, 28)
+        self._prev_reset_btn.setFixedSize(14, 14)
         self._prev_reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         title_row.addWidget(self._prev_reset_btn)
         v.addLayout(title_row)
@@ -990,7 +1017,7 @@ class ThemeDialog(QDialog):
         self._prev_spin.setRange(0, 200)
         self._prev_spin.setValue(100.0)
         self._prev_spin.setSuffix(" %")
-        self._prev_spin.setFixedWidth(76)
+        self._prev_spin.setFixedWidth(38)
         tempo_row.addWidget(self._prev_spin)
         v.addLayout(tempo_row)
 
@@ -1017,8 +1044,8 @@ class ThemeDialog(QDialog):
         card.setObjectName("section_card")
         card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         v = QVBoxLayout(card)
-        v.setContentsMargins(12, 6, 12, 8)
-        v.setSpacing(4)
+        v.setContentsMargins(6, 3, 6, 4)
+        v.setSpacing(2)
 
         title = QLabel("OPTIONS")
         title.setProperty("role", "section")
@@ -1029,7 +1056,7 @@ class ThemeDialog(QDialog):
         v.addWidget(self._prev_check)
         check_desc = QLabel("Map to the full 88-key piano")
         check_desc.setProperty("role", "muted")
-        check_desc.setContentsMargins(25, 0, 0, 0)
+        check_desc.setContentsMargins(13, 0, 0, 0)
         v.addWidget(check_desc)
         return card
 
@@ -1042,7 +1069,7 @@ class ThemeDialog(QDialog):
         part_card.setObjectName("part_card")
         part_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         pc_v = QVBoxLayout(part_card)
-        pc_v.setContentsMargins(8, 5, 8, 5)
+        pc_v.setContentsMargins(4, 3, 4, 3)
         pc_v.setSpacing(1)
         pc_title = QLabel("Track 1")
         pc_title.setObjectName("part_card_title")
@@ -1057,7 +1084,7 @@ class ThemeDialog(QDialog):
         save_card.setObjectName("save_card")
         save_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         sc_v = QVBoxLayout(save_card)
-        sc_v.setContentsMargins(8, 5, 8, 5)
+        sc_v.setContentsMargins(4, 3, 4, 3)
         sc_v.setSpacing(1)
         sc_title = QLabel("Demo.json")
         sc_title.setObjectName("part_card_title")
@@ -1073,8 +1100,8 @@ class ThemeDialog(QDialog):
         bar.setObjectName("transport_bar")
         bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         v = QVBoxLayout(bar)
-        v.setContentsMargins(12, 8, 12, 8)
-        v.setSpacing(6)
+        v.setContentsMargins(6, 4, 6, 4)
+        v.setSpacing(3)
 
         # Scrubber row
         scrub_row = QHBoxLayout()
@@ -1096,29 +1123,20 @@ class ThemeDialog(QDialog):
         action_row.setSpacing(5)
         self._prev_play_btn = QPushButton()
         self._prev_play_btn.setObjectName("play_button")
-        self._prev_play_btn.setIconSize(QSize(22, 22))
+        self._prev_play_btn.setIconSize(QSize(11, 11))
         self._prev_play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._prev_stop_btn = QPushButton()
         self._prev_stop_btn.setObjectName("stop_button")
-        self._prev_stop_btn.setIconSize(QSize(22, 22))
+        self._prev_stop_btn.setIconSize(QSize(11, 11))
         self._prev_stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         action_row.addWidget(self._prev_play_btn)
         action_row.addWidget(self._prev_stop_btn)
         action_row.addStretch()
         self._prev_save_btn = QPushButton()
         self._prev_save_btn.setObjectName("save_button")
-        self._prev_save_btn.setIconSize(QSize(22, 22))
+        self._prev_save_btn.setIconSize(QSize(11, 11))
         self._prev_save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         action_row.addWidget(self._prev_save_btn)
-        action_row.addSpacing(8)
-        pedal_swatch = QFrame()
-        pedal_swatch.setObjectName("pedal_swatch")
-        pedal_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        pedal_swatch.setFixedSize(18, 18)
-        pedal_lbl = QLabel("PEDAL")
-        pedal_lbl.setProperty("role", "muted")
-        action_row.addWidget(pedal_swatch)
-        action_row.addWidget(pedal_lbl)
         v.addLayout(action_row)
         return bar
 
@@ -1133,9 +1151,12 @@ class ThemeDialog(QDialog):
             current = _SWATCH_WIDTH if expand else 0
         end = _SWATCH_WIDTH if expand else 0
         if current == end:
-            # Already at the target state; still fire the post-animation logic.
-            if not expand:
+            if expand:
+                self._expand_panel_btn.setVisible(False)
+                self._collapse_panel_btn.setVisible(True)
+            else:
                 self._expand_panel_btn.setVisible(True)
+                self._collapse_panel_btn.setVisible(False)
             return
         self._swatch_anim.setStartValue(current)
         self._swatch_anim.setEndValue(end)
@@ -1144,12 +1165,14 @@ class ThemeDialog(QDialog):
         )
         if expand:
             self._expand_panel_btn.setVisible(False)
+            self._collapse_panel_btn.setVisible(True)
         self._swatch_anim.start()
 
     def _on_swatch_anim_finished(self) -> None:
         """Show the expand button once the swatch panel has fully collapsed."""
         if self._swatch_panel_widget.maximumWidth() == 0:
             self._expand_panel_btn.setVisible(True)
+            self._collapse_panel_btn.setVisible(False)
 
     # ── Population ────────────────────────────────────────────────────
 
@@ -1191,7 +1214,6 @@ class ThemeDialog(QDialog):
         self._del_btn.setEnabled(not theme.builtin)
         self._rename_btn.setEnabled(not theme.builtin)
         self._export_btn.setEnabled(True)
-        self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
 
         # Live preview
@@ -1206,7 +1228,6 @@ class ThemeDialog(QDialog):
 
     def _mark_dirty(self, *_) -> None:
         self._pending_save = True
-        self._save_btn.setEnabled(True)
         self._revert_btn.setEnabled(True)
 
     def _on_new(self) -> None:
@@ -1284,7 +1305,6 @@ class ThemeDialog(QDialog):
         ThemeManager.save_custom(updated)
         self._current_theme = updated
         self._pending_save = False
-        self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
         self._populate_list(select_name=new_name)
 
@@ -1300,7 +1320,6 @@ class ThemeDialog(QDialog):
                 self._swatches[key].set_color(getattr(original, key))
             self._preview(original)
         self._pending_save = False
-        self._save_btn.setEnabled(False)
         self._revert_btn.setEnabled(False)
 
     def _on_export(self) -> None:
@@ -1346,18 +1365,7 @@ class ThemeDialog(QDialog):
 
     def _on_accept(self) -> None:
         if self._pending_save:
-            reply = QMessageBox.question(
-                self, "Unsaved Changes",
-                "You have unsaved edits. Save them before applying?",
-                QMessageBox.StandardButton.Save |
-                QMessageBox.StandardButton.Discard |
-                QMessageBox.StandardButton.Cancel,
-            )
-            if reply == QMessageBox.StandardButton.Cancel:
-                return
-            if reply == QMessageBox.StandardButton.Save:
-                self._on_save()
-
+            self._on_save()
         if self._current_theme:
             ThemeManager.set_active_name(self._current_theme.name)
             self.theme_applied.emit(self._current_theme.name)
@@ -1374,9 +1382,9 @@ class ThemeDialog(QDialog):
         self._rename_btn.setIcon(_svg_icon(_SVG_RENAME, color))
         self._export_btn.setIcon(_svg_icon(_SVG_EXPORT, color))
         self._import_btn.setIcon(_svg_icon(_SVG_IMPORT, color))
-        self._inspect_btn.setIcon(_svg_icon(_SVG_INSPECT, color))
-        self._expand_panel_btn.setIcon(_svg_icon(_SVG_EXPAND_PANEL, color))
-        self._collapse_panel_btn.setIcon(_svg_icon(_SVG_COLLAPSE_PANEL, color))
+        self._inspect_btn.setIcon(_svg_icon(_SVG_INSPECT_MODE, color))
+        self._expand_panel_btn.setIcon(_svg_icon(_SVG_PALETTE, color))
+        self._collapse_panel_btn.setIcon(_svg_icon(_SVG_PALETTE, color))
 
     def _preview(self, theme: ThemeColors) -> None:
         """Apply the previewed theme to the preview panel only. Dialog chrome and main window are not touched."""
@@ -1389,28 +1397,30 @@ class ThemeDialog(QDialog):
         ss = generate_stylesheet(theme)
         self._preview_panel.setStyleSheet(
             ss
-            + f"\nQFrame#preview_window {{ border: 1px solid {theme.border}; border-radius: 4px; background-color: {theme.bg_primary}; }}"
+            + f"\nQFrame#preview_window {{ border: 1px solid {theme.border}; border-radius: 4px; background-color: {theme.bg_primary}; font-size: 9px; }}"
+            + f"\nQFrame#preview_window * {{ font-size: 9px; }}"
             + f"\nQPushButton#play_button {{ background-color: {play_bg}; border-color: {play_bdr}; }}"
             + f"\nQPushButton#play_button:hover {{ background-color: {play_hov}; }}"
             + f"\nQPushButton#stop_button {{ background-color: {stop_bg}; border-color: {stop_bdr}; }}"
             + f"\nQPushButton#stop_button:hover {{ background-color: {stop_hov}; }}"
             + f"\nQFrame#pedal_swatch {{ background-color: {theme.pedal_color}; border-radius: 4px; }}"
+            + f"\nQFrame#border_swatch {{ background-color: {theme.border}; border-radius: 2px; }}"
         )
-        _ti = 22
+        _ti = 11
         self._prev_play_btn.setIcon(ph_icon("play",        theme.accent_play, _ti))
         self._prev_stop_btn.setIcon(ph_icon("stop",        theme.accent_stop, _ti))
         self._prev_save_btn.setIcon(ph_icon("floppy-disk", theme.accent_save, _ti))
         # Reset button (card_reset role) renders its glyph in the muted-text color.
         self._prev_reset_btn.setIcon(
-            ph_icon("arrow-counter-clockwise", theme.text_secondary, 14)
+            ph_icon("arrow-counter-clockwise", theme.text_secondary, 7)
         )
-        self._prev_reset_btn.setIconSize(QSize(14, 14))
+        self._prev_reset_btn.setIconSize(QSize(7, 7))
         # File strip tile uses an accent-colored music-note icon.
         self._prev_file_tile_icon.setPixmap(
-            ph_icon("music-note", theme.accent, 16).pixmap(32, 32)
+            ph_icon("music-note", theme.accent, 8).pixmap(16, 16)
         )
         # Sidebar logo and nav icons.
-        _ni = 18
+        _ni = 9
         self._prev_sidebar_logo.setPixmap(
             ph_icon("music-note", theme.text_primary, _ni).pixmap(_ni * 2, _ni * 2)
         )
@@ -1423,8 +1433,8 @@ class ThemeDialog(QDialog):
     def _sync_toolbar_btn_sizes(self) -> None:
         h = self._combo.sizeHint().height()
         for btn in (
-            self._expand_panel_btn, self._new_btn, self._del_btn,
-            self._rename_btn, self._export_btn, self._import_btn,
+            self._expand_panel_btn, self._collapse_panel_btn, self._new_btn,
+            self._del_btn, self._rename_btn, self._export_btn, self._import_btn,
         ):
             btn.setFixedSize(h, h)
 

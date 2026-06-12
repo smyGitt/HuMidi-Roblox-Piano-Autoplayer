@@ -10,6 +10,7 @@ from core.models import Note, KeyEvent
 from core.core import MidiParser, TempoMap
 from core.section_analyzer import SectionAnalyzer, assign_hands
 from core.player import Player
+from core.compiler import compile_events
 import core.pedal_generator as pedal_generator
 
 
@@ -174,9 +175,10 @@ class _SaveWorker(QObject):
         analyzer = SectionAnalyzer(final_notes, tempo_map, debug_log=debug_log)
         sections = analyzer.analyze()
 
-        compiler_player = Player(self.config, final_notes, sections, tempo_map)
-        compiler_player.status_updated.connect(self.status_updated)
-        events_to_serialize = compiler_player.export_compiled_events()
+        events_to_serialize = compile_events(
+            self.config, final_notes, sections,
+            log=self.status_updated.emit if self.config.get('debug_mode') else None,
+        )
 
         if not events_to_serialize:
             self.save_failed.emit(
@@ -328,6 +330,23 @@ class PlaybackController(QObject):
         self.player_thread = None
         self.playback_finished.emit()
 
+    # -- Thread wiring --------------------------------------------------------
+
+    def _wire_and_start_player(self, player: Player, entry_point) -> None:
+        """Move player onto a new QThread, wire all signals, and start playback."""
+        self.player_thread = QThread()
+        player.moveToThread(self.player_thread)
+        self.player_thread.started.connect(entry_point)
+        player.playback_finished.connect(self._on_playback_finished)
+        player.status_updated.connect(self.status_updated.emit)
+        player.progress_updated.connect(self.progress_updated.emit)
+        player.visualizer_updated.connect(self.visualizer_updated.emit)
+        player.pedal_updated.connect(self.pedal_updated.emit)
+        player.auto_paused.connect(self.auto_paused.emit)
+        player.error_occurred.connect(self.error_occurred.emit)
+        self.playback_started.emit()
+        self.player_thread.start()
+
     # -- Save -----------------------------------------------------------------
 
     def save(self, config: Dict, selected_tracks_info: List, save_dir: str, original_filename: str):
@@ -386,21 +405,8 @@ class PlaybackController(QObject):
         self.timeline_data_ready.emit(final_notes, total_dur, tempo_map)
         self.pedal_data_ready.emit(pedal_intervals)
 
-        self.player_thread = QThread()
         self.player = Player(config, final_notes, sections, tempo_map)
-        self.player.moveToThread(self.player_thread)
-        self.player_thread.started.connect(self.player.play)
-
-        self.player.playback_finished.connect(self._on_playback_finished)
-        self.player.status_updated.connect(self.status_updated.emit)
-        self.player.progress_updated.connect(self.progress_updated.emit)
-        self.player.visualizer_updated.connect(self.visualizer_updated.emit)
-        self.player.pedal_updated.connect(self.pedal_updated.emit)
-        self.player.auto_paused.connect(self.auto_paused.emit)
-        self.player.error_occurred.connect(self.error_occurred.emit)
-
-        self.playback_started.emit()
-        self.player_thread.start()
+        self._wire_and_start_player(self.player, self.player.play)
 
     def _on_prepare_error(self, error_msg: str):
         self.error_occurred.emit(error_msg)
@@ -445,21 +451,8 @@ class PlaybackController(QObject):
         except Exception:
             self.pedal_data_ready.emit([])
 
-        self.player_thread = QThread()
         self.player = Player(config, notes, sections, tempo_map)
-        self.player.moveToThread(self.player_thread)
-        self.player_thread.started.connect(self.player.play)
-
-        self.player.playback_finished.connect(self._on_playback_finished)
-        self.player.status_updated.connect(self.status_updated.emit)
-        self.player.progress_updated.connect(self.progress_updated.emit)
-        self.player.visualizer_updated.connect(self.visualizer_updated.emit)
-        self.player.pedal_updated.connect(self.pedal_updated.emit)
-        self.player.auto_paused.connect(self.auto_paused.emit)
-        self.player.error_occurred.connect(self.error_occurred.emit)
-
-        self.playback_started.emit()
-        self.player_thread.start()
+        self._wire_and_start_player(self.player, self.player.play)
 
     # -- Play (pre-compiled save) ---------------------------------------------
 
@@ -538,20 +531,6 @@ class PlaybackController(QObject):
         _pedal_evs = [ev for ev in reconstructed_events if ev.action == 'pedal']
         self.pedal_data_ready.emit(_extract_pedal_intervals(_pedal_evs))
 
-        self.player_thread = QThread()
         self.player = Player(config, [], [], dummy_tempo)
         self.player.load_compiled_events(reconstructed_events, total_dur)
-
-        self.player.moveToThread(self.player_thread)
-        self.player_thread.started.connect(self.player.play_saved_events)
-
-        self.player.playback_finished.connect(self._on_playback_finished)
-        self.player.status_updated.connect(self.status_updated.emit)
-        self.player.progress_updated.connect(self.progress_updated.emit)
-        self.player.visualizer_updated.connect(self.visualizer_updated.emit)
-        self.player.pedal_updated.connect(self.pedal_updated.emit)
-        self.player.auto_paused.connect(self.auto_paused.emit)
-        self.player.error_occurred.connect(self.error_occurred.emit)
-
-        self.playback_started.emit()
-        self.player_thread.start()
+        self._wire_and_start_player(self.player, self.player.play_saved_events)
