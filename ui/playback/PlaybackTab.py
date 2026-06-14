@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
+    QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
 from ui.widgets import make_card
+from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.ph_icon_label import PhIconLabel
 from ui.playback.sub_tab_bar import SubTabBar
 from ui.playback.file_strip import FileStrip
@@ -215,7 +216,7 @@ class PlaybackTab(QWidget):
                           0, 0.1, 0,   " s",  factor=10000.0,
                           tooltip="Apply a sinusoidal tempo variation across the song for a more expressive feel",
                           desc="gently speeds up then slows down the tempo in a wave across the song")
-        self.invert_sway_check = QCheckBox("Invert Sway")
+        self.invert_sway_check = ToggleSwitch("Invert Sway")
         self.invert_sway_check.setToolTip("Invert the phase of the tempo sway curve")
         self.all_humanization_checks['invert_tempo_sway'] = self.invert_sway_check
         self.all_humanization_checks['tempo_sway'].toggled.connect(
@@ -228,7 +229,7 @@ class PlaybackTab(QWidget):
         _invert_vbox.addWidget(self.invert_sway_check)
         _invert_desc = QLabel("flips the sway so the tempo slows down first, then speeds back up")
         _invert_desc.setProperty("role", "muted")
-        _invert_desc.setContentsMargins(25, 0, 0, 0)
+        _invert_desc.setContentsMargins(36, 0, 0, 0)
         _invert_vbox.addWidget(_invert_desc)
         left_layout.addWidget(_invert_container)
         left_layout.addStretch()
@@ -254,7 +255,7 @@ class PlaybackTab(QWidget):
         layout.addLayout(cols)
 
         # Dummy vary_velocity entry for legacy save compatibility.
-        self.all_humanization_checks['vary_velocity'] = QCheckBox()
+        self.all_humanization_checks['vary_velocity'] = ToggleSwitch()
 
         self.select_all_humanization_check.toggled.connect(self._toggle_all)
         for check in self.all_humanization_checks.values():

@@ -14,8 +14,8 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout, QGridLayout,
     QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
-    QFrame, QMessageBox, QFileDialog,
-    QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
+    QFrame, QMessageBox, QFileDialog, QSizePolicy,
+    QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
     QApplication, QColorDialog, QInputDialog,
 )
 from PyQt6.QtCore import (
@@ -27,6 +27,7 @@ from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QCursor
 from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES, _mix
 from ui.widgets.ph_icon import ph_icon
 from ui.widgets.ph_icon_label import PhIconLabel, IconProvider
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
 # ── Preview scale ─────────────────────────────────────────────────────────────
@@ -60,6 +61,10 @@ _COLOR_GROUPS: list[tuple[str, str] | str] = [
     ("accent",          "Accent"),
     ("accent_controls", "Controls"),
     ("accent_save",     "Save Color"),
+    "TOGGLE SWITCH",
+    ("toggle_off",      "Off"),
+    ("toggle_on",       "On"),
+    ("knob_color",      "Knob"),
     "STATUS",
     ("accent_play",     "Play Color"),
     ("accent_stop",     "Stop / Danger"),
@@ -104,7 +109,7 @@ _BY_CLASS: dict[str, tuple[str, str]] = {
     "QDoubleSpinBox": ("bg_input",        "Input Fields"),
     "QSpinBox":       ("bg_input",        "Input Fields"),
     "QSlider":        ("accent_controls", "Controls"),
-    "QCheckBox":      ("accent_controls", "Controls"),
+    "ToggleSwitch":   ("knob_color",      "Knob"),
     "QPushButton":    ("bg_button",       "Button"),
     "QFrame":         ("bg_primary",      "Background"),
     "QWidget":        ("bg_primary",      "Background"),
@@ -393,6 +398,7 @@ class ThemeDialog(QDialog):
             provider.register(_icon, _color_fn)
 
         self._apply_own_stylesheet()
+        self._sync_toolbar_btn_widths()
         self._populate_list()
 
     # ── Layout ────────────────────────────────────────────────────────
@@ -406,65 +412,74 @@ class ThemeDialog(QDialog):
         toolbar = QHBoxLayout()
         toolbar.setSpacing(4)
 
-        self._expand_panel_btn = PhIconLabel("palette", size=16)
+        self._expand_panel_btn = PhIconLabel("palette", size=16, allow_vertical_expansion=True)
+        self._expand_panel_btn.setProperty("role", "icon_btn")
         self._expand_panel_btn.setToolTip("Open color editor")
         self._expand_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._expand_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(True))
-        toolbar.addWidget(self._expand_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._expand_panel_btn)
 
-        self._collapse_panel_btn = PhIconLabel("palette", size=16)
+        self._collapse_panel_btn = PhIconLabel("palette", size=16, allow_vertical_expansion=True)
+        self._collapse_panel_btn.setProperty("role", "icon_btn")
         self._collapse_panel_btn.setToolTip("Collapse color editor")
         self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._collapse_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(False))
         self._collapse_panel_btn.setVisible(False)
-        toolbar.addWidget(self._collapse_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._collapse_panel_btn)
 
         self._combo = QComboBox()
         self._combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         )
+        self._combo.setMinimumContentsLength(0)
+        self._combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._combo.currentIndexChanged.connect(self._on_row_changed)
-        toolbar.addWidget(self._combo, 1, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._combo, 1)
 
-        self._new_btn = PhIconLabel("new-theme", size=16)
+        self._new_btn = PhIconLabel("new-theme", size=16, allow_vertical_expansion=True)
+        self._new_btn.setProperty("role", "icon_btn")
         self._new_btn.setToolTip("Duplicate selected theme as a new custom preset")
         self._new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._new_btn.clicked.connect(self._on_new)
 
-        self._del_btn = PhIconLabel("delete-theme", size=16)
+        self._del_btn = PhIconLabel("delete-theme", size=16, allow_vertical_expansion=True)
+        self._del_btn.setProperty("role", "icon_btn")
         self._del_btn.setToolTip("Delete this custom theme (built-in themes cannot be deleted)")
         self._del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._del_btn.setEnabled(False)
         self._del_btn.clicked.connect(self._on_delete)
 
-        self._rename_btn = PhIconLabel("rename-theme", size=16)
+        self._rename_btn = PhIconLabel("rename-theme", size=16, allow_vertical_expansion=True)
+        self._rename_btn.setProperty("role", "icon_btn")
         self._rename_btn.setToolTip("Rename this custom theme")
         self._rename_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._rename_btn.setEnabled(False)
         self._rename_btn.clicked.connect(self._on_rename)
 
-        toolbar.addWidget(self._new_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        toolbar.addWidget(self._del_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        toolbar.addWidget(self._rename_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._new_btn)
+        toolbar.addWidget(self._del_btn)
+        toolbar.addWidget(self._rename_btn)
 
         t_sep = QFrame()
         t_sep.setFrameShape(QFrame.Shape.VLine)
         t_sep.setObjectName("v_sep")
         toolbar.addWidget(t_sep)
 
-        self._export_btn = PhIconLabel("export-theme", size=16)
+        self._export_btn = PhIconLabel("export-theme", size=16, allow_vertical_expansion=True)
+        self._export_btn.setProperty("role", "icon_btn")
         self._export_btn.setToolTip("Export theme to JSON file")
         self._export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._on_export)
 
-        self._import_btn = PhIconLabel("import-theme", size=16)
+        self._import_btn = PhIconLabel("import-theme", size=16, allow_vertical_expansion=True)
+        self._import_btn.setProperty("role", "icon_btn")
         self._import_btn.setToolTip("Import theme from JSON file")
         self._import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._import_btn.clicked.connect(self._on_import)
 
-        toolbar.addWidget(self._export_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        toolbar.addWidget(self._import_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        toolbar.addWidget(self._export_btn)
+        toolbar.addWidget(self._import_btn)
         outer.addLayout(toolbar)
 
         top_sep = QFrame()
@@ -602,7 +617,7 @@ class ThemeDialog(QDialog):
         outer.setContentsMargins(4, 0, 4, 4)
         outer.setSpacing(6)
 
-        self._builtin_label = QLabel("Built-in (read only)")
+        self._builtin_label = QLabel("Built-in (editing creates a copy)")
         self._builtin_label.setProperty("role", "placeholder")
         self._builtin_label.setVisible(False)
         outer.addWidget(self._builtin_label)
@@ -892,12 +907,12 @@ class ThemeDialog(QDialog):
         title = QLabel("OPTIONS")
         title.setProperty("role", "section")
         v.addWidget(title)
-        self._prev_check = QCheckBox("88-Key Layout")
+        self._prev_check = ToggleSwitch("88-Key Layout")
         self._prev_check.setChecked(True)
         v.addWidget(self._prev_check)
         check_desc = QLabel("Map to the full 88-key piano")
         check_desc.setProperty("role", "muted")
-        check_desc.setContentsMargins(13, 0, 0, 0)
+        check_desc.setContentsMargins(36, 0, 0, 0)
         v.addWidget(check_desc)
         return card
 
@@ -1042,7 +1057,7 @@ class ThemeDialog(QDialog):
         self._builtin_label.setVisible(theme.builtin)
         for key, _lbl in _COLOR_FIELDS:
             self._swatches[key].set_color(getattr(theme, key))
-            self._swatches[key].set_editable(not theme.builtin)
+            self._swatches[key].set_editable(True)
 
         self._del_btn.setEnabled(not theme.builtin)
         self._rename_btn.setEnabled(not theme.builtin)
@@ -1054,6 +1069,11 @@ class ThemeDialog(QDialog):
     def _on_color_changed(self, field: str, value: str) -> None:
         if self._current_theme is None:
             return
+        if self._current_theme.builtin:
+            base = self._current_theme
+            candidate = _unique_copy_name(base.name, set(ThemeManager.all_themes().keys()))
+            ThemeManager.save_custom(replace(base, name=candidate, builtin=False))
+            self._populate_list(select_name=candidate)
         self._current_theme = replace(self._current_theme, **{field: value})
         self._mark_dirty()
         self._preview(self._current_theme)
@@ -1227,6 +1247,14 @@ class ThemeDialog(QDialog):
         for icon_lbl, icon_name, is_active in self._prev_nav_icon_labels:
             color = theme.text_primary if is_active else theme.text_secondary
             icon_lbl.setPixmap(ph_icon(icon_name, color, _ni).pixmap(_ni * 2, _ni * 2))
+        self._prev_check.update_colors(
+            track_off=theme.toggle_off,
+            track_on=theme.toggle_on,
+            knob=theme.knob_color,
+            text_col=theme.text_primary,
+            dis_text=_mix(theme.text_primary, theme.bg_primary, 0.65),
+            dis_track=_mix(theme.border, theme.bg_primary, 0.50),
+        )
         if self._hover_overlay is not None:
             self._hover_overlay.set_accent(theme.accent)
 
@@ -1234,6 +1262,15 @@ class ThemeDialog(QDialog):
         active = ThemeManager.get_active()
         self.setStyleSheet(generate_stylesheet(active))
         self._refresh_io_icons(active)
+
+    def _sync_toolbar_btn_widths(self) -> None:
+        h = self._combo.sizeHint().height()
+        for btn in (
+            self._expand_panel_btn, self._collapse_panel_btn,
+            self._new_btn, self._del_btn, self._rename_btn,
+            self._export_btn, self._import_btn,
+        ):
+            btn.setFixedWidth(h)
 
     def _cleanup_inspect(self) -> None:
         QApplication.instance().removeEventFilter(self._inspect_filter)

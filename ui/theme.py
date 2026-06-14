@@ -51,6 +51,9 @@ class ThemeColors:
     bg_button:     str = "#21213a"   # generic button background
     accent_save:   str = "#5b8dee"   # save button accent
     accent_loaded: str = "#c9a535"   # file loaded / warning indicator
+    knob_color:   str = "#dcdcdf"   # toggle switch knob
+    toggle_on:    str = "#5b8dee"   # toggle switch track color when checked
+    toggle_off:   str = "#7878a0"   # toggle switch track color when unchecked
     builtin: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
@@ -70,6 +73,13 @@ class ThemeColors:
             d["accent_save"] = d.get("accent", "#5b8dee")
         if "accent_loaded" not in d:
             d["accent_loaded"] = d.get("pedal_color", "#c9a535")
+        if "knob_color" not in d:
+            bg = d.get("bg_primary", "#1c1c2e")
+            d["knob_color"] = _mix(bg, "#ffffff", 0.85)
+        if "toggle_on" not in d:
+            d["toggle_on"] = d.get("accent_controls", "#5b8dee")
+        if "toggle_off" not in d:
+            d["toggle_off"] = d.get("text_secondary", "#7878a0")
         return cls(**d)
 
 
@@ -83,6 +93,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         border="#30363d", accent_play="#3fb950", accent_stop="#f85149",
         pedal_color="#f0a030", accent_loaded="#d4a020",
         accent_controls="#58a6ff", bg_button="#161b22", accent_save="#58a6ff",
+        knob_color="#dadbdc", toggle_on="#58a6ff", toggle_off="#8b949e",
         builtin=True,
     ),
     "Light": ThemeColors(
@@ -92,6 +103,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         border="#d0d0e8", accent_play="#2a9a60", accent_stop="#cc3333",
         pedal_color="#d08010", accent_loaded="#b87010",
         accent_controls="#4a7adb", bg_button="#ffffff", accent_save="#4a7adb",
+        knob_color="#fcfcfd", toggle_on="#4a7adb", toggle_off="#6868a0",
         builtin=True,
     ),
     "Hatsune Miku": ThemeColors(
@@ -101,6 +113,7 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         border="#2e5963", accent_play="#4affff", accent_stop="#ff0000",
         pedal_color="#51a4cb", accent_loaded="#d4bd0d",
         accent_controls="#00ffff", bg_button="#2c2c2c", accent_save="#ffec1c",
+        knob_color="#dbdbdb", toggle_on="#00ffff", toggle_off="#2a7fa3",
         builtin=True,
     ),
 }
@@ -262,32 +275,6 @@ QSpinBox::up-button:hover, QSpinBox::down-button:hover {
     background-color: %(spinner_hover)s;
 }
 
-/* Checkboxes */
-QCheckBox {
-    spacing: 7px;
-    color: %(text_primary)s;
-}
-QCheckBox::indicator {
-    width: 15px;
-    height: 15px;
-    border: 1.5px solid %(border)s;
-    border-radius: 4px;
-    background-color: %(bg_input)s;
-}
-QCheckBox::indicator:hover {
-    border-color: %(accent_controls)s;
-}
-QCheckBox::indicator:checked {
-    background-color: %(accent_controls)s;
-    border-color: %(accent_controls)s;
-}
-QCheckBox::indicator:disabled {
-    background-color: %(dis_bg)s;
-    border-color: %(dis_border)s;
-}
-QCheckBox:disabled {
-    color: %(dis_text)s;
-}
 
 /* Combo boxes */
 QComboBox {
@@ -747,10 +734,6 @@ QPushButton[role="card_reset"] {
     border-radius: 4px;
     padding: 0px;
     margin: 0px;
-    min-width: 28px;
-    max-width: 28px;
-    min-height: 28px;
-    max-height: 28px;
 }
 QPushButton[role="card_reset"]:hover {
     background-color: %(btn_hover)s;
@@ -760,23 +743,28 @@ QPushButton[role="card_reset"]:pressed {
     background-color: %(btn_pressed)s;
 }
 
-/* -- Icon-only toolbar/panel buttons (no text; size set by Python) ---------- */
-QPushButton[role="icon_btn"] {
+/* -- PhIconLabel toolbar action buttons (role="icon_btn" on QLabel) -------- */
+QLabel[role="icon_btn"] {
     background-color: transparent;
-    border: 1px solid transparent;
     border-radius: 4px;
-    padding: 0px;
+    min-height: 26px;
 }
-QPushButton[role="icon_btn"]:hover {
+QLabel[role="icon_btn"]:hover {
     background-color: %(btn_hover)s;
-    border-color: %(border)s;
+    border: 1px solid %(border)s;
 }
-QPushButton[role="icon_btn"]:pressed {
-    background-color: %(btn_pressed)s;
-}
-QPushButton[role="icon_btn"]:disabled {
+QLabel[role="icon_btn"]:disabled {
     background-color: transparent;
-    border-color: transparent;
+}
+
+/* -- Folder action icon buttons (Files page: open save dir / themes dir) --- */
+QLabel#folder_open_btn {
+    border: 1px solid %(border)s;
+    border-radius: 5px;
+    background-color: %(bg_input)s;
+}
+QLabel#folder_open_btn:hover {
+    border-color: %(accent)s;
 }
 
 /* -- Page header bars ------------------------------------------------------ */

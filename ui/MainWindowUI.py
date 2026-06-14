@@ -3,7 +3,7 @@ import sys
 import webbrowser
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                             QCheckBox, QSlider, QLabel, QStackedWidget, QFrame,
+                             QSlider, QLabel, QStackedWidget, QFrame,
                              QSizePolicy, QScrollArea, QApplication)
 from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
@@ -12,13 +12,14 @@ from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
 from ui.widgets.ph_icon import ph_icon
 from ui.widgets.ph_icon_label import IconProvider
+from ui.widgets.toggle_switch import ToggleSwitch, ToggleSwitchProvider
 from ui.playback.PlaybackTab import PlaybackTab
 from ui.settings.SettingsTab import SettingsTab
 from ui.translator.TranslatorTab import TranslatorTab
 from ui.visualizer.VisualizerTab import VisualizerTab
 from ui.debug.DebugTab import DebugTab
 from ui.license.LicenseTab import LicenseTab
-from ui.theme import ThemeManager, generate_stylesheet
+from ui.theme import ThemeManager, generate_stylesheet, _mix
 
 
 _W_SIDEBAR_COLLAPSED = 44   # label geometry starts at x=44; sidebar clips it to zero at this width
@@ -101,7 +102,7 @@ class MainWindowUI(QObject):
         cs_layout.addWidget(self._collapsed_file_label)
 
         # Row 2: humanize checkbox
-        self._collapsed_humanize_check = QCheckBox("Humanize")
+        self._collapsed_humanize_check = ToggleSwitch("Humanize")
         self._collapsed_humanize_check.setToolTip("Enable or disable all humanization at once")
         cs_layout.addWidget(self._collapsed_humanize_check)
 
@@ -412,6 +413,15 @@ class MainWindowUI(QObject):
             self.settings_tab.themes_edit_btn,
             lambda c: (c.text_secondary, c.accent),
         )
+        # SettingsTab -- browse/set action icons
+        provider.register(
+            self.settings_tab.save_browse_btn,
+            lambda c: (c.text_secondary, c.accent),
+        )
+        provider.register(
+            self.settings_tab.themes_browse_btn,
+            lambda c: (c.text_secondary, c.accent),
+        )
 
         # PlaybackTab -- file strip and drop zone decorative icons
         provider.register(
@@ -518,6 +528,14 @@ class MainWindowUI(QObject):
         self._github_nav.update_icon_colors(theme.text_secondary, theme.text_primary)
         self._status_indicator.update_colors(theme.text_secondary, theme.accent_play, "#c44b4b", theme.accent_loaded)
         IconProvider.instance().notify_theme_changed(theme)
+        ToggleSwitchProvider.instance().notify_theme_changed(
+            track_off=theme.toggle_off,
+            track_on=theme.toggle_on,
+            knob=theme.knob_color,
+            text_col=theme.text_primary,
+            dis_text=_mix(theme.text_primary, theme.bg_primary, 0.65),
+            dis_track=_mix(theme.border, theme.bg_primary, 0.50),
+        )
 
         # Collapsed strip load buttons
         _px = self._collapsed_load_btn.fontMetrics().height()

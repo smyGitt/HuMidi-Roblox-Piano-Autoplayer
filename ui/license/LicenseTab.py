@@ -91,12 +91,7 @@ PyInstaller
 """,
 
     "Phosphor Icons": """\
-Phosphor Icons
-  A flexible icon family for interfaces, diagrams, presentations, and more.
-
-  License : MIT
-  URL     : https://phosphoricons.com
-  GitHub  : https://github.com/phosphor-icons/homepage
+MIT License
 
 Copyright (c) 2020 Phosphor Icons
 

@@ -9,7 +9,6 @@ from typing import List, Dict, Optional, Tuple
 from core.models import Note, KeyEvent, MusicalSection, KeyState
 from core.core import TempoMap, KeyMapper
 from core.keyboard_driver import KeyboardDriver
-from core.compiler import compile_events
 
 class Player(QObject):
     status_updated = Signal(str)
@@ -41,6 +40,14 @@ class Player(QObject):
 
         self.stop_event = threading.Event()
         self.pause_event = threading.Event()
+
+        # Cross-thread seek handoff. seek() is invoked from the GUI thread but
+        # all key/timing state is owned by the player thread's cursor loop.
+        # The request is parked here under a lock and applied inside the loop
+        # so no physical-keyboard or timing state is ever mutated concurrently.
+        self._seek_lock = threading.Lock()
+        self._pending_seek: Optional[float] = None
+
         self.key_states: Dict[str, KeyState] = {}
         self.active_pitches: set = set()
         self.pedal_is_down = False
@@ -66,16 +73,6 @@ class Player(QObject):
             self.debug_log.append(msg)
             self.status_updated.emit(msg)
 
-    def _apply_humanization_and_compile(self):
-        """Delegate compilation to core.compiler.compile_events and populate runtime state."""
-        log_fn = self.status_updated.emit if self.debug_log is not None else None
-        self.compiled_events = compile_events(self.config, self.notes, self.sections, log=log_fn)
-        self.total_duration = self.compiled_events[-1].time if self.compiled_events else 0.0
-        self.key_states.clear()
-        for ev in self.compiled_events:
-            if ev.action in ('press', 'release') and ev.key_char not in self.key_states:
-                self.key_states[ev.key_char] = KeyState(ev.key_char)
-
     def load_compiled_events(self, events: List[KeyEvent], total_duration: float):
         """Load pre-compiled events for saved playback, bypassing the compilation pipeline.
 
@@ -99,25 +96,32 @@ class Player(QObject):
         self.status_updated.emit("Playing from save!")
         self._execute_playback()
 
-    def play(self):
-        self.status_updated.emit("Initiating playback sequence...")
-        self._log_debug("\n=== STARTING PLAYBACK PROCESS ===")
-        self.status_updated.emit("Compiling playback events...")
-        self._apply_humanization_and_compile()
+    def play_compiled(self):
+        """Entry point for events compiled off-thread (the normal MIDI play path).
+
+        The PlaybackController's _PrepareWorker now runs core.compiler.compile_events
+        on its own QThread and injects the result via load_compiled_events, so the
+        player thread only needs to execute. No compilation happens here.
+        """
         self.status_updated.emit("Playing!")
         self._execute_playback()
 
     def _execute_playback(self):
         """Shared playback execution: countdown → cursor loop → cleanup.
 
-        Called by both play() (after compilation) and play_saved_events()
-        (after load_compiled_events). Owns the try/except/finally so the
-        pattern is defined exactly once.
+        Called by play() (after compilation), play_compiled() and
+        play_saved_events() (after load_compiled_events). Owns the single
+        try/except/finally so the pattern is defined exactly once.
+
+        Cleanup in the finally block is UNCONDITIONAL: shutdown() releases every
+        physically-held key and playback_finished is emitted exactly once on
+        every exit path (normal stop, exception, or stop-during-countdown). Do
+        not reintroduce an `if stop_event.is_set()` guard here -- a future loop
+        exit that forgets to set the flag would otherwise leak key state.
         """
         try:
             if self.config.get('countdown'): self._run_countdown()
             if self.stop_event.is_set():
-                self.playback_finished.emit()
                 return
 
             self.start_time = time.perf_counter()
@@ -132,9 +136,8 @@ class Player(QObject):
             self.error_occurred.emit(error_msg)
             self.stop_event.set()
         finally:
-            if self.stop_event.is_set():
-                self.shutdown()
-                self.playback_finished.emit()
+            self.shutdown()
+            self.playback_finished.emit()
 
     def stop(self):
         if not self.stop_event.is_set():
@@ -163,6 +166,25 @@ class Player(QObject):
             self.status_updated.emit("Paused.")
 
     def seek(self, target_time: float):
+        """Thread-safe seek entry point.
+
+        Invoked from the GUI thread. It does NOT touch key, timing, or index
+        state directly; it parks the target time under a lock. The cursor loop
+        picks it up at the top of its next iteration and runs _apply_seek on the
+        player thread, so shutdown()/state mutation never races the loop.
+        """
+        with self._seek_lock:
+            self._pending_seek = target_time
+
+    def _consume_pending_seek(self):
+        """Player-thread helper: apply a parked seek request, if any."""
+        with self._seek_lock:
+            target = self._pending_seek
+            self._pending_seek = None
+        if target is not None:
+            self._apply_seek(target)
+
+    def _apply_seek(self, target_time: float):
         old_idx = self.event_index
         self.shutdown()
         times = [e.time for e in self.compiled_events]
@@ -204,16 +226,20 @@ class Player(QObject):
         self._pedal_net_down = False
 
         while not self.stop_event.is_set():
+            # Apply any GUI-thread seek request before doing anything else so
+            # the rest of the iteration sees consistent index/timing state.
+            self._consume_pending_seek()
+
             if self.pause_event.is_set():
                 if not _was_paused:
-                    # First pause iteration: safe to release now — cursor loop owns all key presses
+                    # First pause iteration: safe to release now; cursor loop owns all key presses
                     self.shutdown()
                     _was_paused = True
                 time.sleep(0.05)
                 continue
 
             if _was_paused:
-                # Just unpaused — re-press any notes that were mid-play at the pause point
+                # Just unpaused: re-press any notes that were mid-play at the pause point
                 self._sync_active_keys_at_resume()
                 _was_paused = False
 
@@ -340,7 +366,7 @@ class Player(QObject):
             try:
                 with self.keyboard.pressed(*modifiers):
                     if was_physically_down:
-                        # Key already held by an overlapping note — re-strike for new attack
+                        # Key already held by an overlapping note; re-strike for new attack
                         self.keyboard.release(base_key)
                         time.sleep(0.001)
                         self.keyboard.press(base_key)
@@ -385,7 +411,7 @@ class Player(QObject):
         """Re-press any notes/pedal that were physically held at the moment of pause.
 
         Uses the running _key_net / _key_last_press counters maintained by
-        _execute_chord_event — O(currently-held keys) instead of O(all events).
+        _execute_chord_event, O(currently-held keys) instead of O(all events).
         """
         pitch_net: Dict[int, int] = {}
         keys_repressed = []

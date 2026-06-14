@@ -11,6 +11,7 @@ from ui.widgets.humidi_button import HuMidiButton
 from ui.widgets.elided_label import ElidedLabel
 from ui.widgets.status_indicator import StatusIndicator
 from ui.widgets.ph_icon_label import PhIconLabel, IconProvider
+from ui.widgets.toggle_switch import ToggleSwitch, ToggleSwitchProvider
 
 __all__ = [
     "NavButton",
@@ -21,4 +22,6 @@ __all__ = [
     "StatusIndicator",
     "PhIconLabel",
     "IconProvider",
+    "ToggleSwitch",
+    "ToggleSwitchProvider",
 ]

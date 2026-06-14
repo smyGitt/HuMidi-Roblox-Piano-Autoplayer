@@ -1,18 +1,19 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QCheckBox, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
-def _make_check_pair(checkbox: QCheckBox, desc_text: str) -> QWidget:
+def _make_check_pair(checkbox: ToggleSwitch, desc_text: str) -> QWidget:
     container = QWidget()
     vbox = QVBoxLayout(container)
     vbox.setContentsMargins(0, 0, 0, 0)
     vbox.setSpacing(1)
     desc = QLabel(desc_text)
     desc.setProperty("role", "muted")
-    desc.setContentsMargins(25, 0, 0, 0)
+    desc.setContentsMargins(36, 0, 0, 0)
     vbox.addWidget(checkbox)
     vbox.addWidget(desc)
     return container
@@ -42,17 +43,17 @@ class OptionsCard(QWidget):
 
         card, body = make_card("OPTIONS", title_buttons=[self.reset_icon])
 
-        self.use_88_key_check = QCheckBox("88-Key Layout")
+        self.use_88_key_check = ToggleSwitch("88-Key Layout")
         self.use_88_key_check.setToolTip(
             "Map notes to the full 88-key piano layout instead of a compressed keyboard layout"
         )
-        self.countdown_check = QCheckBox("Countdown")
+        self.countdown_check = ToggleSwitch("Countdown")
         self.countdown_check.setToolTip("Show a 3-second countdown before playback begins")
-        self.debug_check = QCheckBox("Debug Output")
+        self.debug_check = ToggleSwitch("Debug Output")
         self.debug_check.setToolTip(
             "Print verbose event logs to the Debug tab during playback"
         )
-        self.auto_detect_hands_check = QCheckBox("Auto-detect hands")
+        self.auto_detect_hands_check = ToggleSwitch("Auto-detect hands")
         self.auto_detect_hands_check.setToolTip(
             "Use MIDI track names to assign left/right hand zones automatically"
         )

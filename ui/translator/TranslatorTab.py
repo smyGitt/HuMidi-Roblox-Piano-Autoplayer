@@ -1,9 +1,11 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QTextEdit, QSpinBox, QCheckBox, QPushButton, QFrame, QStackedWidget
+    QTextEdit, QSpinBox, QPushButton, QFrame, QStackedWidget
 )
 from PyQt6.QtCore import pyqtSignal as Signal, Qt
 from PyQt6.QtGui import QFont
+
+from ui.widgets.toggle_switch import ToggleSwitch
 
 from core.translator import FormatRegistry
 from ui.widgets import make_card
@@ -122,7 +124,7 @@ class TranslatorTab(QWidget):
         self.bpm_spinbox.setValue(120)
         self.bpm_spinbox.setFixedWidth(70)
         self.bpm_spinbox.setToolTip("Tempo used to calculate note durations from the sheet")
-        self.humanize_check = QCheckBox("Humanize")
+        self.humanize_check = ToggleSwitch("Humanize")
         self.humanize_check.setToolTip(
             "Apply current humanization settings during playback.\n"
             "When unchecked, the sheet plays back exactly as written."

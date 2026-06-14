@@ -22,4 +22,5 @@ class AppState:
     total_song_duration_sec: float = 1.0
     max_note_duration: float = 0.0
     current_pedal_intervals: List = field(default_factory=list)
+    pedal_interval_starts: List = field(default_factory=list)
     parsed_tempo_map: Optional[Any] = None

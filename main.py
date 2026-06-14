@@ -3,17 +3,20 @@ import sys
 import os
 import json
 import bisect
+import tempfile
+import threading
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QDialog
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread
 from PyQt6.QtGui import QIcon
 
-from core.core import MidiParser, KeyMapper, TempoMap
+from core.core import KeyMapper, TempoMap
 from core.translator import FormatRegistry
 from managers.HotkeyManager import HotkeyManager
 import webbrowser
 from managers.UpdateManager import UpdateChecker
 from controllers.PlaybackController import PlaybackController
+from controllers.midi_parse_worker import MidiParseWorker
 from controllers.app_state import AppState
 from managers.ConfigManager import ConfigManager
 from ui.MainWindowUI import MainWindowUI
@@ -47,6 +50,38 @@ def _validate_save_data(data: dict) -> tuple[bool, str]:
     return True, ''
 
 
+def _write_json_atomic(filepath: str, data: dict) -> None:
+    """Serialize `data` to `filepath` via a temp file + atomic os.replace.
+
+    The original file is never truncated in place, so an interrupted write (for
+    example a daemon thread killed at application exit) cannot corrupt an
+    existing save: the replace either happened in full or not at all.
+    """
+    target_dir = os.path.dirname(filepath) or '.'
+    fd, tmp_path = tempfile.mkstemp(dir=target_dir, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=4)
+        os.replace(tmp_path, filepath)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _stamp_last_accessed_async(filepath: str, data: dict) -> None:
+    """Persist the already-updated `last_accessed` timestamp off the GUI thread.
+
+    For large saves the JSON re-serialization is non-trivial; doing it on a
+    daemon thread keeps the UI responsive right after a save card is clicked.
+    The write is atomic (see _write_json_atomic), so backgrounding it is safe.
+    """
+    threading.Thread(
+        target=_write_json_atomic, args=(filepath, data), daemon=True
+    ).start()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -65,6 +100,10 @@ class MainWindow(QMainWindow):
         
         # Global Application States
         self.state = AppState()
+
+        # Threaded track-selection parse (see _parse_and_select_tracks)
+        self._parse_thread = None
+        self._parse_worker = None
 
         self._bind_signals()
 
@@ -99,7 +138,7 @@ class MainWindow(QMainWindow):
         self.ui.settings_tab.save_browse_btn.clicked.connect(self._browse_save_dir)
         self.ui.settings_tab.save_edit_btn.clicked.connect(self._open_save_dir)
         self.ui.settings_tab.themes_browse_btn.clicked.connect(self._browse_themes_dir)
-        self.ui.settings_tab.themes_edit_btn.clicked.connect(self._open_themes_file)
+        self.ui.settings_tab.themes_edit_btn.clicked.connect(self._open_themes_dir)
         self.ui._collapsed_load_btn.clicked.connect(self.select_file)
         self.ui._collapsed_load_saved_btn.clicked.connect(self.open_load_dialog)
         self.ui.settings_tab.hk_btn.clicked.connect(self._change_hotkey)
@@ -110,7 +149,7 @@ class MainWindow(QMainWindow):
         self.ui.settings_tab.always_top_check.toggled.connect(self._toggle_always_on_top)
         self.ui.settings_tab.opacity_slider.valueChanged.connect(self._change_opacity)
 
-        # Settings-tab persistence — save immediately on change so closing without playing doesn't lose them
+        # Settings-tab persistence: save immediately on change so closing without playing doesn't lose them
         self.ui.settings_tab.always_top_check.toggled.connect(self._save_config)
         self.ui.settings_tab.opacity_slider.valueChanged.connect(self._save_config)
         self.ui.settings_tab.timeline_vis_check.toggled.connect(self._save_config)
@@ -186,13 +225,11 @@ class MainWindow(QMainWindow):
             ThemeManager.set_themes_dir(path)
             self.ui.settings_tab.themes_path_input.setText(str(ThemeManager._themes_file))
 
-    def _open_themes_file(self):
+    def _open_themes_dir(self):
         import subprocess
-        themes_file = ThemeManager._themes_file
-        if not themes_file.exists():
-            ThemeManager._themes_dir.mkdir(parents=True, exist_ok=True)
-            themes_file.write_text("{}", encoding="utf-8")
-        subprocess.Popen(["notepad.exe", str(themes_file)])
+        themes_dir = ThemeManager._themes_dir
+        themes_dir.mkdir(parents=True, exist_ok=True)
+        subprocess.Popen(["explorer", os.path.normpath(str(themes_dir))])
 
     def _change_hotkey(self):
         QMessageBox.information(self, "Bind Key", "Press the key you want to bind now.")
@@ -262,7 +299,11 @@ class MainWindow(QMainWindow):
             if note.end_time > time:
                 active_pitches.add(note.pitch)
         self.ui.piano_widget.set_active_pitches(list(active_pitches))
-        pedal_down = any(s <= time < e for s, e in self.state.current_pedal_intervals)
+        # Pedal intervals are non-overlapping and sorted by start, so a single
+        # bisect locates the only candidate interval instead of scanning all.
+        starts = self.state.pedal_interval_starts
+        idx = bisect.bisect_right(starts, time) - 1
+        pedal_down = idx >= 0 and time < self.state.current_pedal_intervals[idx][1]
         self.ui.piano_widget.set_pedal_active(pedal_down)
         self.ui.update_time_label(time, self.state.total_song_duration_sec)
 
@@ -277,6 +318,7 @@ class MainWindow(QMainWindow):
 
     def _on_pedal_data_ready(self, intervals: list):
         self.state.current_pedal_intervals = intervals
+        self.state.pedal_interval_starts = [s for s, _ in intervals]
         self.ui.timeline_widget.set_pedal_intervals(intervals)
 
     def update_progress(self, current_time):
@@ -300,6 +342,8 @@ class MainWindow(QMainWindow):
             return
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
             return
+        if self._parse_thread and self._parse_thread.isRunning():
+            return
         self.state.loaded_save_data = None
         self.state.loaded_save_filename = None
         self.state.parsed_tracks = None
@@ -321,12 +365,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        try:
-            data.setdefault('metadata', {})['last_accessed'] = datetime.now().isoformat()
-            with open(filepath, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception:
-            pass
+        data.setdefault('metadata', {})['last_accessed'] = datetime.now().isoformat()
+        _stamp_last_accessed_async(filepath, data)
 
         self.state.loaded_save_data = data
         self.state.loaded_save_filename = os.path.basename(filepath)
@@ -377,15 +417,28 @@ class MainWindow(QMainWindow):
         self._apply_save(filepath, data)
 
     def _parse_and_select_tracks(self, filepath):
+        """Parse the MIDI structure off the GUI thread, then open the dialog.
+
+        MidiParser.parse_structure can take a noticeable amount of time on large
+        files; running it on a MidiParseWorker QThread keeps the window (and the
+        status-indicator animation) responsive. The TrackSelectionDialog is
+        opened from the _on_midi_parsed slot once results arrive.
+        """
+        if self._parse_thread and self._parse_thread.isRunning():
+            return
         self.ui.log_output.append("Parsing MIDI structure...")
         self.ui._status_indicator.set_state(StatusIndicator.LOADING, "LOADING MIDI")
-        try:
-            tracks, tempo_map, pedal_count = MidiParser.parse_structure(filepath, 1.0, None)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to parse MIDI:\n{e}")
-            self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "NO FILE")
-            return
 
+        self._parse_thread = QThread()
+        self._parse_worker = MidiParseWorker(filepath)
+        self._parse_worker.moveToThread(self._parse_thread)
+        self._parse_thread.started.connect(self._parse_worker.run)
+        self._parse_worker.parsed.connect(self._on_midi_parsed)
+        self._parse_worker.failed.connect(self._on_midi_parse_failed)
+        self._parse_worker.finished.connect(self._on_parse_cleanup)
+        self._parse_thread.start()
+
+    def _on_midi_parsed(self, tracks, tempo_map, pedal_count):
         self.state.parsed_tracks = tracks
         self.state.loaded_pedal_count = pedal_count
         self.state.parsed_tempo_map = tempo_map
@@ -409,6 +462,17 @@ class MainWindow(QMainWindow):
             self.ui.scrubber_slider.setEnabled(False)
             self.ui._set_save_enabled(False)
             self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "NO FILE")
+
+    def _on_midi_parse_failed(self, error_msg: str):
+        QMessageBox.critical(self, "Error", f"Failed to parse MIDI:\n{error_msg}")
+        self.ui._status_indicator.set_state(StatusIndicator.UNLOADED, "NO FILE")
+
+    def _on_parse_cleanup(self):
+        if self._parse_thread:
+            self._parse_thread.quit()
+            self._parse_thread.wait(2000)
+        self._parse_worker = None
+        self._parse_thread = None
 
     def _edit_track_selection(self) -> None:
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
@@ -630,7 +694,17 @@ class MainWindow(QMainWindow):
             webbrowser.open(releases_url)
 
     def closeEvent(self, event):
+        # Join every background thread (bounded) so none outlives the window and
+        # later emits a signal into a destroyed MainWindow.
         self._update_checker.quit()
+        self._update_checker.wait(2000)
+        manual_checker = getattr(self, '_manual_checker', None)
+        if manual_checker is not None:
+            manual_checker.quit()
+            manual_checker.wait(2000)
+        if self._parse_thread and self._parse_thread.isRunning():
+            self._parse_thread.quit()
+            self._parse_thread.wait(2000)
         self._save_config()
         self.playback_controller.shutdown()
         event.accept()

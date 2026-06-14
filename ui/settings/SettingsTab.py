@@ -1,7 +1,9 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QCheckBox, QSlider,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider,
     QLabel, QComboBox, QLineEdit, QFrame, QStackedWidget)
 from PyQt6.QtCore import Qt
+
+from ui.widgets.toggle_switch import ToggleSwitch
 
 from ui.widgets import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -75,7 +77,7 @@ class SettingsTab(QWidget):
         body.setSpacing(6)
 
         body.addWidget(self._section_label("Window"))
-        self.always_top_check = QCheckBox("Always on Top")
+        self.always_top_check = ToggleSwitch("Always on Top")
         self.always_top_check.setToolTip("Keep this window above all other windows")
         body.addWidget(self.always_top_check)
 
@@ -91,13 +93,13 @@ class SettingsTab(QWidget):
 
         body.addSpacing(8)
         body.addWidget(self._section_label("Visualizer"))
-        self.timeline_vis_check = QCheckBox("Timeline")
+        self.timeline_vis_check = ToggleSwitch("Timeline")
         self.timeline_vis_check.setChecked(True)
         self.timeline_vis_check.setToolTip(
             "Show the piano-roll timeline in the Visualizer tab "
             "(disable for a simple seek slider)"
         )
-        self.piano_vis_check = QCheckBox("Piano Keys")
+        self.piano_vis_check = ToggleSwitch("Piano Keys")
         self.piano_vis_check.setChecked(True)
         self.piano_vis_check.setToolTip("Show the piano key visualizer in the Visualizer tab")
         body.addWidget(self.timeline_vis_check)
@@ -146,11 +148,14 @@ class SettingsTab(QWidget):
         self.save_path_input = QLineEdit()
         self.save_path_input.setReadOnly(True)
         self.save_path_input.setToolTip("Directory where humanized performance saves are stored")
-        self.save_edit_btn = PhIconLabel("rename-theme", size=14)
+        self.save_edit_btn = PhIconLabel("folder-closed", size=32, hover_icon_name="folder-open")
+        self.save_edit_btn.setObjectName("folder_open_btn")
         self.save_edit_btn.setToolTip("Open save directory in Explorer")
         self.save_edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.save_browse_btn = QPushButton("Set...")
+        self.save_browse_btn = PhIconLabel("rename-theme", size=32)
+        self.save_browse_btn.setObjectName("folder_open_btn")
         self.save_browse_btn.setToolTip("Choose where to save humanized performance files")
+        self.save_browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         save_row.addWidget(self.save_path_input, 1)
         save_row.addWidget(self.save_edit_btn)
         save_row.addWidget(self.save_browse_btn)
@@ -173,11 +178,14 @@ class SettingsTab(QWidget):
         self.themes_path_input.setReadOnly(True)
         self.themes_path_input.setText(str(ThemeManager._themes_file))
         self.themes_path_input.setToolTip("JSON file where custom themes are stored")
-        self.themes_edit_btn = PhIconLabel("rename-theme", size=14)
-        self.themes_edit_btn.setToolTip("Open themes.json in the default editor")
+        self.themes_edit_btn = PhIconLabel("folder-closed", size=32, hover_icon_name="folder-open")
+        self.themes_edit_btn.setObjectName("folder_open_btn")
+        self.themes_edit_btn.setToolTip("Open themes directory in Explorer")
         self.themes_edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.themes_browse_btn = QPushButton("Set...")
+        self.themes_browse_btn = PhIconLabel("rename-theme", size=32)
+        self.themes_browse_btn.setObjectName("folder_open_btn")
         self.themes_browse_btn.setToolTip("Move the themes file to a different directory")
+        self.themes_browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         themes_row.addWidget(self.themes_path_input, 1)
         themes_row.addWidget(self.themes_edit_btn)
         themes_row.addWidget(self.themes_browse_btn)

@@ -18,29 +18,51 @@ class PhIconLabel(EventInjectableMixin, QLabel):
     a logical size in pixels. Register with IconProvider.instance().register() to
     attach hover color-swap and theme tracking automatically.
 
+    Pass hover_icon_name to swap to a different icon stem on hover (e.g. show
+    "folder-closed" at rest and "folder-open" on hover). When omitted, both
+    states render the same icon_name with different colors.
+
     clicked is emitted on left-button release so callers can wire it like a
     QPushButton signal without subclassing or adding custom press handlers.
     """
 
     clicked = Signal()
 
-    def __init__(self, icon_name: str, size: int = 20, parent: QWidget | None = None):
+    def __init__(
+        self,
+        icon_name: str,
+        size: int = 20,
+        parent: QWidget | None = None,
+        *,
+        hover_icon_name: str | None = None,
+        allow_vertical_expansion: bool = False,
+    ):
         super().__init__(parent)
         self.icon_name = icon_name
+        self.hover_icon_name = hover_icon_name
         self.size = size
         self.normal_pixmap: QPixmap | None = None
         self.hover_pixmap:  QPixmap | None = None
         self._color_fn: Callable | None = None
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedSize(size, size)
-        self.setScaledContents(True)
+        self.setScaledContents(False)
+        if allow_vertical_expansion:
+            self.setFixedWidth(size)
+        else:
+            self.setFixedSize(size, size)
 
     def set_colors(self, normal_hex: str, hover_hex: str) -> None:
         """Re-render both pixmaps from hex strings and refresh the display."""
         from ui.widgets.ph_icon import ph_icon
         phys = self.size * 2
-        self.normal_pixmap = ph_icon(self.icon_name, normal_hex, self.size).pixmap(phys, phys)
-        self.hover_pixmap  = ph_icon(self.icon_name, hover_hex,  self.size).pixmap(phys, phys)
+        n = ph_icon(self.icon_name, normal_hex, self.size).pixmap(phys, phys)
+        n.setDevicePixelRatio(2.0)
+        self.normal_pixmap = n
+        hover_name = self.hover_icon_name if self.hover_icon_name is not None else self.icon_name
+        h = ph_icon(hover_name, hover_hex, self.size).pixmap(phys, phys)
+        h.setDevicePixelRatio(2.0)
+        self.hover_pixmap = h
         self.setPixmap(self.normal_pixmap)
 
     def apply_colors(self, colors: "ThemeColors") -> None:

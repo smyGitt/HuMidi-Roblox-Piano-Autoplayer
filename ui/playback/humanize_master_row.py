@@ -1,18 +1,19 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QCheckBox, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
-def _make_check_pair(checkbox: QCheckBox, desc_text: str) -> QWidget:
+def _make_check_pair(checkbox: ToggleSwitch, desc_text: str) -> QWidget:
     container = QWidget()
     vbox = QVBoxLayout(container)
     vbox.setContentsMargins(0, 0, 0, 0)
     vbox.setSpacing(1)
     desc = QLabel(desc_text)
     desc.setProperty("role", "muted")
-    desc.setContentsMargins(25, 0, 0, 0)
+    desc.setContentsMargins(36, 0, 0, 0)
     vbox.addWidget(checkbox)
     vbox.addWidget(desc)
     return container
@@ -45,16 +46,16 @@ class HumanizeMasterRow(QWidget):
 
         card, body = make_card("GENERAL SETTINGS", title_buttons=[self.reset_icon])
 
-        self.select_all_humanization_check = QCheckBox("Humanize all")
+        self.select_all_humanization_check = ToggleSwitch("Humanize all")
         self.select_all_humanization_check.setToolTip(
             "Enable or disable all humanization options at once"
         )
-        self.simulate_hands_check = QCheckBox("Simulate Hands")
+        self.simulate_hands_check = ToggleSwitch("Simulate Hands")
         self.simulate_hands_check.setToolTip(
             "Assign notes to left/right hand and limit simultaneous finger usage "
             "to simulate realistic hand behavior"
         )
-        self.enable_chord_roll_check = QCheckBox("Chord Roll")
+        self.enable_chord_roll_check = ToggleSwitch("Chord Roll")
         self.enable_chord_roll_check.setToolTip(
             "Slightly stagger the notes within each chord to simulate the natural "
             "roll of fingers across the keys"

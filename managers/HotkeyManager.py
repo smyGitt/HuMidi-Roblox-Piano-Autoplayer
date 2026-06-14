@@ -1,3 +1,5 @@
+import threading
+
 from PyQt6.QtCore import QObject, pyqtSignal as Signal
 from pynput import keyboard
 from pynput.keyboard import Key
@@ -20,6 +22,10 @@ class HotkeyManager(QObject):
 
     def __init__(self):
         super().__init__()
+        # _lock guards every field below that the pynput listener thread writes
+        # (current_mods, current_key, _held_mods, listening_for_bind) and that
+        # the GUI thread reads (format_hotkey_string).
+        self._lock = threading.Lock()
         self.current_mods = frozenset()
         self.current_key  = Key.f6
         self._held_mods   = set()
@@ -35,12 +41,14 @@ class HotkeyManager(QObject):
         self.listener.start()
 
     def format_hotkey_string(self):
+        with self._lock:
+            mods = self.current_mods
+            k = self.current_key
         parts = []
         for mod, label in [(Key.ctrl, "Ctrl"), (Key.alt, "Alt"),
                            (Key.shift, "Shift"), (Key.cmd, "Cmd")]:
-            if mod in self.current_mods:
+            if mod in mods:
                 parts.append(label)
-        k = self.current_key
         if hasattr(k, 'char') and k.char:
             parts.append(k.char.upper())
         else:
@@ -48,25 +56,36 @@ class HotkeyManager(QObject):
         return "+".join(parts)
 
     def on_release(self, key):
-        self._held_mods.discard(_normalize(key))
+        with self._lock:
+            self._held_mods.discard(_normalize(key))
 
     def on_press(self, key):
+        # Runs on the pynput listener thread. All shared-state reads/writes are
+        # done under the lock, then signal emission (and format_hotkey_string,
+        # which locks independently) happens after release to avoid re-entrancy.
         canon = _normalize(key)
-        if canon in _CANONICAL_MODS:
-            self._held_mods.add(canon)
-
-        if self.listening_for_bind:
+        emit_bound = False
+        emit_toggle = False
+        with self._lock:
             if canon in _CANONICAL_MODS:
-                return
-            self.current_mods = frozenset(self._held_mods)
-            self.current_key  = key
-            self.listening_for_bind = False
-            self.bound_updated.emit(self.format_hotkey_string())
-            return
+                self._held_mods.add(canon)
 
-        if _normalize(key) == _normalize(self.current_key):
-            if frozenset(self._held_mods) == self.current_mods:
-                self.toggle_requested.emit()
+            if self.listening_for_bind:
+                if canon in _CANONICAL_MODS:
+                    return
+                self.current_mods = frozenset(self._held_mods)
+                self.current_key  = key
+                self.listening_for_bind = False
+                emit_bound = True
+            elif _normalize(key) == _normalize(self.current_key):
+                if frozenset(self._held_mods) == self.current_mods:
+                    emit_toggle = True
+
+        if emit_bound:
+            self.bound_updated.emit(self.format_hotkey_string())
+        if emit_toggle:
+            self.toggle_requested.emit()
 
     def start_binding(self):
-        self.listening_for_bind = True
+        with self._lock:
+            self.listening_for_bind = True

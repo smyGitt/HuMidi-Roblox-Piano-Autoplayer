@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QCheckBox, QDoubleSpinBox, QSlider, QLabel)
+    QWidget, QVBoxLayout, QGridLayout, QDoubleSpinBox, QSlider, QLabel)
 from PyQt6.QtCore import Qt
+
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
 class HumRow(QWidget):
@@ -18,7 +20,7 @@ class HumRow(QWidget):
         self._setup_ui(name, min_val, max_val, def_val, suffix, factor, decimals, tooltip, desc)
 
     def _setup_ui(self, name, min_val, max_val, def_val, suffix, factor, decimals, tooltip, desc):
-        self.check = QCheckBox(name)
+        self.check = ToggleSwitch(name)
         self.slider, self.spinbox = self._make_slider_spinbox(
             min_val, max_val, def_val, suffix, factor=factor, decimals=decimals
         )
@@ -44,7 +46,7 @@ class HumRow(QWidget):
             check_vbox.addWidget(self.check)
             desc_label = QLabel(desc)
             desc_label.setProperty("role", "muted")
-            desc_label.setContentsMargins(25, 0, 0, 0)
+            desc_label.setContentsMargins(36, 0, 0, 0)
             check_vbox.addWidget(desc_label)
             grid.addWidget(check_container, 0, 0)
         else:
