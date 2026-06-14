@@ -2,12 +2,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel,
     QSlider, QDoubleSpinBox, QSpinBox, QComboBox
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
-from ui.widgets.humidi_button import HuMidiButton
-from ui.widgets.ph_icon import ph_icon
+from ui.widgets.ph_icon_label import PhIconLabel
 
 
 class PerformanceCard(QWidget):
@@ -37,12 +35,12 @@ class PerformanceCard(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        self._reset_btn = HuMidiButton(tooltip="Reset performance settings to defaults")
-        self._reset_btn.setProperty("role", "card_reset")
-        self._reset_btn.setFixedSize(28, 28)
-        self._reset_btn.clicked.connect(self.reset_to_default)
+        self.reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
+        self.reset_icon.setToolTip("Reset performance settings to defaults")
+        self.reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_icon.clicked.connect(self.reset_to_default)
 
-        card, body = make_card("PERFORMANCE", title_buttons=[self._reset_btn])
+        card, body = make_card("PERFORMANCE", title_buttons=[self.reset_icon])
 
         grid = QGridLayout()
         grid.setVerticalSpacing(10)
@@ -125,9 +123,3 @@ class PerformanceCard(QWidget):
         self.transpose_spinbox.setValue(0)
         self.pedal_style_combo.setCurrentText("Auto (Default)")
 
-    def update_icon_color(self, color: str) -> None:
-        _logical = 14
-        _pix = ph_icon("arrow-counter-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
-        _pix.setDevicePixelRatio(2.0)
-        self._reset_btn.setIcon(QIcon(_pix))
-        self._reset_btn.setIconSize(QSize(_logical, _logical))

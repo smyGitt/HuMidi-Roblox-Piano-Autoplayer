@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton)
-from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
-from ui.widgets.ph_icon import ph_icon
+from ui.widgets.ph_icon_label import PhIconLabel
 
 
 class MidiDropZone(QFrame):
@@ -29,10 +29,7 @@ class MidiDropZone(QFrame):
         vbox.setContentsMargins(0, 4, 0, 4)
         vbox.setSpacing(8)
 
-        self._drop_icon_lbl = QLabel()
-        self._drop_icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._drop_icon_lbl.setFixedSize(QSize(48, 48))
-        self._drop_icon_lbl.setScaledContents(True)
+        self.drop_icon = PhIconLabel("folder-open", size=48)
 
         drop_hint = QLabel("Drop a .mid file")
         drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -54,18 +51,12 @@ class MidiDropZone(QFrame):
         btn_row.addWidget(self.load_saved_btn)
 
         vbox.addStretch()
-        vbox.addWidget(self._drop_icon_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
+        vbox.addWidget(self.drop_icon, alignment=Qt.AlignmentFlag.AlignHCenter)
         vbox.addWidget(drop_hint)
         vbox.addWidget(drop_sub)
         vbox.addSpacing(8)
         vbox.addLayout(btn_row)
         vbox.addStretch()
-
-    def update_icon_color(self, hex_color: str, size: int = 48) -> None:
-        """Re-render the drop-zone folder icon with the given theme color."""
-        self._drop_icon_lbl.setPixmap(
-            ph_icon("folder-open", hex_color, size).pixmap(size * 2, size * 2)
-        )
 
     @classmethod
     def _first_midi_path(cls, mime) -> str | None:

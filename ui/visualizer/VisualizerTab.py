@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea
 from PyQt6.QtCore import Qt
 
-from ui.visualizer import PianoWidget, TimelineWidget
+from ui.visualizer.visualizer import PianoWidget, TimelineWidget
 
 
 class VisualizerTab(QWidget):

@@ -17,9 +17,10 @@ from controllers.PlaybackController import PlaybackController
 from controllers.app_state import AppState
 from managers.ConfigManager import ConfigManager
 from ui.MainWindowUI import MainWindowUI
-from ui.TrackSelectionDialog import TrackSelectionDialog
-from ui.LoadSaveDialog import LoadSaveDialog
+from ui.dialogs.TrackSelectionDialog import TrackSelectionDialog
+from ui.dialogs.LoadSaveDialog import LoadSaveDialog
 from ui.widgets import StatusIndicator
+from ui.theme import ThemeManager
 
 APP_VERSION = "2.0"
 
@@ -96,6 +97,9 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.all_saves_btn.clicked.connect(self.open_load_dialog)
         self.ui.playback_tab.drop_zone.file_dropped.connect(self._open_midi)
         self.ui.settings_tab.save_browse_btn.clicked.connect(self._browse_save_dir)
+        self.ui.settings_tab.save_edit_btn.clicked.connect(self._open_save_dir)
+        self.ui.settings_tab.themes_browse_btn.clicked.connect(self._browse_themes_dir)
+        self.ui.settings_tab.themes_edit_btn.clicked.connect(self._open_themes_file)
         self.ui._collapsed_load_btn.clicked.connect(self.select_file)
         self.ui._collapsed_load_saved_btn.clicked.connect(self.open_load_dialog)
         self.ui.settings_tab.hk_btn.clicked.connect(self._change_hotkey)
@@ -168,6 +172,27 @@ class MainWindow(QMainWindow):
             self.config_manager.set_save_dir(path)
             self.ui.settings_tab.save_path_input.setText(path)
             self._save_config()
+
+    def _open_save_dir(self):
+        import subprocess
+        path = self.config_manager.save_dir
+        if os.path.isdir(path):
+            subprocess.Popen(["explorer", os.path.normpath(path)])
+
+    def _browse_themes_dir(self):
+        current = str(ThemeManager._themes_dir)
+        path = QFileDialog.getExistingDirectory(self, "Select Themes Directory", current)
+        if path:
+            ThemeManager.set_themes_dir(path)
+            self.ui.settings_tab.themes_path_input.setText(str(ThemeManager._themes_file))
+
+    def _open_themes_file(self):
+        import subprocess
+        themes_file = ThemeManager._themes_file
+        if not themes_file.exists():
+            ThemeManager._themes_dir.mkdir(parents=True, exist_ok=True)
+            themes_file.write_text("{}", encoding="utf-8")
+        subprocess.Popen(["notepad.exe", str(themes_file)])
 
     def _change_hotkey(self):
         QMessageBox.information(self, "Bind Key", "Press the key you want to bind now.")

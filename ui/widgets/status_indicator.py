@@ -147,7 +147,7 @@ class StatusIndicator(QFrame):
     def state(self) -> str:
         return self._state
 
-    def update_colors(self, icon_hex: str, ready_hex: str, unload_hex: str, loaded_hex: str = "#c9a535") -> None:
+    def update_colors(self, icon_hex: str, ready_hex: str, unload_hex: str, loaded_hex: str) -> None:
         """Rebuild animation frames and re-render the current state dot/icon."""
         self._icon_color   = icon_hex
         self._ready_color  = ready_hex

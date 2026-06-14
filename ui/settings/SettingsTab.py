@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from ui.widgets import make_card
+from ui.widgets.ph_icon_label import PhIconLabel
 from ui.theme import ThemeManager
 
 
@@ -130,17 +131,57 @@ class SettingsTab(QWidget):
         card, body = make_card("")
         body.setSpacing(6)
 
-        body.addWidget(self._section_label("Save Directory"))
+        save_hdr = QHBoxLayout()
+        save_hdr.setSpacing(4)
+        save_hdr.setContentsMargins(0, 0, 0, 0)
+        self.save_dir_icon = PhIconLabel("folder-open", size=14)
+        self.save_dir_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_hdr.addWidget(self.save_dir_icon)
+        save_hdr.addWidget(self._section_label("Save Directory"))
+        save_hdr.addStretch()
+        body.addLayout(save_hdr)
+
         save_row = QHBoxLayout()
         save_row.setSpacing(8)
         self.save_path_input = QLineEdit()
         self.save_path_input.setReadOnly(True)
         self.save_path_input.setToolTip("Directory where humanized performance saves are stored")
-        self.save_browse_btn = QPushButton("Browse")
+        self.save_edit_btn = PhIconLabel("rename-theme", size=14)
+        self.save_edit_btn.setToolTip("Open save directory in Explorer")
+        self.save_edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.save_browse_btn = QPushButton("Set...")
         self.save_browse_btn.setToolTip("Choose where to save humanized performance files")
         save_row.addWidget(self.save_path_input, 1)
+        save_row.addWidget(self.save_edit_btn)
         save_row.addWidget(self.save_browse_btn)
         body.addLayout(save_row)
+
+        body.addSpacing(10)
+        themes_hdr = QHBoxLayout()
+        themes_hdr.setSpacing(4)
+        themes_hdr.setContentsMargins(0, 0, 0, 0)
+        self.themes_file_icon = PhIconLabel("folder-open", size=14)
+        self.themes_file_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        themes_hdr.addWidget(self.themes_file_icon)
+        themes_hdr.addWidget(self._section_label("Themes File"))
+        themes_hdr.addStretch()
+        body.addLayout(themes_hdr)
+
+        themes_row = QHBoxLayout()
+        themes_row.setSpacing(8)
+        self.themes_path_input = QLineEdit()
+        self.themes_path_input.setReadOnly(True)
+        self.themes_path_input.setText(str(ThemeManager._themes_file))
+        self.themes_path_input.setToolTip("JSON file where custom themes are stored")
+        self.themes_edit_btn = PhIconLabel("rename-theme", size=14)
+        self.themes_edit_btn.setToolTip("Open themes.json in the default editor")
+        self.themes_edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.themes_browse_btn = QPushButton("Set...")
+        self.themes_browse_btn.setToolTip("Move the themes file to a different directory")
+        themes_row.addWidget(self.themes_path_input, 1)
+        themes_row.addWidget(self.themes_edit_btn)
+        themes_row.addWidget(self.themes_browse_btn)
+        body.addLayout(themes_row)
         body.addStretch()
 
         page_layout.addWidget(card, 1)

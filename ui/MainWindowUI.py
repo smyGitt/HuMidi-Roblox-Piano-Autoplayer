@@ -11,12 +11,13 @@ from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
 
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
 from ui.widgets.ph_icon import ph_icon
-from ui.PlaybackTab import PlaybackTab
-from ui.SettingsTab import SettingsTab
-from ui.TranslatorTab import TranslatorTab
-from ui.VisualizerTab import VisualizerTab
-from ui.DebugTab import DebugTab
-from ui.LicenseTab import LicenseTab
+from ui.widgets.ph_icon_label import IconProvider
+from ui.playback.PlaybackTab import PlaybackTab
+from ui.settings.SettingsTab import SettingsTab
+from ui.translator.TranslatorTab import TranslatorTab
+from ui.visualizer.VisualizerTab import VisualizerTab
+from ui.debug.DebugTab import DebugTab
+from ui.license.LicenseTab import LicenseTab
 from ui.theme import ThemeManager, generate_stylesheet
 
 
@@ -379,7 +380,80 @@ class MainWindowUI(QObject):
         )
 
         self._switch_page(0)
+        self._register_icon_labels()
         self.apply_theme(ThemeManager.get_active_name())
+
+    # -- Icon provider registration -------------------------------------------
+
+    def _register_icon_labels(self) -> None:
+        """Register all PhIconLabel instances with IconProvider.
+
+        Called once after the full UI is built. Each label receives a color_fn
+        that derives its normal and hover hex values from a ThemeColors instance.
+        Hover swap behavior is injected automatically by IconProvider.register().
+        """
+        provider = IconProvider.instance()
+
+        # SettingsTab -- Files page section icons
+        provider.register(
+            self.settings_tab.save_dir_icon,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
+        provider.register(
+            self.settings_tab.themes_file_icon,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
+        # SettingsTab -- edit-open action icons
+        provider.register(
+            self.settings_tab.save_edit_btn,
+            lambda c: (c.text_secondary, c.accent),
+        )
+        provider.register(
+            self.settings_tab.themes_edit_btn,
+            lambda c: (c.text_secondary, c.accent),
+        )
+
+        # PlaybackTab -- file strip and drop zone decorative icons
+        provider.register(
+            self.playback_tab.file_strip.tile_icon,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
+        provider.register(
+            self.playback_tab.drop_zone.drop_icon,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
+
+        # PlaybackTab -- card reset icons (danger: destructive action)
+        provider.register(
+            self.playback_tab.perf_reset_icon,
+            lambda c: (c.text_secondary, c.accent_stop),
+        )
+        provider.register(
+            self.playback_tab.opts_reset_icon,
+            lambda c: (c.text_secondary, c.accent_stop),
+        )
+        provider.register(
+            self.playback_tab.humanize_reset_icon,
+            lambda c: (c.text_secondary, c.accent_stop),
+        )
+        provider.register(
+            self.playback_tab.timing_reset_icon,
+            lambda c: (c.text_secondary, c.accent_stop),
+        )
+        provider.register(
+            self.playback_tab.hands_reset_icon,
+            lambda c: (c.text_secondary, c.accent_stop),
+        )
+
+        # PlaybackTab -- saved songs panel title buttons
+        provider.register(
+            self.playback_tab.refresh_saved_songs_btn,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
+        provider.register(
+            self.playback_tab.all_saves_btn,
+            lambda c: (c.text_secondary, c.text_primary),
+        )
 
     # -- Navigation -----------------------------------------------------------
 
@@ -442,7 +516,8 @@ class MainWindowUI(QObject):
         for btn in self._nav_btns:
             btn.update_icon_colors(theme.text_secondary, theme.text_primary)
         self._github_nav.update_icon_colors(theme.text_secondary, theme.text_primary)
-        self._status_indicator.update_colors(theme.text_secondary, theme.accent_play, "#c44b4b")
+        self._status_indicator.update_colors(theme.text_secondary, theme.accent_play, "#c44b4b", theme.accent_loaded)
+        IconProvider.instance().notify_theme_changed(theme)
 
         # Collapsed strip load buttons
         _px = self._collapsed_load_btn.fontMetrics().height()
@@ -470,11 +545,8 @@ class MainWindowUI(QObject):
         icon = self._icon_expand if self._is_collapsed else self._icon_collapse
         self.collapse_btn.setIcon(icon)
 
-        # File strip, drop-zone, and card-level reset button icons
-        self.playback_tab.file_strip.update_icon_color(theme.text_secondary)
-        self.playback_tab.drop_zone.update_icon_color(theme.text_secondary)
         self.playback_tab._drop_card.set_colors(theme.border, theme.accent)
-        self.playback_tab.update_icon_color(theme.text_secondary)
+        self.playback_tab.redraw_saved_song_cards()
 
         self.timeline_widget.left_hand_color.setNamedColor(theme.accent)
         self.timeline_widget.left_hand_color.setAlpha(210)
@@ -491,8 +563,8 @@ class MainWindowUI(QObject):
         self.piano_widget.update()
 
     def _open_theme_dialog(self) -> None:
-        from ui.ThemeDialog import ThemeDialog
-        dlg = ThemeDialog(self.main_window, self.main_window)
+        from ui.dialogs.ThemeDialog import ThemeDialog
+        dlg = ThemeDialog(self.main_window)
         dlg.theme_applied.connect(self._on_theme_dialog_accepted)
         dlg.exec()
 

@@ -1,10 +1,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QCheckBox, QLabel
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
-from ui.widgets.humidi_button import HuMidiButton
-from ui.widgets.ph_icon import ph_icon
+from ui.widgets.ph_icon_label import PhIconLabel
 
 
 def _make_check_pair(checkbox: QCheckBox, desc_text: str) -> QWidget:
@@ -37,12 +35,12 @@ class OptionsCard(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        self._reset_btn = HuMidiButton(tooltip="Reset options to defaults")
-        self._reset_btn.setProperty("role", "card_reset")
-        self._reset_btn.setFixedSize(28, 28)
-        self._reset_btn.clicked.connect(self.reset_to_default)
+        self.reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
+        self.reset_icon.setToolTip("Reset options to defaults")
+        self.reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_icon.clicked.connect(self.reset_to_default)
 
-        card, body = make_card("OPTIONS", title_buttons=[self._reset_btn])
+        card, body = make_card("OPTIONS", title_buttons=[self.reset_icon])
 
         self.use_88_key_check = QCheckBox("88-Key Layout")
         self.use_88_key_check.setToolTip(
@@ -75,9 +73,3 @@ class OptionsCard(QWidget):
         self.countdown_check.setChecked(True)
         self.debug_check.setChecked(False)
 
-    def update_icon_color(self, color: str) -> None:
-        _logical = 14
-        _pix = ph_icon("arrow-counter-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
-        _pix.setDevicePixelRatio(2.0)
-        self._reset_btn.setIcon(QIcon(_pix))
-        self._reset_btn.setIconSize(QSize(_logical, _logical))

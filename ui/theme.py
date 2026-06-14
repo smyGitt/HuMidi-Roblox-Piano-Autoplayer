@@ -50,6 +50,7 @@ class ThemeColors:
     accent_controls: str = "#5b8dee" # sliders and checkboxes
     bg_button:     str = "#21213a"   # generic button background
     accent_save:   str = "#5b8dee"   # save button accent
+    accent_loaded: str = "#c9a535"   # file loaded / warning indicator
     builtin: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
@@ -67,37 +68,21 @@ class ThemeColors:
             d["bg_button"] = d.get("bg_secondary", "#21213a")
         if "accent_save" not in d:
             d["accent_save"] = d.get("accent", "#5b8dee")
+        if "accent_loaded" not in d:
+            d["accent_loaded"] = d.get("pedal_color", "#c9a535")
         return cls(**d)
 
 
 # -- Built-in presets ---------------------------------------------------------
 
 BUILTIN_THEMES: dict[str, ThemeColors] = {
-    "Paper": ThemeColors(
-        name="Paper",
-        bg_primary="#f3ecdb", bg_secondary="#fbf6e8", bg_input="#f7efd9",
-        accent="#c4922c", text_primary="#211a12", text_secondary="#7a6a55",
-        border="#e4d7bd", accent_play="#6e8b4e", accent_stop="#a64a3a",
-        pedal_color="#b88130",
-        accent_controls="#c4922c", bg_button="#fbf6e8", accent_save="#c4922c",
-        builtin=True,
-    ),
-    "Lacquer": ThemeColors(
-        name="Lacquer",
-        bg_primary="#1f1a14", bg_secondary="#28221a", bg_input="#1a1611",
-        accent="#c4922c", text_primary="#ecdfc8", text_secondary="#8a7a64",
-        border="#3a3128", accent_play="#6e8b4e", accent_stop="#a64a3a",
-        pedal_color="#b88130",
-        accent_controls="#c4922c", bg_button="#28221a", accent_save="#c4922c",
-        builtin=True,
-    ),
-    "Dark": ThemeColors(
-        name="Dark",
-        bg_primary="#1c1c2e", bg_secondary="#21213a", bg_input="#24243e",
-        accent="#5b8dee", text_primary="#dcdcf0", text_secondary="#7878a0",
-        border="#32324a", accent_play="#4ecb8d", accent_stop="#e05c5c",
-        pedal_color="#e8a020",
-        accent_controls="#5b8dee", bg_button="#21213a", accent_save="#5b8dee",
+    "Midnight": ThemeColors(
+        name="Midnight",
+        bg_primary="#0d1117", bg_secondary="#161b22", bg_input="#1c2230",
+        accent="#58a6ff", text_primary="#e6edf3", text_secondary="#8b949e",
+        border="#30363d", accent_play="#3fb950", accent_stop="#f85149",
+        pedal_color="#f0a030", accent_loaded="#d4a020",
+        accent_controls="#58a6ff", bg_button="#161b22", accent_save="#58a6ff",
         builtin=True,
     ),
     "Light": ThemeColors(
@@ -105,26 +90,17 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
         bg_primary="#f0f0f8", bg_secondary="#ffffff", bg_input="#fafafa",
         accent="#4a7adb", text_primary="#1a1a2e", text_secondary="#6868a0",
         border="#d0d0e8", accent_play="#2a9a60", accent_stop="#cc3333",
-        pedal_color="#d08010",
+        pedal_color="#d08010", accent_loaded="#b87010",
         accent_controls="#4a7adb", bg_button="#ffffff", accent_save="#4a7adb",
         builtin=True,
     ),
-    "Midnight": ThemeColors(
-        name="Midnight",
-        bg_primary="#0d1117", bg_secondary="#161b22", bg_input="#1c2230",
-        accent="#58a6ff", text_primary="#e6edf3", text_secondary="#8b949e",
-        border="#30363d", accent_play="#3fb950", accent_stop="#f85149",
-        pedal_color="#f0a030",
-        accent_controls="#58a6ff", bg_button="#161b22", accent_save="#58a6ff",
-        builtin=True,
-    ),
-    "Mocha": ThemeColors(
-        name="Mocha",
-        bg_primary="#1c1614", bg_secondary="#26201e", bg_input="#302824",
-        accent="#e6a050", text_primary="#ece0d0", text_secondary="#907060",
-        border="#3c3028", accent_play="#7ab860", accent_stop="#e05060",
-        pedal_color="#c8901a",
-        accent_controls="#e6a050", bg_button="#26201e", accent_save="#e6a050",
+    "Hatsune Miku": ThemeColors(
+        name="Hatsune Miku",
+        bg_primary="#111111", bg_secondary="#2c2c2c", bg_input="#1a1611",
+        accent="#00ffff", text_primary="#00bbcc", text_secondary="#2a7fa3",
+        border="#2e5963", accent_play="#4affff", accent_stop="#ff0000",
+        pedal_color="#51a4cb", accent_loaded="#d4bd0d",
+        accent_controls="#00ffff", bg_button="#2c2c2c", accent_save="#ffec1c",
         builtin=True,
     ),
 }
@@ -690,26 +666,6 @@ QPushButton#sub_tab_btn:hover {
     color: %(text_primary)s;
 }
 
-/* -- Stats tiles ----------------------------------------------------------- */
-QFrame#stats_tile {
-    background-color: %(bg_input)s;
-    border: 0.5px solid %(border)s;
-    border-radius: 6px;
-    padding: 6px 10px;
-}
-QLabel#stats_tile_value {
-    font-family: "JetBrains Mono", "Consolas", monospace;
-    font-size: 12pt;
-    font-weight: 600;
-    color: %(text_primary)s;
-}
-QLabel#stats_tile_label {
-    font-size: 7pt;
-    color: %(text_secondary)s;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
 /* -- Section cards --------------------------------------------------------- */
 QFrame#section_card {
     background-color: %(bg_secondary)s;
@@ -1000,6 +956,18 @@ class ThemeManager:
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
 
+    @classmethod
+    def set_themes_dir(cls, directory: "Path | str") -> None:
+        """Relocate the themes file to a new directory. Migrates existing data."""
+        from pathlib import Path as _Path
+        new_dir = _Path(directory)
+        new_file = new_dir / "themes.json"
+        existing = cls._load_raw()
+        cls._themes_dir = new_dir
+        cls._themes_file = new_file
+        if existing:
+            cls._save_raw(existing)
+
     # -- Public API -----------------------------------------------------------
 
     @classmethod
@@ -1016,9 +984,14 @@ class ThemeManager:
                 pass
         return themes
 
+    _FALLBACK = "Midnight"
+
     @classmethod
     def get_active_name(cls) -> str:
-        return cls._load_raw().get("active", "Paper")
+        name = cls._load_raw().get("active", cls._FALLBACK)
+        if name not in cls.all_themes():
+            return cls._FALLBACK
+        return name
 
     @classmethod
     def set_active_name(cls, name: str) -> None:
@@ -1029,7 +1002,7 @@ class ThemeManager:
     @classmethod
     def get_active(cls) -> ThemeColors:
         name = cls.get_active_name()
-        return cls.all_themes().get(name, BUILTIN_THEMES["Paper"])
+        return cls.all_themes().get(name, BUILTIN_THEMES[cls._FALLBACK])
 
     @classmethod
     def save_custom(cls, theme: ThemeColors) -> None:
@@ -1046,5 +1019,5 @@ class ThemeManager:
         raw = cls._load_raw()
         raw["custom"] = [d for d in raw.get("custom", []) if d.get("name") != name]
         if raw.get("active") == name:
-            raw["active"] = "Paper"
+            raw["active"] = cls._FALLBACK
         cls._save_raw(raw)

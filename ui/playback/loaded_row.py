@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QScrollAr
 from PyQt6.QtCore import Qt, QSize
 
 from core.core import KeyMapper
-from ui.widgets.part_card import PartCard
+from ui.playback.part_card import PartCard
 
 
 class _HScrollArea(QScrollArea):

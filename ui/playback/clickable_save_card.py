@@ -54,9 +54,6 @@ class ClickableSaveCard(QFrame):
         pix = ph_icon("clock", color, _sz).pixmap(_sz * 2, _sz * 2)
         self._time_icon_lbl.setPixmap(pix)
 
-    def update_icon_color(self, color: str) -> None:
-        self._render_time_icon(color)
-
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setProperty("pressed", True)

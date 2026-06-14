@@ -1,15 +1,19 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
     QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
-from PyQt6.QtCore import Qt, QSize, pyqtSignal as Signal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
-from ui.widgets import (
-    make_card, SubTabBar, FileStrip, MidiDropZone,
-    LoadedRow, SavedSongsPanel, PerformanceCard, OptionsCard,
-    HumanizeMasterRow, HumRow, HuMidiButton,
-)
-from ui.widgets.ph_icon import ph_icon
+from ui.widgets import make_card
+from ui.widgets.ph_icon_label import PhIconLabel
+from ui.playback.sub_tab_bar import SubTabBar
+from ui.playback.file_strip import FileStrip
+from ui.playback.midi_drop_zone import MidiDropZone
+from ui.playback.loaded_row import LoadedRow
+from ui.playback.saved_songs_panel import SavedSongsPanel
+from ui.playback.performance_card import PerformanceCard
+from ui.playback.options_card import OptionsCard
+from ui.playback.humanize_master_row import HumanizeMasterRow
+from ui.playback.hum_row import HumRow
 
 
 class PlaybackTab(QWidget):
@@ -127,6 +131,7 @@ class PlaybackTab(QWidget):
         self.tempo_spinbox     = self._perf_card.tempo_spinbox
         self.pedal_style_combo = self._perf_card.pedal_style_combo
         self.transpose_spinbox = self._perf_card.transpose_spinbox
+        self.perf_reset_icon   = self._perf_card.reset_icon
 
         # Right column: OPTIONS card (includes auto-detect hands).
         self._opts_card = OptionsCard()
@@ -137,6 +142,7 @@ class PlaybackTab(QWidget):
         self.countdown_check          = self._opts_card.countdown_check
         self.debug_check              = self._opts_card.debug_check
         self._auto_detect_hands_check = self._opts_card.auto_detect_hands_check
+        self.opts_reset_icon          = self._opts_card.reset_icon
 
         row1.addWidget(self._perf_card, 1)
         row1.addWidget(self._opts_card, 1)
@@ -178,6 +184,7 @@ class PlaybackTab(QWidget):
         self.select_all_humanization_check = (
             self._humanize_master.select_all_humanization_check
         )
+        self.humanize_reset_icon = self._humanize_master.reset_icon
         self.all_humanization_checks['simulate_hands']   = (
             self._humanize_master.simulate_hands_check
         )
@@ -186,28 +193,28 @@ class PlaybackTab(QWidget):
         )
         layout.addWidget(self._humanize_master)
 
-        # Two-column detail cards
-        cols = QHBoxLayout()
-        cols.setSpacing(14)
+        # Stacked detail cards
+        cols = QVBoxLayout()
+        cols.setSpacing(10)
 
         # Left: Timing & Feel
-        self._timing_reset_btn = HuMidiButton(tooltip="Reset timing & feel to defaults")
-        self._timing_reset_btn.setProperty("role", "card_reset")
-        self._timing_reset_btn.setFixedSize(28, 28)
-        self._timing_reset_btn.clicked.connect(self._reset_timing_to_default)
-        left_card, left_layout = make_card("TIMING & FEEL", title_buttons=[self._timing_reset_btn])
+        self.timing_reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
+        self.timing_reset_icon.setToolTip("Reset timing & feel to defaults")
+        self.timing_reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.timing_reset_icon.clicked.connect(self._reset_timing_to_default)
+        left_card, left_layout = make_card("TIMING & FEEL", title_buttons=[self.timing_reset_icon])
         self._add_hum_row(left_layout, "Vary Timing",       "vary_timing",
                           0, 0.1, 0.01, " s",  factor=10000.0,
                           tooltip="Add random timing offsets to note events (in seconds)",
-                          desc="random per-note timing offset in seconds")
+                          desc="nudges each note slightly off the exact beat, like a real player")
         self._add_hum_row(left_layout, "Vary Articulation", "vary_articulation",
                           50, 100, 95,  "%",   factor=100.0, decimals=1,
                           tooltip="Randomize note hold duration; lower values create a more staccato feel",
-                          desc="randomize note hold duration")
+                          desc="randomly shortens or lengthens how long each note is held down")
         self._add_hum_row(left_layout, "Tempo Sway",        "tempo_sway",
                           0, 0.1, 0,   " s",  factor=10000.0,
                           tooltip="Apply a sinusoidal tempo variation across the song for a more expressive feel",
-                          desc="sinusoidal tempo variation across the song")
+                          desc="gently speeds up then slows down the tempo in a wave across the song")
         self.invert_sway_check = QCheckBox("Invert Sway")
         self.invert_sway_check.setToolTip("Invert the phase of the tempo sway curve")
         self.all_humanization_checks['invert_tempo_sway'] = self.invert_sway_check
@@ -219,7 +226,7 @@ class PlaybackTab(QWidget):
         _invert_vbox.setContentsMargins(0, 0, 0, 0)
         _invert_vbox.setSpacing(1)
         _invert_vbox.addWidget(self.invert_sway_check)
-        _invert_desc = QLabel("flip the sway curve phase")
+        _invert_desc = QLabel("flips the sway so the tempo slows down first, then speeds back up")
         _invert_desc.setProperty("role", "muted")
         _invert_desc.setContentsMargins(25, 0, 0, 0)
         _invert_vbox.addWidget(_invert_desc)
@@ -227,23 +234,23 @@ class PlaybackTab(QWidget):
         left_layout.addStretch()
 
         # Right: Hands & Imperfection
-        self._hands_reset_btn = HuMidiButton(tooltip="Reset hands & imperfection to defaults")
-        self._hands_reset_btn.setProperty("role", "card_reset")
-        self._hands_reset_btn.setFixedSize(28, 28)
-        self._hands_reset_btn.clicked.connect(self._reset_hands_to_default)
-        right_card, right_layout = make_card("HANDS & IMPERFECTION", title_buttons=[self._hands_reset_btn])
+        self.hands_reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
+        self.hands_reset_icon.setToolTip("Reset hands & imperfection to defaults")
+        self.hands_reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hands_reset_icon.clicked.connect(self._reset_hands_to_default)
+        right_card, right_layout = make_card("HANDS & IMPERFECTION", title_buttons=[self.hands_reset_icon])
         self._add_hum_row(right_layout, "Hand Drift",   "hand_drift",
                           0, 100, 25, "%", factor=100.0, decimals=1,
                           tooltip="Simulate gradual timing drift between the left and right hands",
-                          desc="gradual timing drift between hands")
+                          desc="gradually shifts one hand's timing ahead or behind the other over time")
         self._add_hum_row(right_layout, "Mistakes",     "mistake_chance",
                           0, 10,   0, "%", factor=100.0, decimals=1,
                           tooltip="Randomly skip notes to simulate human errors",
-                          desc="randomly skip notes during playback")
+                          desc="randomly drops a note here and there, like a real player slipping up")
         right_layout.addStretch()
 
-        cols.addWidget(left_card, 1)
-        cols.addWidget(right_card, 1)
+        cols.addWidget(left_card)
+        cols.addWidget(right_card)
         layout.addLayout(cols)
 
         # Dummy vary_velocity entry for legacy save compatibility.
@@ -360,20 +367,9 @@ class PlaybackTab(QWidget):
         self.all_humanization_spinboxes['mistake_chance'].setValue(0.5)
         self.update_enabled_states()
 
-    def update_icon_color(self, color: str) -> None:
-        _logical = 14
-        _sz = QSize(_logical, _logical)
-        _pix = ph_icon("arrow-counter-clockwise", color, _logical).pixmap(_logical * 2, _logical * 2)
-        _pix.setDevicePixelRatio(2.0)
-        _icon = QIcon(_pix)
-        self._perf_card.update_icon_color(color)
-        self._opts_card.update_icon_color(color)
-        self._humanize_master.update_icon_color(color)
-        self._saved_panel.update_icon_color(color)
-        self._timing_reset_btn.setIcon(_icon)
-        self._timing_reset_btn.setIconSize(_sz)
-        self._hands_reset_btn.setIcon(_icon)
-        self._hands_reset_btn.setIconSize(_sz)
+    def redraw_saved_song_cards(self) -> None:
+        """Redraw saved song cards from cache with the current theme color."""
+        self._saved_panel.redraw_cards()
 
     def load_config(self, config: dict) -> None:
         self.tempo_spinbox.setValue(config.get('tempo', 100.0))
