@@ -9,8 +9,6 @@ Cancelling requires no revert because the main window is never touched.
 from __future__ import annotations
 from dataclasses import replace
 import json
-import os
-import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -21,40 +19,14 @@ from PyQt6.QtWidgets import (
     QApplication, QColorDialog, QInputDialog,
 )
 from PyQt6.QtCore import (
-    Qt, QSize, QByteArray, pyqtSignal as Signal, QEvent, QObject,
+    Qt, QSize, pyqtSignal as Signal, QEvent, QObject,
     QPoint, QPropertyAnimation, QEasingCurve, QRect, QTimer,
 )
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, QCursor
-from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QCursor
 
 from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES, _mix
 from ui.widgets.ph_icon import ph_icon
-
-
-# ── Asset helpers ─────────────────────────────────────────────────────────────
-
-def _custom_icons_dir() -> str:
-    base = getattr(sys, "_MEIPASS", os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(base, "assets", "icons", "custom")
-
-
-def _svg_icon(name: str, color: str, size: int = 16) -> QIcon:
-    """Load a custom SVG from assets/icons/custom/<name>.svg, tint with color, return QIcon."""
-    path = os.path.join(_custom_icons_dir(), f"{name}.svg")
-    with open(path, "rb") as fh:
-        data = fh.read().replace(b"currentColor", color.encode())
-    renderer = QSvgRenderer(QByteArray(data))
-    phys = size * 2
-    pix = QPixmap(phys, phys)
-    pix.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    renderer.render(painter)
-    painter.end()
-    icon = QIcon()
-    icon.addPixmap(pix)
-    return icon
+from ui.widgets.ph_icon_label import PhIconLabel, IconProvider
 
 
 # ── Preview scale ─────────────────────────────────────────────────────────────
@@ -411,8 +383,16 @@ class ThemeDialog(QDialog):
         QApplication.instance().installEventFilter(self._inspect_filter)
         self.finished.connect(self._cleanup_inspect)
 
+        _color_fn = lambda c: (c.text_secondary, c.text_primary)
+        provider = IconProvider.instance()
+        for _icon in (
+            self._expand_panel_btn, self._collapse_panel_btn,
+            self._new_btn, self._del_btn, self._rename_btn,
+            self._export_btn, self._import_btn,
+        ):
+            provider.register(_icon, _color_fn)
+
         self._apply_own_stylesheet()
-        self._sync_toolbar_btn_sizes()
         self._populate_list()
 
     # ── Layout ────────────────────────────────────────────────────────
@@ -426,19 +406,13 @@ class ThemeDialog(QDialog):
         toolbar = QHBoxLayout()
         toolbar.setSpacing(4)
 
-        self._expand_panel_btn = QPushButton()
-        self._expand_panel_btn.setFixedSize(28, 28)
-        self._expand_panel_btn.setIconSize(QSize(16, 16))
-        self._expand_panel_btn.setProperty("role", "icon_btn")
+        self._expand_panel_btn = PhIconLabel("palette", size=16)
         self._expand_panel_btn.setToolTip("Open color editor")
         self._expand_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._expand_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(True))
         toolbar.addWidget(self._expand_panel_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self._collapse_panel_btn = QPushButton()
-        self._collapse_panel_btn.setFixedSize(28, 28)
-        self._collapse_panel_btn.setIconSize(QSize(16, 16))
-        self._collapse_panel_btn.setProperty("role", "icon_btn")
+        self._collapse_panel_btn = PhIconLabel("palette", size=16)
         self._collapse_panel_btn.setToolTip("Collapse color editor")
         self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._collapse_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(False))
@@ -452,26 +426,20 @@ class ThemeDialog(QDialog):
         self._combo.currentIndexChanged.connect(self._on_row_changed)
         toolbar.addWidget(self._combo, 1, Qt.AlignmentFlag.AlignVCenter)
 
-        self._new_btn = QPushButton()
-        self._new_btn.setFixedSize(28, 28)
-        self._new_btn.setIconSize(QSize(16, 16))
-        self._new_btn.setProperty("role", "icon_btn")
+        self._new_btn = PhIconLabel("new-theme", size=16)
         self._new_btn.setToolTip("Duplicate selected theme as a new custom preset")
+        self._new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._new_btn.clicked.connect(self._on_new)
 
-        self._del_btn = QPushButton()
-        self._del_btn.setFixedSize(28, 28)
-        self._del_btn.setIconSize(QSize(16, 16))
-        self._del_btn.setProperty("role", "icon_btn")
+        self._del_btn = PhIconLabel("delete-theme", size=16)
         self._del_btn.setToolTip("Delete this custom theme (built-in themes cannot be deleted)")
+        self._del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._del_btn.setEnabled(False)
         self._del_btn.clicked.connect(self._on_delete)
 
-        self._rename_btn = QPushButton()
-        self._rename_btn.setFixedSize(28, 28)
-        self._rename_btn.setIconSize(QSize(16, 16))
-        self._rename_btn.setProperty("role", "icon_btn")
+        self._rename_btn = PhIconLabel("rename-theme", size=16)
         self._rename_btn.setToolTip("Rename this custom theme")
+        self._rename_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._rename_btn.setEnabled(False)
         self._rename_btn.clicked.connect(self._on_rename)
 
@@ -484,19 +452,15 @@ class ThemeDialog(QDialog):
         t_sep.setObjectName("v_sep")
         toolbar.addWidget(t_sep)
 
-        self._export_btn = QPushButton()
-        self._export_btn.setFixedSize(28, 28)
-        self._export_btn.setIconSize(QSize(16, 16))
-        self._export_btn.setProperty("role", "icon_btn")
+        self._export_btn = PhIconLabel("export-theme", size=16)
         self._export_btn.setToolTip("Export theme to JSON file")
+        self._export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._on_export)
 
-        self._import_btn = QPushButton()
-        self._import_btn.setFixedSize(28, 28)
-        self._import_btn.setIconSize(QSize(16, 16))
-        self._import_btn.setProperty("role", "icon_btn")
+        self._import_btn = PhIconLabel("import-theme", size=16)
         self._import_btn.setToolTip("Import theme from JSON file")
+        self._import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._import_btn.clicked.connect(self._on_import)
 
         toolbar.addWidget(self._export_btn, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -1217,15 +1181,16 @@ class ThemeDialog(QDialog):
 
     # ── Helpers ───────────────────────────────────────────────────────
 
-    def _refresh_io_icons(self, color: str) -> None:
-        self._new_btn.setIcon(_svg_icon("new-theme", color))
-        self._del_btn.setIcon(_svg_icon("delete-theme", color))
-        self._rename_btn.setIcon(_svg_icon("rename-theme", color))
-        self._export_btn.setIcon(_svg_icon("export-theme", color))
-        self._import_btn.setIcon(_svg_icon("import-theme", color))
-        self._inspect_btn.setIcon(_svg_icon("inspect-mode", color))
-        self._expand_panel_btn.setIcon(_svg_icon("palette", color))
-        self._collapse_panel_btn.setIcon(_svg_icon("palette", color))
+    def _refresh_io_icons(self, colors: ThemeColors) -> None:
+        normal, hover = colors.text_secondary, colors.text_primary
+        self._new_btn.set_colors(normal, hover)
+        self._del_btn.set_colors(normal, hover)
+        self._rename_btn.set_colors(normal, hover)
+        self._export_btn.set_colors(normal, hover)
+        self._import_btn.set_colors(normal, hover)
+        self._expand_panel_btn.set_colors(normal, hover)
+        self._collapse_panel_btn.set_colors(normal, hover)
+        self._inspect_btn.setIcon(ph_icon("inspect-mode", normal))
 
     def _preview(self, theme: ThemeColors) -> None:
         """Apply the previewed theme to the preview panel only."""
@@ -1265,18 +1230,10 @@ class ThemeDialog(QDialog):
         if self._hover_overlay is not None:
             self._hover_overlay.set_accent(theme.accent)
 
-    def _sync_toolbar_btn_sizes(self) -> None:
-        h = self._combo.sizeHint().height()
-        for btn in (
-            self._expand_panel_btn, self._collapse_panel_btn, self._new_btn,
-            self._del_btn, self._rename_btn, self._export_btn, self._import_btn,
-        ):
-            btn.setFixedSize(h, h)
-
     def _apply_own_stylesheet(self) -> None:
         active = ThemeManager.get_active()
         self.setStyleSheet(generate_stylesheet(active))
-        self._refresh_io_icons(active.text_secondary)
+        self._refresh_io_icons(active)
 
     def _cleanup_inspect(self) -> None:
         QApplication.instance().removeEventFilter(self._inspect_filter)
