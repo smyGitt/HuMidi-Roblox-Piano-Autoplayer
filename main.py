@@ -12,6 +12,7 @@ from PyQt6.QtGui import QIcon
 
 from core.core import KeyMapper, TempoMap
 from core.translator import FormatRegistry
+import core.session_cache as session_cache
 from managers.HotkeyManager import HotkeyManager
 import webbrowser
 from managers.UpdateManager import UpdateChecker
@@ -195,6 +196,19 @@ class MainWindow(QMainWindow):
         self.playback_controller.ai_pedal_stats_ready.connect(
             self.ui.playback_tab.set_ai_pedal_stats
         )
+        # Two-phase compilation signals
+        self.playback_controller.notes_phase_done.connect(self._on_notes_phase_done)
+        self.playback_controller.pedal_phase_done.connect(self._on_pedal_phase_done)
+        self.playback_controller.session_ready.connect(self._on_session_ready)
+
+        # Toast signals
+        self.ui.playback_tab.tab_shown.connect(self._on_playback_tab_shown)
+        self.ui.playback_tab.config_changed.connect(self._on_playback_tab_shown)
+        self.ui.playback_tab.apply_requested.connect(self._on_apply_requested)
+        self.ui.playback_tab.discard_requested.connect(self._on_discard_requested)
+
+        # Pending flag for auto-pedal after notes compile (Apply path with notes dirty)
+        self._auto_compile_pedal_after_notes: bool = False
 
     # --- Windows Specific GUI Modifications ---
     def _toggle_always_on_top(self, checked):
@@ -320,7 +334,7 @@ class MainWindow(QMainWindow):
         self.state.total_song_duration_sec = total_dur
         self.ui.timeline_widget.set_data(notes, total_dur, tempo_map)
         self.ui.reset_timeline_position()
-        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
+        # Status is set by notes_phase_done / pedal_phase_done / session_ready signals.
 
     def _on_pedal_data_ready(self, intervals: list):
         self.state.current_pedal_intervals = intervals
@@ -472,7 +486,10 @@ class MainWindow(QMainWindow):
             self.ui.play_button.setEnabled(True)
             self.ui.scrubber_slider.setEnabled(True)
             self.ui._set_save_enabled(True)
-            self.ui._status_indicator.set_state(StatusIndicator.LOADED, "FILE LOADED")
+            # Invalidate any prior compiled state and kick off phase-1 notes compilation.
+            self.playback_controller.invalidate_notes_cache()
+            config = self.ui.gather_playback_config()
+            self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
         else:
             self.ui.log_output.append("Track selection cancelled.")
             self.state.selected_tracks_info = None
@@ -510,6 +527,11 @@ class MainWindow(QMainWindow):
         )
         self.ui._set_save_enabled(bool(self.state.selected_tracks_info))
         self.ui.play_button.setEnabled(bool(self.state.selected_tracks_info))
+        if self.state.selected_tracks_info:
+            self.playback_controller.invalidate_notes_cache()
+            self.ui.playback_tab.hide_toast()
+            config = self.ui.gather_playback_config()
+            self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
 
     # --- Translator ---
     def _on_play_sheet(self, text: str, format_name: str, bpm: int, humanize: bool):
@@ -602,6 +624,7 @@ class MainWindow(QMainWindow):
     _STATUS_SHORT = [
         ("Preparing playback",                          "PREPPING"),
         ("Analyzing musical structure",                 "ANALYZING"),
+        ("Compiling note events",                       "COMPILING"),
         ("Generating pedal events",                     "GEN. PEDAL"),
         ("Preparing playback from imported sheet",      "PREPPING"),
         ("Initializing playback from pre-compiled",     "LOADING SAVE"),
@@ -615,6 +638,66 @@ class MainWindow(QMainWindow):
             if text.startswith(prefix):
                 self.ui._status_indicator.set_text(short)
                 return
+
+    # --- Two-phase compilation slots ---
+
+    def _on_notes_phase_done(self) -> None:
+        """Phase 1 complete: notes humanized and cached. Status -> LOADED."""
+        self.ui._status_indicator.set_state(StatusIndicator.LOADED, "NOTES RDY")
+        if self._auto_compile_pedal_after_notes:
+            self._auto_compile_pedal_after_notes = False
+            config = self.ui.gather_playback_config()
+            self.playback_controller.compile_pedal(config)
+
+    def _on_pedal_phase_done(self) -> None:
+        """Phase 2 complete (MIDI path): pedal generated and merged. Status -> READY."""
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
+
+    def _on_session_ready(self) -> None:
+        """Translator monolithic path done. Status -> READY."""
+        self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
+
+    # --- Toast slots ---
+
+    def _on_playback_tab_shown(self) -> None:
+        """Check dirty flags when user navigates to PlaybackTab; show toast if stale."""
+        if not self.playback_controller.has_compiled_notes():
+            return
+        config = self.ui.gather_playback_config()
+        notes_fresh = self.playback_controller.notes_match_config(config)
+        pedal_fresh = (
+            self.playback_controller.pedal_ever_compiled()
+            and self.playback_controller.pedal_match_config(config)
+        )
+        if notes_fresh and (not self.playback_controller.pedal_ever_compiled() or pedal_fresh):
+            self.ui.playback_tab.hide_toast()
+            return
+        notes_dirty = not notes_fresh
+        pedal_dirty_independent = (
+            self.playback_controller.pedal_ever_compiled()
+            and not self.playback_controller.pedal_match_config(config)
+        )
+        self.ui.playback_tab.show_toast(notes_dirty, pedal_dirty_independent)
+
+    def _on_apply_requested(self) -> None:
+        """Apply button pressed: recompile whichever phase(s) are stale."""
+        if self.playback_controller.is_preparing() or self.playback_controller.is_playing():
+            return
+        config = self.ui.gather_playback_config()
+        notes_dirty = not self.playback_controller.notes_match_config(config)
+        if notes_dirty:
+            # Notes must be recompiled; pedal must follow automatically.
+            self._auto_compile_pedal_after_notes = True
+            self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
+        else:
+            self.playback_controller.compile_pedal(config)
+
+    def _on_discard_requested(self) -> None:
+        """Discard button pressed: restore UI to the last compiled snapshot."""
+        restore = self.playback_controller.get_restore_config()
+        if restore:
+            self.ui.playback_tab.restore_from_runtime_config(restore)
+        self.ui.playback_tab.hide_toast()
 
     # --- Core Executions ---
     def handle_save(self):
@@ -634,35 +717,64 @@ class MainWindow(QMainWindow):
     def _on_save_failed(self, error_message: str):
         QMessageBox.critical(self, "Save Error", error_message)
 
+    def _prepare_ui_for_playback(self) -> None:
+        """Disable controls and switch to the Visualizer tab for any play path."""
+        self.ui.set_controls_enabled(False, bool(self.state.loaded_save_data))
+        self.ui.stop_button.setEnabled(False)
+        self.ui.play_button.setEnabled(False)
+        if self.ui._nav_btns[1].isEnabled():
+            self.ui.tabs.setCurrentIndex(1)
+
     def handle_play(self):
         if self.playback_controller.is_playing() or self.playback_controller.is_paused():
             self.toggle_playback_state()
             return
         if self.playback_controller.is_preparing():
-            return  # silently ignore while preparation is in progress
+            return
 
+        # Save path: unchanged.
         if self.state.loaded_save_data:
             try:
+                self._prepare_ui_for_playback()
                 self.playback_controller.play_from_save(self.state.loaded_save_data)
             except Exception as e:
                 QMessageBox.critical(self, "Incompatible Save", f"This save file could not be played:\n{e}")
                 self.state.loaded_save_data = None
                 self.state.loaded_save_filename = None
                 self.ui.play_button.setEnabled(False)
-                return
-        else:
-            config = self.ui.gather_playback_config()
-            if not self.state.selected_tracks_info:
-                QMessageBox.warning(self, "No Tracks", "Please select a MIDI file and choose tracks first.")
-                return
-            self.playback_controller.play(config, self.state.selected_tracks_info)
+            return
 
-        self.ui.set_controls_enabled(False, bool(self.state.loaded_save_data))
-        # Stop button is enabled in _on_playback_started once the Player thread is live.
-        self.ui.stop_button.setEnabled(False)
-        self.ui.play_button.setEnabled(False)
-        if self.ui._nav_btns[1].isEnabled():
-            self.ui.tabs.setCurrentIndex(1)
+        # MIDI path.
+        if not self.state.selected_tracks_info:
+            QMessageBox.warning(self, "No Tracks", "Please select a MIDI file and choose tracks first.")
+            return
+
+        config = self.ui.gather_playback_config()
+        pc = self.playback_controller
+        notes_fresh = pc.has_compiled_notes() and pc.notes_match_config(config)
+        pedal_compiled = pc.pedal_ever_compiled()
+        pedal_fresh = pedal_compiled and pc.pedal_match_config(config)
+
+        if notes_fresh and not pedal_compiled:
+            # Notes ready but pedal never generated: compile pedal then play.
+            self._prepare_ui_for_playback()
+            pc.compile_pedal_and_play(config)
+            return
+
+        if notes_fresh and pedal_fresh:
+            # Both compiled and current: play immediately without recompiling.
+            self._prepare_ui_for_playback()
+            pc.start_playback(config)
+            return
+
+        # Events are stale: navigate to Playback sub-tab and show the toast.
+        # Do NOT start playback.
+        self.ui.tabs.setCurrentIndex(0)
+        self.ui.playback_tab.navigate_to_playback_sub_tab()
+        notes_dirty = not notes_fresh
+        pedal_dirty_independent = pedal_compiled and not pedal_fresh
+        self.ui.playback_tab.show_toast(notes_dirty, pedal_dirty_independent)
+        self.ui.playback_tab.shake_toast()
 
     def handle_stop(self):
         self.playback_controller.stop()
@@ -726,6 +838,7 @@ class MainWindow(QMainWindow):
             self._parse_thread.wait(2000)
         self._save_config()
         self.playback_controller.shutdown()
+        session_cache.clear_cache()
         event.accept()
 
 if __name__ == "__main__":

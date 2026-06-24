@@ -667,6 +667,12 @@ QPushButton#sub_tab_btn:hover {
     color: %(text_primary)s;
 }
 
+/* -- Apply/Discard toast --------------------------------------------------- */
+QFrame[variant="toast"] {
+    background-color: %(bg_secondary)s;
+    border-top: 1px solid %(border)s;
+}
+
 /* -- Section cards --------------------------------------------------------- */
 QFrame#section_card {
     background-color: %(bg_secondary)s;

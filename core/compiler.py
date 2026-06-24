@@ -2,40 +2,45 @@
 
 This module has no Qt dependency and drives no hardware. It can be called from
 any worker thread or test without a running QApplication.
+
+Two-phase API
+-------------
+compile_note_events  -- humanization only; returns (sorted note events, humanized notes)
+compile_pedal_events -- pedal generation from humanized notes
+merge_compiled       -- heap-merges note and pedal events into the final sorted list
+
+compile_events       -- backwards-compatible one-shot wrapper that calls all three
 """
 
 import copy
 import heapq
 import random
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from core.config import PlaybackConfig
-from core.models import Note, KeyEvent, MusicalSection, KeyState
+from core.models import Note, KeyEvent, MusicalSection
 from core.core import KeyMapper
 from core.humanizer import Humanizer
 import core.pedal_generator as pedal_generator
 
 
-def compile_events(
+def compile_note_events(
     config: PlaybackConfig,
     notes: List[Note],
     sections: List[MusicalSection],
     log: Optional[Callable[[str], None]] = None,
-    out_meta: Optional[dict] = None,
-) -> List[KeyEvent]:
-    """Run humanization + event compilation for a set of notes.
+) -> Tuple[List[KeyEvent], List[Note]]:
+    """Run humanization and build note press/release KeyEvents.
 
-    Returns a sorted KeyEvent list ready for playback or serialization.
-    Does not drive hardware, manage threads, or emit Qt signals.
+    Returns (note_events, humanized_notes).
 
-    Parameters
-    ----------
-    config:    Full playback config dict.
-    notes:     Notes with hand assignments already applied.
-    sections:  MusicalSection list from SectionAnalyzer.
-    log:       Optional callable for debug logging (e.g. signal.emit).
-    out_meta:  Optional dict forwarded to pedal_generator.generate_events; AI
-               strategies populate it with 'threshold_on' / 'threshold_off'.
+    note_events     -- sorted KeyEvent list containing only press/release events
+                       (no pedal). Safe to store and re-use across pedal
+                       regenerations because it is returned as a plain list, not
+                       a live heap.
+    humanized_notes -- post-Humanizer note list; must be passed to
+                       compile_pedal_events so pedal generation operates on the
+                       same timing that will actually be played.
     """
     def _log(msg: str) -> None:
         if log:
@@ -105,42 +110,105 @@ def compile_events(
             else:
                 notes_unmapped += 1
 
-    _log(f"[COMPILE] Pedal style: {config.get('pedal_style', 'none')}")
-    for event in pedal_generator.generate_events(config, all_notes, sections, log, out_meta):
-        heapq.heappush(temp_heap, event)
+    press_count = sum(1 for e in temp_heap if e.action == 'press')
+    _log(
+        f"[COMPILE] Note events: {len(temp_heap)} | "
+        f"Mistakes: {mistakes_injected} | Unmapped: {notes_unmapped}"
+    )
+
+    note_events: List[KeyEvent] = []
+    while temp_heap:
+        note_events.append(heapq.heappop(temp_heap))
+
+    return note_events, all_notes
+
+
+def compile_pedal_events(
+    config: PlaybackConfig,
+    humanized_notes: List[Note],
+    sections: List[MusicalSection],
+    log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
+) -> List[KeyEvent]:
+    """Generate pedal KeyEvents from humanized notes.
+
+    humanized_notes must be the list returned by compile_note_events (same
+    timing as what the player will execute). Passing the raw pre-humanizer
+    notes will cause the pedal to be misaligned with playback.
+    """
+    if log:
+        log(f"[COMPILE] Pedal style: {config.get('pedal_style', 'none')}")
+    return pedal_generator.generate_events(config, humanized_notes, sections, log, out_meta)
+
+
+def merge_compiled(
+    note_events: List[KeyEvent],
+    pedal_events: List[KeyEvent],
+    log: Optional[Callable[[str], None]] = None,
+) -> List[KeyEvent]:
+    """Merge sorted note events and pedal events into a single sorted KeyEvent list.
+
+    Creates a fresh heap each call so note_events can be reused across multiple
+    pedal regeneration runs without mutation.
+    """
+    heap: List[KeyEvent] = list(note_events)
+    heapq.heapify(heap)
+    for ev in pedal_events:
+        heapq.heappush(heap, ev)
 
     compiled: List[KeyEvent] = []
-    while temp_heap:
-        compiled.append(heapq.heappop(temp_heap))
+    while heap:
+        compiled.append(heapq.heappop(heap))
 
-    total_duration = compiled[-1].time if compiled else 0.0
-
-    press_count   = sum(1 for e in compiled if e.action == 'press')
-    release_count = sum(1 for e in compiled if e.action == 'release')
-    pedal_down    = sum(1 for e in compiled if e.action == 'pedal' and e.key_char == 'down')
-    pedal_up      = sum(1 for e in compiled if e.action == 'pedal' and e.key_char == 'up')
-    pitches       = [e.pitch for e in compiled if e.pitch is not None]
-    pitch_range   = (
-        f"{KeyMapper.pitch_to_name(min(pitches))}-{KeyMapper.pitch_to_name(max(pitches))}"
-        if pitches else "none"
-    )
-    unique_keys = len({e.key_char for e in compiled if e.action in ('press', 'release')})
-
-    _log(
-        f"[COMPILE] Result: {len(compiled)} events | "
-        f"press={press_count} release={release_count} pedal_down={pedal_down} pedal_up={pedal_up}"
-    )
-    _log(
-        f"[COMPILE] Duration: {total_duration:.2f}s | Pitch range: {pitch_range} | "
-        f"Unique keys: {unique_keys} | Mistakes: {mistakes_injected} | Unmapped: {notes_unmapped}"
-    )
-    if total_duration > 0:
-        _log(
-            f"[COMPILE] Density: {press_count / total_duration:.1f} presses/sec | "
-            f"{pedal_down / total_duration:.2f} pedal-downs/sec"
+    if log and compiled:
+        total_duration = compiled[-1].time
+        press_count   = sum(1 for e in compiled if e.action == 'press')
+        release_count = sum(1 for e in compiled if e.action == 'release')
+        pedal_down    = sum(1 for e in compiled if e.action == 'pedal' and e.key_char == 'down')
+        pedal_up      = sum(1 for e in compiled if e.action == 'pedal' and e.key_char == 'up')
+        pitches       = [e.pitch for e in compiled if e.pitch is not None]
+        pitch_range   = (
+            f"{KeyMapper.pitch_to_name(min(pitches))}-{KeyMapper.pitch_to_name(max(pitches))}"
+            if pitches else "none"
         )
+        unique_keys = len({e.key_char for e in compiled if e.action in ('press', 'release')})
+
+        log(
+            f"[COMPILE] Result: {len(compiled)} events | "
+            f"press={press_count} release={release_count} pedal_down={pedal_down} pedal_up={pedal_up}"
+        )
+        log(
+            f"[COMPILE] Duration: {total_duration:.2f}s | Pitch range: {pitch_range} | "
+            f"Unique keys: {unique_keys}"
+        )
+        if total_duration > 0:
+            log(
+                f"[COMPILE] Density: {press_count / total_duration:.1f} presses/sec | "
+                f"{pedal_down / total_duration:.2f} pedal-downs/sec"
+            )
 
     return compiled
+
+
+def compile_events(
+    config: PlaybackConfig,
+    notes: List[Note],
+    sections: List[MusicalSection],
+    log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
+) -> List[KeyEvent]:
+    """One-shot wrapper: humanize + pedal generation + merge.
+
+    Backwards-compatible entry point used by _SaveWorker and the translator
+    path's _PrepareWorker. For the two-phase MIDI play path use
+    compile_note_events / compile_pedal_events / merge_compiled directly.
+
+    out_meta is forwarded to compile_pedal_events; AI strategies populate it
+    with 'threshold_on' / 'threshold_off' on success.
+    """
+    note_events, humanized_notes = compile_note_events(config, notes, sections, log)
+    pedal_events = compile_pedal_events(config, humanized_notes, sections, log, out_meta)
+    return merge_compiled(note_events, pedal_events, log)
 
 
 def _get_mistake_pitch(original_pitch: int) -> Optional[int]:

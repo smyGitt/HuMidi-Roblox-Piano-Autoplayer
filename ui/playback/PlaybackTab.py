@@ -17,12 +17,17 @@ from ui.playback.options_card import OptionsCard
 from ui.playback.humanize_master_row import HumanizeMasterRow
 from ui.playback.hum_row import HumRow
 from ui.playback.pedal_ai_card import PedalAICard
+from ui.playback.apply_toast import ApplyToast
 
 
 class PlaybackTab(QWidget):
 
     edit_selection_requested = Signal()
     save_card_clicked = Signal(str, str, str)  # (filepath, save_name, song_name)
+    apply_requested   = Signal()
+    discard_requested = Signal()
+    tab_shown         = Signal()
+    config_changed    = Signal()
 
     # Re-exported from PerformanceCard for backward-compatible callers.
     PEDAL_MAPPING     = PerformanceCard.PEDAL_MAPPING
@@ -31,6 +36,9 @@ class PlaybackTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._original_bpm: float = 0.0
+        self._toast_notes_dirty: bool = False
+        self._toast_pedal_dirty: bool = False
+        self._restoring: bool = False
         self._setup_ui()
 
     def _setup_ui(self):
@@ -55,8 +63,87 @@ class PlaybackTab(QWidget):
         self._stack.addWidget(self._scrollable(self._build_playback_tab())) # II
         self._stack.addWidget(self._scrollable(self._build_humanize_tab())) # III
 
+        self._toast = ApplyToast(self)
+        self._toast.apply_clicked.connect(self._on_toast_apply)
+        self._toast.discard_clicked.connect(self._on_toast_discard)
+        self._wire_config_changed_signals()
+
     def _on_sub_tab_changed(self, index: int) -> None:
         self._stack.setCurrentIndex(index)
+
+    def _emit_config_changed(self, *_) -> None:
+        if not self._restoring:
+            self.config_changed.emit()
+
+    def _wire_config_changed_signals(self) -> None:
+        emit = self._emit_config_changed
+        self.tempo_spinbox.valueChanged.connect(emit)
+        self.use_88_key_check.toggled.connect(emit)
+        self.pedal_style_combo.currentIndexChanged.connect(emit)
+        for check in self.all_humanization_checks.values():
+            check.toggled.connect(emit)
+        for spinbox in self.all_humanization_spinboxes.values():
+            spinbox.valueChanged.connect(emit)
+        self._pedal_ai_card.threshold_on_spinbox.valueChanged.connect(emit)
+        self._pedal_ai_card.threshold_off_spinbox.valueChanged.connect(emit)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.tab_shown.emit()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reposition_toast()
+
+    # -- Toast helpers --------------------------------------------------------
+
+    def _reposition_toast(self) -> None:
+        if self._toast.is_toast_visible():
+            self._toast.resize(self.width(), ApplyToast.HEIGHT)
+            self._toast.move(0, self.height() - ApplyToast.HEIGHT)
+
+    def _set_scroll_bottom_pad(self, extra: int) -> None:
+        bottom = 12 + extra
+        for layout in (
+            self._file_page_layout,
+            self._playback_page_layout,
+            self._humanize_page_layout,
+        ):
+            m = layout.contentsMargins()
+            layout.setContentsMargins(m.left(), m.top(), m.right(), bottom)
+
+    def _on_toast_apply(self) -> None:
+        self.apply_requested.emit()
+        self.hide_toast()
+
+    def _on_toast_discard(self) -> None:
+        self.hide_toast()
+        self.discard_requested.emit()
+
+    def show_toast(self, notes_dirty: bool, pedal_dirty_independent: bool) -> None:
+        """Update toast message and slide it into view if not already visible."""
+        self._toast_notes_dirty = notes_dirty
+        self._toast_pedal_dirty = pedal_dirty_independent
+        self._toast.update_message(notes_dirty, pedal_dirty_independent)
+        if not self._toast.is_toast_visible():
+            self._set_scroll_bottom_pad(ApplyToast.HEIGHT)
+            self._toast.show_sliding()
+
+    def hide_toast(self) -> None:
+        self._set_scroll_bottom_pad(0)
+        self._toast.hide_sliding()
+        self._toast_notes_dirty = False
+        self._toast_pedal_dirty = False
+
+    def shake_toast(self) -> None:
+        if not self._toast.is_toast_visible():
+            self._set_scroll_bottom_pad(ApplyToast.HEIGHT)
+            self._toast.show_sliding()
+        self._toast.shake()
+
+    def navigate_to_playback_sub_tab(self) -> None:
+        """Switch to the Playback sub-tab (index 1) programmatically."""
+        self._sub_tab_bar.set_active(1)
 
     @staticmethod
     def _scrollable(widget: QWidget) -> QScrollArea:
@@ -74,6 +161,7 @@ class PlaybackTab(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(12, 12, 12, 12)
+        self._file_page_layout = layout
         layout.setSpacing(10)
 
         # Row 1: LOADED card containing the LoadedRow widget.
@@ -120,6 +208,7 @@ class PlaybackTab(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(12, 12, 12, 12)
+        self._playback_page_layout = layout
         layout.setSpacing(10)
 
         # Row 1: two equal columns
@@ -245,6 +334,7 @@ class PlaybackTab(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(12, 12, 12, 12)
+        self._humanize_page_layout = layout
         layout.setSpacing(10)
 
         self.all_humanization_checks    = {}
@@ -393,6 +483,62 @@ class PlaybackTab(QWidget):
     def refresh_saved_songs(self, save_dir) -> None:
         """Rescan save_dir and redraw the saved songs list."""
         self._saved_panel.refresh_saved_songs(save_dir)
+
+    def restore_from_runtime_config(self, config: dict) -> None:
+        """Restore UI controls from a runtime config dict (gather_playback_config format).
+
+        Used by the Discard path to roll back UI to the last compiled snapshot.
+        Only touches keys present in config; ignores unknown keys silently.
+        """
+        self._restoring = True
+        try:
+            self._restore_from_runtime_config_impl(config)
+        finally:
+            self._restoring = False
+
+    def _restore_from_runtime_config_impl(self, config: dict) -> None:
+        if 'tempo' in config:
+            m = config['tempo'] / 100.0
+            self.tempo_slider.blockSignals(True)
+            self.tempo_slider.setValue(int(round(m * 100.0)))
+            self.tempo_slider.blockSignals(False)
+            self.tempo_spinbox.setValue(m)
+        if 'pedal_style' in config:
+            display = self.PEDAL_MAPPING_INV.get(config['pedal_style'], "Auto (Default)")
+            self.pedal_style_combo.setCurrentText(display)
+        if 'pedal_threshold_on' in config and 'pedal_threshold_off' in config:
+            self._pedal_ai_card.set_thresholds(
+                config['pedal_threshold_on'], config['pedal_threshold_off']
+            )
+        if 'use_88_key_layout' in config:
+            self.use_88_key_check.setChecked(config['use_88_key_layout'])
+        if 'simulate_hands' in config:
+            self.all_humanization_checks['simulate_hands'].setChecked(config['simulate_hands'])
+        if 'enable_chord_roll' in config:
+            self.all_humanization_checks['enable_chord_roll'].setChecked(config['enable_chord_roll'])
+        if 'vary_timing' in config:
+            self.all_humanization_checks['vary_timing'].setChecked(config['vary_timing'])
+        if 'timing_variance' in config:
+            self.all_humanization_spinboxes['vary_timing'].setValue(config['timing_variance'])
+        if 'vary_articulation' in config:
+            self.all_humanization_checks['vary_articulation'].setChecked(config['vary_articulation'])
+        if 'articulation' in config:
+            self.all_humanization_spinboxes['vary_articulation'].setValue(config['articulation'] * 100.0)
+        if 'enable_drift_correction' in config:
+            self.all_humanization_checks['hand_drift'].setChecked(config['enable_drift_correction'])
+        if 'drift_decay_factor' in config:
+            self.all_humanization_spinboxes['hand_drift'].setValue(config['drift_decay_factor'] * 100.0)
+        if 'enable_tempo_sway' in config:
+            self.all_humanization_checks['tempo_sway'].setChecked(config['enable_tempo_sway'])
+        if 'tempo_sway_intensity' in config:
+            self.all_humanization_spinboxes['tempo_sway'].setValue(config['tempo_sway_intensity'])
+        if 'invert_tempo_sway' in config:
+            self.all_humanization_checks['invert_tempo_sway'].setChecked(config['invert_tempo_sway'])
+        if 'enable_mistakes' in config:
+            self.all_humanization_checks['mistake_chance'].setChecked(config['enable_mistakes'])
+        if 'mistake_chance' in config:
+            self.all_humanization_spinboxes['mistake_chance'].setValue(config['mistake_chance'])
+        self.update_enabled_states()
 
     def set_groups_enabled(self, enabled: bool, skip_playback_humanization: bool = False) -> None:
         self.file_strip.setEnabled(enabled)
