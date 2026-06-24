@@ -97,7 +97,7 @@ class PerformanceCard(QWidget):
         vbox.setSpacing(1)
         lbl = QLabel(label_text)
         desc = QLabel(desc_text)
-        desc.setProperty("role", "muted")
+        desc.setProperty("variant", "muted")
         vbox.addWidget(lbl)
         vbox.addWidget(desc)
         return container

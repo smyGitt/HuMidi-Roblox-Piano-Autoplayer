@@ -1,8 +1,8 @@
 import webbrowser
 
 from PyQt6.QtWidgets import QFrame, QLabel
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt, pyqtProperty
+from PyQt6.QtGui import QColor
 
 from ui.widgets.ph_icon import ph_icon
 
@@ -25,8 +25,9 @@ class DiscordNavButton(QFrame):
         super().__init__(parent)
         self.setObjectName("nav_btn")
         self._url = url
-        self._color_dim = "#7878a0"
-        self._color_hi  = "#dcdcf0"
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._color_dim = QColor("#7878a0")
+        self._color_hi  = QColor("#dcdcf0")
         self._hovered = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -52,12 +53,27 @@ class DiscordNavButton(QFrame):
 
     def _refresh_icon(self) -> None:
         color = self._color_hi if self._hovered else self._color_dim
-        pix = ph_icon("discord-logo", color, _ICON_SIZE).pixmap(_ICON_SIZE * 2, _ICON_SIZE * 2)
+        pix = ph_icon("discord-logo", color.name(), _ICON_SIZE).pixmap(_ICON_SIZE * 2, _ICON_SIZE * 2)
         self._icon_lbl.setPixmap(pix)
 
-    def update_colors(self, dim: str, hi: str) -> None:
-        self._color_dim = dim
-        self._color_hi = hi
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def colorDim(self) -> QColor:
+        return self._color_dim
+
+    @colorDim.setter
+    def colorDim(self, c: QColor) -> None:
+        self._color_dim = c
+        self._refresh_icon()
+
+    @pyqtProperty(QColor)
+    def colorHi(self) -> QColor:
+        return self._color_hi
+
+    @colorHi.setter
+    def colorHi(self, c: QColor) -> None:
+        self._color_hi = c
         self._refresh_icon()
 
     def mousePressEvent(self, event):

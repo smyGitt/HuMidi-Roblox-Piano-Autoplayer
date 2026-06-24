@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (
     QTextEdit, QSpinBox, QPushButton, QFrame, QStackedWidget
 )
 from PyQt6.QtCore import pyqtSignal as Signal, Qt
-from PyQt6.QtGui import QFont
 
 from ui.widgets.toggle_switch import ToggleSwitch
 
@@ -53,7 +52,7 @@ class TranslatorTab(QWidget):
         tbl.setSpacing(8)
 
         fmt_lbl = QLabel("Format")
-        fmt_lbl.setProperty("role", "muted")
+        fmt_lbl.setProperty("variant", "muted")
         self.format_combo = QComboBox()
         self.format_combo.addItems(FormatRegistry.names())
         self.format_combo.setToolTip("Select the Roblox piano sheet format")
@@ -95,7 +94,7 @@ class TranslatorTab(QWidget):
         # Source card: sheet-text input
         src_card, src_body = make_card("Source")
         self.import_text = QTextEdit()
-        self.import_text.setFont(QFont("Courier New", 9))
+        self.import_text.setProperty("variant", "mono")
         self.import_text.setPlaceholderText(
             "e.g.\ne e e [6t] e\ne y 9 y t [wy] t\ne w [6e] e e t"
         )
@@ -105,7 +104,7 @@ class TranslatorTab(QWidget):
         # Preview card (notation legend / key-range bar / stat tiles not yet implemented)
         prev_card, prev_body = make_card("Preview")
         prev_lbl = QLabel("Not yet implemented")
-        prev_lbl.setProperty("role", "muted")
+        prev_lbl.setProperty("variant", "muted")
         prev_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # TODO: parsed preview -- notation legend, key-range bar, stat tiles
         prev_body.addWidget(prev_lbl)
@@ -118,7 +117,7 @@ class TranslatorTab(QWidget):
         ab.setContentsMargins(0, 4, 0, 0)
         ab.setSpacing(8)
         bpm_lbl = QLabel("BPM")
-        bpm_lbl.setProperty("role", "muted")
+        bpm_lbl.setProperty("variant", "muted")
         self.bpm_spinbox = QSpinBox()
         self.bpm_spinbox.setRange(20, 400)
         self.bpm_spinbox.setValue(120)
@@ -155,7 +154,7 @@ class TranslatorTab(QWidget):
         # Source card (loaded MIDI track list for export mode -- not yet implemented)
         track_card, track_body = make_card("Source")
         track_lbl = QLabel("Not yet implemented")
-        track_lbl.setProperty("role", "muted")
+        track_lbl.setProperty("variant", "muted")
         track_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # TODO: loaded MIDI track list for export mode
         track_body.addWidget(track_lbl)
@@ -166,11 +165,11 @@ class TranslatorTab(QWidget):
         self.export_status_label = QLabel(
             "Load a MIDI file on the Playback tab, then click Generate."
         )
-        self.export_status_label.setProperty("role", "placeholder")
+        self.export_status_label.setProperty("variant", "placeholder")
         out_body.addWidget(self.export_status_label)
         self.export_text = QTextEdit()
         self.export_text.setReadOnly(True)
-        self.export_text.setFont(QFont("Courier New", 9))
+        self.export_text.setProperty("variant", "mono")
         self.export_text.setPlaceholderText("Generated sheet will appear here...")
         out_body.addWidget(self.export_text)
         body.addWidget(out_card, 1)
@@ -233,6 +232,6 @@ class TranslatorTab(QWidget):
             1 for line in text.splitlines() if line.strip() and not line.startswith('#')
         )
         self.export_status_label.setText(f"Generated {note_count} line(s).")
-        self.export_status_label.setProperty("role", "success")
+        self.export_status_label.setProperty("variant", "success")
         self.export_status_label.style().unpolish(self.export_status_label)
         self.export_status_label.style().polish(self.export_status_label)

@@ -209,7 +209,7 @@ class LoadSaveDialog(QDialog):
 
         # Title
         title = QLabel(metadata.get('source_midi_filename', 'Unknown MIDI'))
-        title.setProperty("role", "title")
+        title.setProperty("variant", "title")
         title.setWordWrap(True)
         self.details_layout.addWidget(title)
 
@@ -221,7 +221,7 @@ class LoadSaveDialog(QDialog):
         except Exception:
             date_str = ts
         date_label = QLabel(date_str)
-        date_label.setProperty("role", "muted")
+        date_label.setProperty("variant", "muted")
         self.details_layout.addWidget(date_label)
 
         # Separator
@@ -236,7 +236,7 @@ class LoadSaveDialog(QDialog):
 
         # Playback settings
         pb_label = QLabel("Playback Settings")
-        pb_label.setProperty("role", "section")
+        pb_label.setProperty("variant", "section")
         self.details_layout.addWidget(pb_label)
 
         pb_grid = QGridLayout()
@@ -245,9 +245,9 @@ class LoadSaveDialog(QDialog):
 
         def add_row(grid, row, key_str, val_str):
             k = QLabel(key_str)
-            k.setProperty("role", "muted")
+            k.setProperty("variant", "muted")
             v = QLabel(str(val_str))
-            v.setProperty("role", "value")
+            v.setProperty("variant", "value")
             grid.addWidget(k, row, 0)
             grid.addWidget(v, row, 2)
 
@@ -259,7 +259,7 @@ class LoadSaveDialog(QDialog):
 
         # Humanization
         hum_label = QLabel("Humanization")
-        hum_label.setProperty("role", "section")
+        hum_label.setProperty("variant", "section")
         self.details_layout.addWidget(hum_label)
 
         hum_grid = QGridLayout()
@@ -270,9 +270,9 @@ class LoadSaveDialog(QDialog):
         def add_h_row(key_str, val_str):
             nonlocal h_row
             k = QLabel(key_str)
-            k.setProperty("role", "muted")
+            k.setProperty("variant", "muted")
             v = QLabel(str(val_str))
-            v.setProperty("role", "value")
+            v.setProperty("variant", "value")
             hum_grid.addWidget(k, h_row, 0)
             hum_grid.addWidget(v, h_row, 2)
             h_row += 1
@@ -298,7 +298,7 @@ class LoadSaveDialog(QDialog):
 
         if h_row == 0:
             none_lbl = QLabel("None selected")
-            none_lbl.setProperty("role", "placeholder")
+            none_lbl.setProperty("variant", "placeholder")
             hum_grid.addWidget(none_lbl, 0, 0)
 
         self.details_layout.addLayout(hum_grid)

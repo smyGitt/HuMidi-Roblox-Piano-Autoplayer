@@ -50,7 +50,7 @@ class LoadedRow(QWidget):
         self._loaded_cards_layout.setSpacing(8)
 
         self._tracks_placeholder = QLabel("No file loaded.")
-        self._tracks_placeholder.setProperty("role", "muted")
+        self._tracks_placeholder.setProperty("variant", "muted")
         self._loaded_cards_layout.addWidget(self._tracks_placeholder)
 
         cards_container = QWidget()
@@ -87,7 +87,7 @@ class LoadedRow(QWidget):
         self._clear_loaded_cards()
         if not parts:
             self._tracks_placeholder = QLabel("No tracks selected.")
-            self._tracks_placeholder.setProperty("role", "muted")
+            self._tracks_placeholder.setProperty("variant", "muted")
             self._loaded_cards_layout.addWidget(self._tracks_placeholder)
             self.edit_selection_btn.setEnabled(True)
             return
@@ -123,7 +123,7 @@ class LoadedRow(QWidget):
         self._clear_loaded_cards()
         if not track_details:
             self._tracks_placeholder = QLabel("No track info in save.")
-            self._tracks_placeholder.setProperty("role", "muted")
+            self._tracks_placeholder.setProperty("variant", "muted")
             self._loaded_cards_layout.addWidget(self._tracks_placeholder)
             return
 
@@ -154,6 +154,6 @@ class LoadedRow(QWidget):
         """Reset to the empty 'No file loaded.' state and disable the edit button."""
         self._clear_loaded_cards()
         self._tracks_placeholder = QLabel("No file loaded.")
-        self._tracks_placeholder.setProperty("role", "muted")
+        self._tracks_placeholder.setProperty("variant", "muted")
         self._loaded_cards_layout.addWidget(self._tracks_placeholder)
         self.edit_selection_btn.setEnabled(False)

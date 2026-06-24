@@ -7,19 +7,18 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                              QSizePolicy, QScrollArea, QApplication)
 from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
-from PyQt6.QtGui import QColor, QCursor, QPixmap, QShortcut, QKeySequence
+from PyQt6.QtGui import QCursor, QPixmap, QShortcut, QKeySequence
 
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
-from ui.widgets.ph_icon import ph_icon
 from ui.widgets.ph_icon_label import IconProvider
-from ui.widgets.toggle_switch import ToggleSwitch, ToggleSwitchProvider
+from ui.widgets.toggle_switch import ToggleSwitch
 from ui.playback.PlaybackTab import PlaybackTab
 from ui.settings.SettingsTab import SettingsTab
 from ui.translator.TranslatorTab import TranslatorTab
 from ui.visualizer.VisualizerTab import VisualizerTab
 from ui.debug.DebugTab import DebugTab
 from ui.license.LicenseTab import LicenseTab
-from ui.theme import ThemeManager, generate_stylesheet, _mix
+from ui.theme import ThemeManager, generate_stylesheet
 
 
 _W_SIDEBAR_COLLAPSED = 44   # label geometry starts at x=44; sidebar clips it to zero at this width
@@ -106,13 +105,13 @@ class MainWindowUI(QObject):
         self._collapsed_humanize_check.setToolTip("Enable or disable all humanization at once")
         cs_layout.addWidget(self._collapsed_humanize_check)
 
-        # Row 3: load buttons (icons set in apply_theme)
-        self._collapsed_load_btn = HuMidiButton(tooltip="Open a MIDI file for playback")
+        # Row 3: load buttons (icon color via QSS qproperty-iconColor)
+        self._collapsed_load_btn = HuMidiButton(
+            tooltip="Open a MIDI file for playback", icon_name="folder-open", icon_size=16)
         self._collapsed_load_btn.setObjectName("cs_load_btn")
-        self._collapsed_load_btn.setIconSize(QSize(16, 16))
-        self._collapsed_load_saved_btn = HuMidiButton(tooltip="Load a saved playback")
+        self._collapsed_load_saved_btn = HuMidiButton(
+            tooltip="Load a saved playback", icon_name="floppy-disk", icon_size=16)
         self._collapsed_load_saved_btn.setObjectName("cs_load_saved_btn")
-        self._collapsed_load_saved_btn.setIconSize(QSize(16, 16))
 
         cs_row3 = QHBoxLayout()
         cs_row3.setSpacing(5)
@@ -325,14 +324,17 @@ class MainWindowUI(QObject):
         btn_row.setContentsMargins(0, 0, 0, 0)
         btn_row.setSpacing(5)
 
-        self.play_button = HuMidiButton(tooltip="Start, pause, or resume playback.")
+        self.play_button = HuMidiButton(
+            tooltip="Start, pause, or resume playback.", icon_name="play", icon_size=22)
         self.play_button.setObjectName("play_button")
 
-        self.stop_button = HuMidiButton(tooltip="Stop playback and return to the beginning.")
+        self.stop_button = HuMidiButton(
+            tooltip="Stop playback and return to the beginning.", icon_name="stop", icon_size=22)
         self.stop_button.setObjectName("stop_button")
 
         self.save_button = HuMidiButton(
             tooltip="Save the current playback to a file so it can be replayed without re-processing the MIDI.",
+            icon_name="floppy-disk", icon_size=22,
         )
         self.save_button.setObjectName("save_button")
 
@@ -341,7 +343,8 @@ class MainWindowUI(QObject):
         btn_row.addStretch()
         btn_row.addWidget(self.save_button)
 
-        self.collapse_btn = HuMidiButton("▲  Collapse", tooltip="Collapse to mini mode (Ctrl+K)")
+        self.collapse_btn = HuMidiButton(
+            tooltip="Collapse to mini mode (Ctrl+K)", icon_name="resize-collapse", icon_size=22)
         self.collapse_btn.setObjectName("collapse_btn")
         self.collapse_btn.clicked.connect(self._toggle_collapsed)
         btn_row.addWidget(self.collapse_btn)
@@ -387,83 +390,45 @@ class MainWindowUI(QObject):
     # -- Icon provider registration -------------------------------------------
 
     def _register_icon_labels(self) -> None:
-        """Register all PhIconLabel instances with IconProvider.
+        """Inject hover behavior into all PhIconLabel instances and tag variants.
 
-        Called once after the full UI is built. Each label receives a color_fn
-        that derives its normal and hover hex values from a ThemeColors instance.
-        Hover swap behavior is injected automatically by IconProvider.register().
+        Called once after the full UI is built, before apply_theme. Icon colors
+        come from QSS via qproperty-* keyed on the variant property set here;
+        IconProvider.register() only injects the pixmap-swap hover behavior.
         """
         provider = IconProvider.instance()
 
-        # SettingsTab -- Files page section icons
-        provider.register(
-            self.settings_tab.save_dir_icon,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
-        provider.register(
-            self.settings_tab.themes_file_icon,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
-        # SettingsTab -- edit-open action icons
-        provider.register(
+        # Hover-to-accent action icons (edit / browse).
+        accent_icons = (
             self.settings_tab.save_edit_btn,
-            lambda c: (c.text_secondary, c.accent),
-        )
-        provider.register(
             self.settings_tab.themes_edit_btn,
-            lambda c: (c.text_secondary, c.accent),
-        )
-        # SettingsTab -- browse/set action icons
-        provider.register(
             self.settings_tab.save_browse_btn,
-            lambda c: (c.text_secondary, c.accent),
-        )
-        provider.register(
             self.settings_tab.themes_browse_btn,
-            lambda c: (c.text_secondary, c.accent),
         )
-
-        # PlaybackTab -- file strip and drop zone decorative icons
-        provider.register(
-            self.playback_tab.file_strip.tile_icon,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
-        provider.register(
-            self.playback_tab.drop_zone.drop_icon,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
-
-        # PlaybackTab -- card reset icons (danger: destructive action)
-        provider.register(
+        # Hover-to-danger icons (destructive card resets).
+        danger_icons = (
             self.playback_tab.perf_reset_icon,
-            lambda c: (c.text_secondary, c.accent_stop),
-        )
-        provider.register(
             self.playback_tab.opts_reset_icon,
-            lambda c: (c.text_secondary, c.accent_stop),
-        )
-        provider.register(
             self.playback_tab.humanize_reset_icon,
-            lambda c: (c.text_secondary, c.accent_stop),
-        )
-        provider.register(
             self.playback_tab.timing_reset_icon,
-            lambda c: (c.text_secondary, c.accent_stop),
-        )
-        provider.register(
             self.playback_tab.hands_reset_icon,
-            lambda c: (c.text_secondary, c.accent_stop),
+        )
+        # Default (hover-to-text_primary) decorative / section icons.
+        default_icons = (
+            self.settings_tab.save_dir_icon,
+            self.settings_tab.themes_file_icon,
+            self.playback_tab.file_strip.tile_icon,
+            self.playback_tab.drop_zone.drop_icon,
+            self.playback_tab.refresh_saved_songs_btn,
+            self.playback_tab.all_saves_btn,
         )
 
-        # PlaybackTab -- saved songs panel title buttons
-        provider.register(
-            self.playback_tab.refresh_saved_songs_btn,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
-        provider.register(
-            self.playback_tab.all_saves_btn,
-            lambda c: (c.text_secondary, c.text_primary),
-        )
+        for icon in accent_icons:
+            icon.setProperty("variant", "icon_accent")
+        for icon in danger_icons:
+            icon.setProperty("variant", "icon_danger")
+        for icon in (*accent_icons, *danger_icons, *default_icons):
+            provider.register(icon)
 
     # -- Navigation -----------------------------------------------------------
 
@@ -519,66 +484,11 @@ class MainWindowUI(QObject):
         if theme is None:
             return
         ThemeManager.set_active_name(name)
+        # The stylesheet is the single source of styling: re-applying it
+        # re-themes every widget, including QPainter widgets and recolored icons,
+        # via qproperty-*. Glyph state (play<->pause, collapse<->expand) is the
+        # only icon concern left in Python (HuMidiButton.set_icon_name).
         self.main_window.setStyleSheet(generate_stylesheet(theme))
-        self._discord_btn.update_colors(theme.text_secondary, theme.text_primary)
-
-        # Nav sidebar icons
-        for btn in self._nav_btns:
-            btn.update_icon_colors(theme.text_secondary, theme.text_primary)
-        self._github_nav.update_icon_colors(theme.text_secondary, theme.text_primary)
-        self._status_indicator.update_colors(theme.text_secondary, theme.accent_play, "#c44b4b", theme.accent_loaded)
-        IconProvider.instance().notify_theme_changed(theme)
-        ToggleSwitchProvider.instance().notify_theme_changed(
-            track_off=theme.toggle_off,
-            track_on=theme.toggle_on,
-            knob=theme.knob_color,
-            text_col=theme.text_primary,
-            dis_text=_mix(theme.text_primary, theme.bg_primary, 0.65),
-            dis_track=_mix(theme.border, theme.bg_primary, 0.50),
-        )
-
-        # Collapsed strip load buttons
-        _px = self._collapsed_load_btn.fontMetrics().height()
-        self._collapsed_load_btn.setIconSize(QSize(_px, _px))
-        self._collapsed_load_btn.setIcon(ph_icon("folder-open", theme.text_primary, _px))
-        self._collapsed_load_saved_btn.setIconSize(QSize(_px, _px))
-        self._collapsed_load_saved_btn.setIcon(ph_icon("floppy-disk", theme.text_primary, _px))
-
-        # Transport button icons (stored for play/pause toggling in main.py)
-        _ti = 22
-        self._icon_play  = ph_icon("play",       theme.accent_play,  _ti)
-        self._icon_pause = ph_icon("pause",      theme.accent_play,  _ti)
-        self._icon_stop  = ph_icon("stop",       theme.accent_stop,  _ti)
-        self._icon_save  = ph_icon("floppy-disk", theme.accent_save,   _ti)
-        self.play_button.setIconSize(QSize(_ti, _ti))
-        self.play_button.setIcon(self._icon_play)
-        self.stop_button.setIconSize(QSize(_ti, _ti))
-        self.stop_button.setIcon(self._icon_stop)
-        self.save_button.setIconSize(QSize(_ti, _ti))
-        self.save_button.setIcon(self._icon_save)
-        self._icon_collapse = ph_icon("resize-collapse", theme.text_secondary, _ti)
-        self._icon_expand   = ph_icon("resize-expand",   theme.text_secondary, _ti)
-        self.collapse_btn.setIconSize(QSize(_ti, _ti))
-        self.collapse_btn.setText("")
-        icon = self._icon_expand if self._is_collapsed else self._icon_collapse
-        self.collapse_btn.setIcon(icon)
-
-        self.playback_tab._drop_card.set_colors(theme.border, theme.accent)
-        self.playback_tab.redraw_saved_song_cards()
-
-        self.timeline_widget.left_hand_color.setNamedColor(theme.accent)
-        self.timeline_widget.left_hand_color.setAlpha(210)
-        self.timeline_widget.right_hand_color.setNamedColor(theme.accent_play)
-        self.timeline_widget.right_hand_color.setAlpha(210)
-        self.timeline_widget.bg_color.setNamedColor(theme.bg_primary)
-        pedal_q = QColor(theme.pedal_color)
-        pedal_q.setAlpha(180)
-        self.timeline_widget.pedal_color = pedal_q
-        self.timeline_widget.cached_background = None
-        self.timeline_widget.update()
-        piano_pedal_q = QColor(theme.pedal_color)
-        self.piano_widget.pedal_color = piano_pedal_q
-        self.piano_widget.update()
 
     def _open_theme_dialog(self) -> None:
         from ui.dialogs.ThemeDialog import ThemeDialog
@@ -665,7 +575,7 @@ class MainWindowUI(QObject):
             self._expanded_size = self.main_window.size()
             self._body.setVisible(False)
             self._collapsed_strip.setVisible(True)
-            self.collapse_btn.setIcon(self._icon_expand)
+            self.collapse_btn.set_icon_name("resize-expand")
             self.collapse_btn.setToolTip("Restore full window (Ctrl+K)")
             self.collapse_btn.setMinimumWidth(0)
             self.collapse_btn.setMaximumWidth(16777215)
@@ -693,7 +603,7 @@ class MainWindowUI(QObject):
         else:
             self._body.setVisible(True)
             self._collapsed_strip.setVisible(False)
-            self.collapse_btn.setIcon(self._icon_collapse)
+            self.collapse_btn.set_icon_name("resize-collapse")
             self.collapse_btn.setToolTip("Collapse to mini mode (Ctrl+K)")
             self.collapse_btn.setProperty("strip_mode", False)
             self.collapse_btn.style().unpolish(self.collapse_btn)

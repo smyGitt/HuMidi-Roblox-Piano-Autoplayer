@@ -248,23 +248,23 @@ class MainWindow(QMainWindow):
         key_str = self.hotkey_manager.format_hotkey_string()
         if self.ui._is_collapsed:
             if self.playback_controller.is_paused():
-                self.ui.play_button.setIcon(self.ui._icon_play)
+                self.ui.play_button.set_icon_name("play")
                 self.ui.play_button.setToolTip(f"Resume ({key_str})")
             elif self.playback_controller.is_playing():
-                self.ui.play_button.setIcon(self.ui._icon_pause)
+                self.ui.play_button.set_icon_name("pause")
                 self.ui.play_button.setToolTip(f"Pause ({key_str})")
             else:
-                self.ui.play_button.setIcon(self.ui._icon_play)
+                self.ui.play_button.set_icon_name("play")
                 self.ui.play_button.setToolTip(f"Play ({key_str})")
         else:
             if self.playback_controller.is_paused():
-                self.ui.play_button.setIcon(self.ui._icon_play)
+                self.ui.play_button.set_icon_name("play")
                 self.ui.play_button.setToolTip("Resume playback.")
             elif self.playback_controller.is_playing():
-                self.ui.play_button.setIcon(self.ui._icon_pause)
+                self.ui.play_button.set_icon_name("pause")
                 self.ui.play_button.setToolTip("Pause playback.")
             else:
-                self.ui.play_button.setIcon(self.ui._icon_play)
+                self.ui.play_button.set_icon_name("play")
                 self.ui.play_button.setToolTip("Start playback.")
 
     def toggle_playback_state(self):

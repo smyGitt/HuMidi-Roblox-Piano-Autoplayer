@@ -300,6 +300,11 @@ QComboBox QAbstractItemView {
     selection-background-color: %(accent)s;
     outline: none;
 }
+/* Compact combo (e.g. inside dialog table cells) */
+QComboBox[variant="compact"] {
+    min-height: 0px;
+    padding: 2px 8px;
+}
 
 /* Text areas */
 QTextEdit {
@@ -308,6 +313,15 @@ QTextEdit {
     border-radius: 6px;
     color: %(text_primary)s;
     selection-background-color: %(accent)s;
+}
+/* Monospace log / code views */
+QTextEdit[variant="mono"] {
+    font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
+    font-size: 9pt;
+}
+QTextEdit[variant="mono_compact"] {
+    font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
+    font-size: 8pt;
 }
 
 /* Scroll bars */
@@ -440,23 +454,23 @@ QToolTip {
     border-radius: 4px;
 }
 
-/* Semantic label roles (set via setProperty("role", "...")) */
-QLabel[role="muted"] {
+/* Semantic label variants (set via setProperty("variant", "...")) */
+QLabel[variant="muted"] {
     color: %(text_secondary)s;
     font-size: 8pt;
 }
-QLabel[role="placeholder"] {
+QLabel[variant="placeholder"] {
     color: %(text_secondary)s;
     font-size: 8pt;
     font-style: italic;
 }
-QLabel[role="drop_hint"] {
+QLabel[variant="drop_hint"] {
     font-family: "Georgia", serif;
     font-style: italic;
     font-size: 13pt;
     color: %(text_primary)s;
 }
-QLabel[role="section"] {
+QLabel[variant="section"] {
     color: %(text_secondary)s;
     font-family: "JetBrains Mono", "Consolas", monospace;
     font-size: 7pt;
@@ -464,16 +478,16 @@ QLabel[role="section"] {
     text-transform: uppercase;
     letter-spacing: 1.6px;
 }
-QLabel[role="value"] {
+QLabel[variant="value"] {
     color: %(text_primary)s;
     font-family: "JetBrains Mono", "Consolas", monospace;
     font-size: 9pt;
 }
-QLabel[role="success"] {
+QLabel[variant="success"] {
     color: %(accent_play)s;
     font-size: 8pt;
 }
-QLabel[role="title"] {
+QLabel[variant="title"] {
     color: %(text_primary)s;
     font-size: 14pt;
     font-weight: bold;
@@ -728,32 +742,32 @@ QPushButton#collapse_btn[strip_mode="true"] {
 }
 
 /* -- Card-level reset icon buttons ----------------------------------------- */
-QPushButton[role="card_reset"] {
+QPushButton[variant="card_reset"] {
     background-color: transparent;
     border: none;
     border-radius: 4px;
-    padding: 0px;
+    padding: 3px;
     margin: 0px;
 }
-QPushButton[role="card_reset"]:hover {
+QPushButton[variant="card_reset"]:hover {
     background-color: %(btn_hover)s;
     border: 1px solid %(border)s;
 }
-QPushButton[role="card_reset"]:pressed {
+QPushButton[variant="card_reset"]:pressed {
     background-color: %(btn_pressed)s;
 }
 
 /* -- PhIconLabel toolbar action buttons (role="icon_btn" on QLabel) -------- */
-QLabel[role="icon_btn"] {
+QLabel[variant="icon_btn"] {
     background-color: transparent;
     border-radius: 4px;
     min-height: 26px;
 }
-QLabel[role="icon_btn"]:hover {
+QLabel[variant="icon_btn"]:hover {
     background-color: %(btn_hover)s;
     border: 1px solid %(border)s;
 }
-QLabel[role="icon_btn"]:disabled {
+QLabel[variant="icon_btn"]:disabled {
     background-color: transparent;
 }
 
@@ -780,7 +794,7 @@ QLabel#page_header_title {
 }
 
 /* -- Settings page vertical nav tabs --------------------------------------- */
-QPushButton[role="settings_nav"] {
+QPushButton[variant="settings_nav"] {
     background: transparent;
     border: none;
     border-left: 2px solid transparent;
@@ -791,11 +805,11 @@ QPushButton[role="settings_nav"] {
     min-height: 0;
     font-size: 9pt;
 }
-QPushButton[role="settings_nav"]:hover {
+QPushButton[variant="settings_nav"]:hover {
     color: %(text_primary)s;
     background-color: %(nav_hover_bg)s;
 }
-QPushButton[role="settings_nav"]:checked {
+QPushButton[variant="settings_nav"]:checked {
     color: %(text_primary)s;
     border-left-color: %(accent)s;
     background-color: %(nav_active_bg)s;
@@ -816,6 +830,74 @@ QPushButton#inspect_btn:checked {
     background-color: %(accent_tint)s;
     border-color: %(accent)s;
 }
+
+/* -- Custom-painted widget colors (driven via qproperty-*) ---------------- */
+/* These widgets render with QPainter and cannot be styled by ordinary QSS;
+   their colors are still sourced from QSS here via Qt's qproperty- syntax,
+   so re-applying the stylesheet re-themes them with no Python color push. */
+ToggleSwitch {
+    qproperty-trackOff: %(toggle_off)s;
+    qproperty-trackOn: %(toggle_on)s;
+    qproperty-knob: %(knob_color)s;
+    qproperty-textColor: %(text_primary)s;
+    qproperty-disText: %(dis_text)s;
+    qproperty-disTrack: %(dis_track)s;
+}
+StatusIndicator {
+    qproperty-iconColor: %(text_secondary)s;
+    qproperty-readyColor: %(accent_play)s;
+    qproperty-unloadColor: %(accent_stop)s;
+    qproperty-loadedColor: %(accent_loaded)s;
+}
+QLabel#status_label {
+    color: %(text_secondary)s;
+}
+NavButton {
+    qproperty-iconColorNormal: %(text_secondary)s;
+    qproperty-iconColorActive: %(text_primary)s;
+}
+DiscordNavButton {
+    qproperty-colorDim: %(text_secondary)s;
+    qproperty-colorHi: %(text_primary)s;
+}
+AnimatedDashedCard {
+    qproperty-borderColor: %(border)s;
+    qproperty-dragBorder: %(accent)s;
+}
+PianoWidget {
+    qproperty-whiteKey: #e6e6f0;
+    qproperty-blackKey: #1c1c2e;
+    qproperty-whiteBorder: #323246;
+    qproperty-blackBorder: #0f0f1e;
+    qproperty-activeKey: %(accent_play)s;
+    qproperty-pedalColor: %(pedal_color)s;
+}
+TimelineWidget {
+    qproperty-bgColor: %(bg_primary)s;
+    qproperty-leftHandColor: %(accent)s;
+    qproperty-rightHandColor: %(accent_play)s;
+    qproperty-unknownColor: #64648c;
+    qproperty-cursorColor: %(text_primary)s;
+    qproperty-measureLineColor: %(text_primary)s;
+    qproperty-pedalColor: %(pedal_color)s;
+}
+
+/* HuMidiButton icon colors (the glyph is a Python state; color is QSS). */
+QPushButton#play_button       { qproperty-iconColor: %(accent_play)s; }
+QPushButton#stop_button       { qproperty-iconColor: %(accent_stop)s; }
+QPushButton#save_button       { qproperty-iconColor: %(accent_save)s; }
+QPushButton#collapse_btn      { qproperty-iconColor: %(text_secondary)s; }
+QPushButton#cs_load_btn       { qproperty-iconColor: %(text_primary)s; }
+QPushButton#cs_load_saved_btn { qproperty-iconColor: %(text_primary)s; }
+
+/* PhIconLabel icon colors. Base hovers to text_primary; variants change the
+   hover target. The rendered glyph is a fixed icon_name set in Python. */
+PhIconLabel {
+    qproperty-iconColor: %(text_secondary)s;
+    qproperty-iconHoverColor: %(text_primary)s;
+}
+PhIconLabel[variant="icon_accent"] { qproperty-iconHoverColor: %(accent)s; }
+PhIconLabel[variant="icon_danger"] { qproperty-iconHoverColor: %(accent_stop)s; }
 """
 
 
@@ -835,13 +917,6 @@ def generate_stylesheet(c: ThemeColors) -> str:
     stop_dis_bg   = _mix(stop_bg, c.bg_primary, 0.55)
     stop_dis_text = _mix(c.accent_stop, c.bg_primary, 0.65)
     stop_dis_bdr  = _mix(stop_border, c.bg_primary, 0.65)
-
-    save_bg       = _mix(c.bg_primary, c.accent, 0.15)
-    save_hover    = _mix(c.bg_primary, c.accent, 0.28)
-    save_border   = _mix(c.accent, c.bg_secondary, 0.40)
-    save_dis_bg   = _mix(save_bg, c.bg_primary, 0.55)
-    save_dis_text = _mix(c.accent, c.bg_primary, 0.65)
-    save_dis_bdr  = _mix(save_border, c.bg_primary, 0.65)
 
     # Generic button (uses bg_button, separate from bg_secondary)
     btn_bg      = c.bg_button
@@ -863,8 +938,6 @@ def generate_stylesheet(c: ThemeColors) -> str:
 
     # Controls (sliders, checkboxes) derived colors
     accent_controls_light = _mix(c.accent_controls, "#ffffff", 0.25)
-    accent_light          = _mix(c.accent, "#ffffff", 0.25)   # kept for compatibility
-    accent_play_hover     = _mix(c.accent_play, "#ffffff", 0.15)
     text_area_bg  = c.bg_input
     scroll_handle = _mix(c.border, c.accent, 0.45)
     tab_bg        = c.bg_secondary
@@ -894,13 +967,11 @@ def generate_stylesheet(c: ThemeColors) -> str:
         accent=c.accent, accent_play=c.accent_play, accent_stop=c.accent_stop,
         accent_controls=c.accent_controls, accent_save=c.accent_save,
         text_primary=c.text_primary, text_secondary=c.text_secondary, border=c.border,
-        accent_light=accent_light, accent_controls_light=accent_controls_light,
+        accent_controls_light=accent_controls_light,
         play_bg=play_bg, play_hover=play_hover, play_border=play_border,
         play_dis_bg=play_dis_bg, play_dis_text=play_dis_text, play_dis_border=play_dis_bdr,
         stop_bg=stop_bg, stop_hover=stop_hover, stop_border=stop_border,
         stop_dis_bg=stop_dis_bg, stop_dis_text=stop_dis_text, stop_dis_border=stop_dis_bdr,
-        save_bg=save_bg, save_hover=save_hover, save_border=save_border,
-        save_dis_bg=save_dis_bg, save_dis_text=save_dis_text, save_dis_border=save_dis_bdr,
         save_btn_bg=save_btn_bg, save_btn_hover=save_btn_hover,
         save_btn_border=save_btn_border,
         save_btn_dis_bg=save_btn_dis_bg, save_btn_dis_text=save_btn_dis_text,
@@ -911,11 +982,13 @@ def generate_stylesheet(c: ThemeColors) -> str:
         tab_bg=tab_bg, tab_hover=tab_hover, status_bg=status_bg,
         tree_alt=tree_alt, grid_line=grid_line,
         spinner_btn=spinner_btn, spinner_hover=spinner_hover,
-        accent_play_hover=accent_play_hover,
         nav_active_bg=nav_active_bg, nav_hover_bg=nav_hover_bg,
         accent_tint=accent_tint, ink_faint=ink_faint, rule_strong=rule_strong,
         dropzone_border=dropzone_border,
         save_card_hover=save_card_hover,
+        # Custom-painted widget colors (consumed via qproperty-*)
+        toggle_off=c.toggle_off, toggle_on=c.toggle_on, knob_color=c.knob_color,
+        dis_track=dis_border, accent_loaded=c.accent_loaded, pedal_color=c.pedal_color,
     )
     return _QSS % d
 

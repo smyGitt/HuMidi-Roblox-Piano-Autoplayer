@@ -1,14 +1,8 @@
-import weakref
-from typing import Callable, TYPE_CHECKING
-
 from PyQt6.QtWidgets import QLabel, QWidget
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
-from PyQt6.QtGui import QPixmap, QMouseEvent
+from PyQt6.QtCore import Qt, pyqtProperty, pyqtSignal as Signal
+from PyQt6.QtGui import QPixmap, QColor, QMouseEvent
 
 from ui.widgets.event_injectable import EventInjectableMixin
-
-if TYPE_CHECKING:
-    from ui.theme import ThemeColors
 
 
 class PhIconLabel(EventInjectableMixin, QLabel):
@@ -16,7 +10,12 @@ class PhIconLabel(EventInjectableMixin, QLabel):
 
     Construct with an icon_name (Phosphor duotone stem, e.g. "folder-open") and
     a logical size in pixels. Register with IconProvider.instance().register() to
-    attach hover color-swap and theme tracking automatically.
+    attach the hover color-swap behavior.
+
+    Icon colors are supplied by QSS via qproperty-* (iconColor, iconHoverColor);
+    set a [variant="icon_accent"] / [variant="icon_danger"] property to pick a
+    different hover color. Both pixmap states are re-rendered whenever a color
+    slot changes, so re-applying the stylesheet re-themes the icon.
 
     Pass hover_icon_name to swap to a different icon stem on hover (e.g. show
     "folder-closed" at rest and "folder-open" on hover). When omitted, both
@@ -25,6 +24,8 @@ class PhIconLabel(EventInjectableMixin, QLabel):
     clicked is emitted on left-button release so callers can wire it like a
     QPushButton signal without subclassing or adding custom press handlers.
     """
+
+    _INSET = 2
 
     clicked = Signal()
 
@@ -43,7 +44,9 @@ class PhIconLabel(EventInjectableMixin, QLabel):
         self.size = size
         self.normal_pixmap: QPixmap | None = None
         self.hover_pixmap:  QPixmap | None = None
-        self._color_fn: Callable | None = None
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._icon_color = QColor("#7878a0")
+        self._icon_hover_color = QColor("#dcdcf0")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setScaledContents(False)
@@ -55,21 +58,36 @@ class PhIconLabel(EventInjectableMixin, QLabel):
     def set_colors(self, normal_hex: str, hover_hex: str) -> None:
         """Re-render both pixmaps from hex strings and refresh the display."""
         from ui.widgets.ph_icon import ph_icon
-        phys = self.size * 2
-        n = ph_icon(self.icon_name, normal_hex, self.size).pixmap(phys, phys)
+        render = self.size - 2 * self._INSET
+        phys = render * 2
+        n = ph_icon(self.icon_name, normal_hex, render).pixmap(phys, phys)
         n.setDevicePixelRatio(2.0)
         self.normal_pixmap = n
         hover_name = self.hover_icon_name if self.hover_icon_name is not None else self.icon_name
-        h = ph_icon(hover_name, hover_hex, self.size).pixmap(phys, phys)
+        h = ph_icon(hover_name, hover_hex, render).pixmap(phys, phys)
         h.setDevicePixelRatio(2.0)
         self.hover_pixmap = h
         self.setPixmap(self.normal_pixmap)
 
-    def apply_colors(self, colors: "ThemeColors") -> None:
-        """Derive hex pair from registered color_fn and call set_colors."""
-        if self._color_fn is not None:
-            normal, hover = self._color_fn(colors)
-            self.set_colors(normal, hover)
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def iconColor(self) -> QColor:
+        return self._icon_color
+
+    @iconColor.setter
+    def iconColor(self, c: QColor) -> None:
+        self._icon_color = c
+        self.set_colors(self._icon_color.name(), self._icon_hover_color.name())
+
+    @pyqtProperty(QColor)
+    def iconHoverColor(self) -> QColor:
+        return self._icon_hover_color
+
+    @iconHoverColor.setter
+    def iconHoverColor(self, c: QColor) -> None:
+        self._icon_hover_color = c
+        self.set_colors(self._icon_color.name(), self._icon_hover_color.name())
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -78,21 +96,15 @@ class PhIconLabel(EventInjectableMixin, QLabel):
 
 
 class IconProvider:
-    """Singleton registry for PhIconLabel instances.
+    """Singleton that injects the standard hover behavior into PhIconLabel.
 
-    Tracks every live PhIconLabel via weak references. A single call to
-    notify_theme_changed(colors) pushes updated colors to all registered labels,
-    replacing per-widget update_icon_color() calls scattered across MainWindowUI.
-
-    Standard hover behavior (pixmap swap on enter/leave) is injected once inside
-    register(). Custom per-instance behaviors are added via label.inject_events()
-    at the call site after registration.
+    Icon colors are driven by QSS via qproperty-* (see PhIconLabel), so this
+    provider no longer broadcasts colors; its sole job is to inject the
+    pixmap-swap hover behavior once at registration time. Custom per-instance
+    behaviors are added via label.inject_events() at the call site afterward.
     """
 
     _instance: "IconProvider | None" = None
-
-    def __init__(self) -> None:
-        self._labels: weakref.WeakSet[PhIconLabel] = weakref.WeakSet()
 
     @classmethod
     def instance(cls) -> "IconProvider":
@@ -100,24 +112,9 @@ class IconProvider:
             cls._instance = cls()
         return cls._instance
 
-    def register(
-        self,
-        label: PhIconLabel,
-        color_fn: Callable[["ThemeColors"], tuple[str, str]],
-    ) -> None:
-        """Register label and inject standard hover swap behavior.
-
-        color_fn receives a ThemeColors and returns (normal_hex, hover_hex).
-        Called once at UI construction time, not on every theme change.
-        """
-        self._labels.add(label)
-        label._color_fn = color_fn
+    def register(self, label: PhIconLabel) -> None:
+        """Inject the standard hover swap behavior (pixmap swap on enter/leave)."""
         label.inject_events(
             hover_enter=lambda w: w.setPixmap(w.hover_pixmap)  if w.hover_pixmap  else None,
             hover_leave=lambda w: w.setPixmap(w.normal_pixmap) if w.normal_pixmap else None,
         )
-
-    def notify_theme_changed(self, colors: "ThemeColors") -> None:
-        """Push updated colors to all live registered labels."""
-        for label in list(self._labels):
-            label.apply_colors(colors)

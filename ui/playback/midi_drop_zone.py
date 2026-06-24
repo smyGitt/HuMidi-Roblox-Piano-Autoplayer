@@ -33,11 +33,11 @@ class MidiDropZone(QFrame):
 
         drop_hint = QLabel("Drop a .mid file")
         drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_hint.setProperty("role", "drop_hint")
+        drop_hint.setProperty("variant", "drop_hint")
 
         drop_sub = QLabel("OR BROWSE BELOW")
         drop_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_sub.setProperty("role", "muted")
+        drop_sub.setProperty("variant", "muted")
 
         self.browse_button = QPushButton("Browse…")
         self.browse_button.setToolTip("Open a MIDI file to play")

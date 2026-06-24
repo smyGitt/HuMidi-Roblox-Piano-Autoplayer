@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QFrame, QLabel
-from PyQt6.QtCore import Qt, QEvent, QSize, pyqtSignal as Signal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt, QEvent, pyqtProperty, pyqtSignal as Signal
+from PyQt6.QtGui import QPixmap, QColor
 
 
 class NavButton(QFrame):
@@ -10,9 +10,9 @@ class NavButton(QFrame):
     never change during sidebar width animation. The sidebar clips their
     rendering at its current boundary, producing a clean slide-in/out effect.
 
-    Call update_icon_colors(normal_hex, active_hex, size) after construction
-    (and again on every theme change) to supply rendered pixmaps. Until that
-    method is called the icon slot is empty.
+    Icon colors are supplied by QSS via qproperty-* (iconColorNormal,
+    iconColorActive); both pixmap states are re-rendered whenever a color slot
+    changes.
     """
 
     clicked = Signal()
@@ -28,6 +28,9 @@ class NavButton(QFrame):
         self._icon_name = icon_name
         self._pix_normal: QPixmap | None = None
         self._pix_active: QPixmap | None = None
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._icon_normal = QColor("#7878a0")
+        self._icon_active = QColor("#dcdcf0")
 
         self.setObjectName("nav_btn")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -50,13 +53,32 @@ class NavButton(QFrame):
         self._text_lbl.setProperty("highlighted", "false")
         self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-    def update_icon_colors(self, normal_hex: str, active_hex: str,
-                           size: int | None = None) -> None:
-        """Re-render both pixmap states using the given hex color strings."""
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def iconColorNormal(self) -> QColor:
+        return self._icon_normal
+
+    @iconColorNormal.setter
+    def iconColorNormal(self, c: QColor) -> None:
+        self._icon_normal = c
+        self._render_icons()
+
+    @pyqtProperty(QColor)
+    def iconColorActive(self) -> QColor:
+        return self._icon_active
+
+    @iconColorActive.setter
+    def iconColorActive(self, c: QColor) -> None:
+        self._icon_active = c
+        self._render_icons()
+
+    def _render_icons(self) -> None:
+        """Re-render both pixmap states from the current color slots."""
         from ui.widgets.ph_icon import ph_icon
-        sz = size or self._ICON_SIZE
-        self._pix_normal = ph_icon(self._icon_name, normal_hex, sz).pixmap(sz * 2, sz * 2)
-        self._pix_active = ph_icon(self._icon_name, active_hex, sz).pixmap(sz * 2, sz * 2)
+        sz = self._ICON_SIZE
+        self._pix_normal = ph_icon(self._icon_name, self._icon_normal.name(), sz).pixmap(sz * 2, sz * 2)
+        self._pix_active = ph_icon(self._icon_name, self._icon_active.name(), sz).pixmap(sz * 2, sz * 2)
         is_hi = self.property("active") == "true" or self.property("hovered") == "true"
         self._icon_lbl.setPixmap(self._pix_active if is_hi else self._pix_normal)
 

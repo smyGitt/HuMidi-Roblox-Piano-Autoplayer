@@ -235,7 +235,7 @@ class SettingsTab(QWidget):
         body.addSpacing(12)
         body.addWidget(self._section_label("Reset"))
         reset_desc = QLabel("Restore all playback and humanization settings to their defaults.")
-        reset_desc.setProperty("role", "muted")
+        reset_desc.setProperty("variant", "muted")
         reset_desc.setWordWrap(True)
         body.addWidget(reset_desc)
         body.addSpacing(4)
@@ -252,7 +252,7 @@ class SettingsTab(QWidget):
     @staticmethod
     def _section_label(text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setProperty("role", "muted")
+        lbl.setProperty("variant", "muted")
         return lbl
 
     def _switch_tab(self, idx: int) -> None:

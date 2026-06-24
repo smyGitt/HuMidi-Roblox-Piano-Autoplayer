@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QTextEdit, QStackedWidget
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
 
 from ui.widgets import make_card
 
@@ -164,7 +163,7 @@ class LicenseTab(QWidget):
         for i, name in enumerate(_LICENSE_TEXTS):
             btn = QPushButton(name)
             btn.setCheckable(True)
-            btn.setProperty("role", "settings_nav")
+            btn.setProperty("variant", "settings_nav")
             btn.clicked.connect(lambda checked, idx=i: self._switch_tab(idx))
             nav_layout.addWidget(btn)
             self._tab_btns.append(btn)
@@ -184,7 +183,7 @@ class LicenseTab(QWidget):
             page_layout.setSpacing(0)
             text_edit = QTextEdit()
             text_edit.setReadOnly(True)
-            text_edit.setFont(QFont("Courier New", 9))
+            text_edit.setProperty("variant", "mono")
             text_edit.setPlainText(text)
             page_layout.addWidget(text_edit)
             self._stack.addWidget(page)

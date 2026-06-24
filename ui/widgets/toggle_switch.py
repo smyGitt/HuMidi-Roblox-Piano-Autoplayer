@@ -1,24 +1,17 @@
-import weakref
-
 from PyQt6.QtWidgets import QAbstractButton, QSizePolicy
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal, QRectF, QSize
 from PyQt6.QtGui import QPainter, QColor
-
-
-def _parse_hex(h: str) -> tuple[int, int, int]:
-    h = h.lstrip("#")
-    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
 
 class ToggleSwitch(QAbstractButton):
     """Animated toggle switch that replaces QCheckBox throughout the UI.
 
     Draws a sliding knob over a color-interpolating track using QPainter.
-    The track fades from track_off to track_on as the knob slides, driven by
+    The track fades from trackOff to trackOn as the knob slides, driven by
     a single QPropertyAnimation on _anim_pos (0.0=off, 1.0=on).
 
-    Auto-registers with ToggleSwitchProvider on construction so theme color
-    pushes reach every live instance without manual registration calls.
+    All colors are supplied by QSS via qproperty-* (trackOff, trackOn, knob,
+    textColor, disText, disTrack); paintEvent only reads the stored QColors.
 
     API is compatible with QCheckBox: isChecked(), setChecked(), toggled(bool),
     stateChanged(int), text(), setText(), setEnabled(), blockSignals().
@@ -37,12 +30,13 @@ class ToggleSwitch(QAbstractButton):
 
         self._pos: float = 0.0
 
-        self._track_off = "#7878a0"
-        self._track_on  = "#5b8dee"
-        self._knob      = "#e8e8f0"
-        self._text_col  = "#dcdcf0"
-        self._dis_text  = "#555566"
-        self._dis_track = "#32324a"
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._track_off = QColor("#7878a0")
+        self._track_on  = QColor("#5b8dee")
+        self._knob      = QColor("#e8e8f0")
+        self._text_col  = QColor("#dcdcf0")
+        self._dis_text  = QColor("#555566")
+        self._dis_track = QColor("#32324a")
 
         self._anim = QPropertyAnimation(self, b"_anim_pos", self)
         self._anim.setDuration(180)
@@ -50,8 +44,6 @@ class ToggleSwitch(QAbstractButton):
 
         self.toggled.connect(self._on_toggled)
         self.toggled.connect(lambda checked: self.stateChanged.emit(2 if checked else 0))
-
-        ToggleSwitchProvider.instance().register(self)
 
     @pyqtProperty(float)
     def _anim_pos(self) -> float:
@@ -61,6 +53,64 @@ class ToggleSwitch(QAbstractButton):
     def _anim_pos(self, value: float) -> None:
         self._pos = value
         self.update()
+
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def trackOff(self) -> QColor:
+        return self._track_off
+
+    @trackOff.setter
+    def trackOff(self, c: QColor) -> None:
+        self._track_off = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def trackOn(self) -> QColor:
+        return self._track_on
+
+    @trackOn.setter
+    def trackOn(self, c: QColor) -> None:
+        self._track_on = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def knob(self) -> QColor:
+        return self._knob
+
+    @knob.setter
+    def knob(self, c: QColor) -> None:
+        self._knob = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def textColor(self) -> QColor:
+        return self._text_col
+
+    @textColor.setter
+    def textColor(self, c: QColor) -> None:
+        self._text_col = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def disText(self) -> QColor:
+        return self._dis_text
+
+    @disText.setter
+    def disText(self, c: QColor) -> None:
+        self._dis_text = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def disTrack(self) -> QColor:
+        return self._dis_track
+
+    @disTrack.setter
+    def disTrack(self, c: QColor) -> None:
+        self._dis_track = c
+        self.update()
+
+    # -- State ----------------------------------------------------------------
 
     def setChecked(self, checked: bool) -> None:
         # Snap pos before super() so the toggled handler skips the animation.
@@ -75,23 +125,6 @@ class ToggleSwitch(QAbstractButton):
         self._anim.setStartValue(self._pos)
         self._anim.setEndValue(target)
         self._anim.start()
-
-    def update_colors(
-        self,
-        track_off: str,
-        track_on: str,
-        knob: str,
-        text_col: str,
-        dis_text: str,
-        dis_track: str,
-    ) -> None:
-        self._track_off = track_off
-        self._track_on  = track_on
-        self._knob      = knob
-        self._text_col  = text_col
-        self._dis_text  = dis_text
-        self._dis_track = dis_track
-        self.update()
 
     def _track_w(self) -> int:
         return int(self._TRACK_H * 1.75)
@@ -120,12 +153,11 @@ class ToggleSwitch(QAbstractButton):
         if not enabled:
             track_color = QColor(self._dis_track)
         else:
-            r1, g1, b1 = _parse_hex(self._track_off)
-            r2, g2, b2 = _parse_hex(self._track_on)
+            c1, c2 = self._track_off, self._track_on
             track_color = QColor(
-                int(r1 + (r2 - r1) * t),
-                int(g1 + (g2 - g1) * t),
-                int(b1 + (b2 - b1) * t),
+                int(c1.red()   + (c2.red()   - c1.red())   * t),
+                int(c1.green() + (c2.green() - c1.green()) * t),
+                int(c1.blue()  + (c2.blue()  - c1.blue())  * t),
             )
 
         knob_color = QColor(self._knob)
@@ -146,7 +178,7 @@ class ToggleSwitch(QAbstractButton):
 
         label = self.text()
         if label:
-            p.setPen(QColor(self._dis_text if not enabled else self._text_col))
+            p.setPen(self._dis_text if not enabled else self._text_col)
             lx = tw + self._LABEL_SPACING
             p.drawText(
                 QRectF(lx, 0, self.width() - lx, self.height()),
@@ -155,33 +187,3 @@ class ToggleSwitch(QAbstractButton):
             )
 
         p.end()
-
-
-class ToggleSwitchProvider:
-    """Singleton registry that pushes theme colors to all live ToggleSwitch instances."""
-
-    _instance: "ToggleSwitchProvider | None" = None
-
-    def __init__(self) -> None:
-        self._switches: weakref.WeakSet[ToggleSwitch] = weakref.WeakSet()
-
-    @classmethod
-    def instance(cls) -> "ToggleSwitchProvider":
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    def register(self, switch: ToggleSwitch) -> None:
-        self._switches.add(switch)
-
-    def notify_theme_changed(
-        self,
-        track_off: str,
-        track_on: str,
-        knob: str,
-        text_col: str,
-        dis_text: str,
-        dis_track: str,
-    ) -> None:
-        for sw in list(self._switches):
-            sw.update_colors(track_off, track_on, knob, text_col, dis_text, dis_track)

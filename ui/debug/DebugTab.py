@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (
     QPushButton, QTextEdit, QApplication, QLabel
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
 
 from ui.widgets import make_card
 
@@ -64,7 +63,7 @@ class DebugTab(QWidget):
         console_card, console_body = make_card("Console")
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont("Courier New", 9))
+        self.log_output.setProperty("variant", "mono")
         console_body.addWidget(self.log_output)
         body_row.addWidget(console_card, 31)  # 31:20 ~= 1.55:1
 
@@ -74,7 +73,7 @@ class DebugTab(QWidget):
 
         levels_card, levels_body = make_card("Levels")
         levels_lbl = QLabel("Not yet implemented")
-        levels_lbl.setProperty("role", "muted")
+        levels_lbl.setProperty("variant", "muted")
         levels_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # TODO: per-level count chips (Info / Debug / Warn / OK tallies)
         levels_body.addWidget(levels_lbl)
@@ -82,7 +81,7 @@ class DebugTab(QWidget):
 
         snap_card, snap_body = make_card("Session Snapshot")
         snap_lbl = QLabel("Not yet implemented")
-        snap_lbl.setProperty("role", "muted")
+        snap_lbl.setProperty("variant", "muted")
         snap_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # TODO: key/value snapshot rows (MIDI file, tempo, pedal style, etc.)
         snap_body.addWidget(snap_lbl)

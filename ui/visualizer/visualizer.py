@@ -1,11 +1,14 @@
 from PyQt6.QtWidgets import QWidget, QSizePolicy
-from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtProperty, pyqtSignal as Signal
 from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
 from typing import List
 from core.models import Note
 from core.core import TempoMap
 
 class PianoWidget(QWidget):
+    """88-key piano visualizer. All colors are supplied by QSS via qproperty-*;
+    paintEvent only reads the stored QColor slots."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(92)
@@ -18,7 +21,72 @@ class PianoWidget(QWidget):
         self.black_keys = {1, 3, 6, 8, 10}
         self.pedal_active = False
         self.show_pedal = True
-        self.pedal_color = QColor(232, 160, 32)   # amber
+
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._white_key    = QColor(230, 230, 240)
+        self._black_key    = QColor(28, 28, 46)
+        self._white_border = QColor(50, 50, 70)
+        self._black_border = QColor(15, 15, 30)
+        self._active_key   = QColor(78, 203, 141)
+        self._pedal_color  = QColor(232, 160, 32)
+
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def whiteKey(self) -> QColor:
+        return self._white_key
+
+    @whiteKey.setter
+    def whiteKey(self, c: QColor) -> None:
+        self._white_key = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def blackKey(self) -> QColor:
+        return self._black_key
+
+    @blackKey.setter
+    def blackKey(self, c: QColor) -> None:
+        self._black_key = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def whiteBorder(self) -> QColor:
+        return self._white_border
+
+    @whiteBorder.setter
+    def whiteBorder(self, c: QColor) -> None:
+        self._white_border = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def blackBorder(self) -> QColor:
+        return self._black_border
+
+    @blackBorder.setter
+    def blackBorder(self, c: QColor) -> None:
+        self._black_border = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def activeKey(self) -> QColor:
+        return self._active_key
+
+    @activeKey.setter
+    def activeKey(self, c: QColor) -> None:
+        self._active_key = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def pedalColor(self) -> QColor:
+        return self._pedal_color
+
+    @pedalColor.setter
+    def pedalColor(self, c: QColor) -> None:
+        self._pedal_color = c
+        self.update()
+
+    # -- State ----------------------------------------------------------------
 
     def set_active_pitches(self, pitches: list):
         self.active_pitches = set(pitches)
@@ -51,9 +119,9 @@ class PianoWidget(QWidget):
         black_key_width = key_width * 0.65
         black_key_height = key_area_height * 0.6
 
-        white_brush = QBrush(QColor(230, 230, 240))
-        black_brush = QBrush(QColor(28, 28, 46))
-        active_brush = QBrush(QColor(78, 203, 141))   # theme accent green
+        white_brush = QBrush(self._white_key)
+        black_brush = QBrush(self._black_key)
+        active_brush = QBrush(self._active_key)
 
         white_idx = 0
         white_key_rects = {}
@@ -66,7 +134,7 @@ class PianoWidget(QWidget):
 
             brush = active_brush if p in self.active_pitches else white_brush
             painter.setBrush(brush)
-            painter.setPen(QPen(QColor(50, 50, 70), 1))
+            painter.setPen(QPen(self._white_border, 1))
             painter.drawRect(rect)
             white_idx += 1
 
@@ -81,20 +149,23 @@ class PianoWidget(QWidget):
 
             brush = active_brush if p in self.active_pitches else black_brush
             painter.setBrush(brush)
-            painter.setPen(QPen(QColor(15, 15, 30), 1))
+            painter.setPen(QPen(self._black_border, 1))
             painter.drawRect(rect)
 
         if self.show_pedal:
             strip_rect = QRectF(0, height - 12, width, 12)
             if self.pedal_active:
-                painter.fillRect(strip_rect, self.pedal_color)
+                painter.fillRect(strip_rect, self._pedal_color)
             else:
-                dim = QColor(self.pedal_color)
+                dim = QColor(self._pedal_color)
                 dim.setAlpha(40)
                 painter.fillRect(strip_rect, dim)
 
 
 class TimelineWidget(QWidget):
+    """Piano-roll + pedal strip timeline. Colors are supplied by QSS via
+    qproperty-*; setters apply the per-channel alpha and invalidate the cache."""
+
     seek_requested = Signal(float)
     scrub_position_changed = Signal(float)
 
@@ -112,13 +183,95 @@ class TimelineWidget(QWidget):
 
         self.cached_background = None
 
-        self.bg_color = QColor(24, 24, 40)
-        self.left_hand_color = QColor(91, 141, 238, 210)   # theme accent blue
-        self.right_hand_color = QColor(78, 203, 141, 210)  # theme accent green
-        self.unknown_color = QColor(100, 100, 140, 160)
-        self.cursor_color = QColor(220, 220, 240)
-        self.measure_line_color = QColor(255, 255, 255, 30)
-        self.pedal_color = QColor(232, 160, 32, 180)       # amber, semi-transparent
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._bg_color = QColor(24, 24, 40)
+        self._left_hand_color = QColor(91, 141, 238, 210)
+        self._right_hand_color = QColor(78, 203, 141, 210)
+        self._unknown_color = QColor(100, 100, 140, 160)
+        self._cursor_color = QColor(220, 220, 240)
+        self._measure_line_color = QColor(255, 255, 255, 30)
+        self._pedal_color = QColor(232, 160, 32, 180)
+
+    # -- QSS-driven color slots ----------------------------------------------
+
+    def _invalidate(self) -> None:
+        self.cached_background = None
+        self.update()
+
+    @pyqtProperty(QColor)
+    def bgColor(self) -> QColor:
+        return self._bg_color
+
+    @bgColor.setter
+    def bgColor(self, c: QColor) -> None:
+        self._bg_color = QColor(c)
+        self._invalidate()
+
+    @pyqtProperty(QColor)
+    def leftHandColor(self) -> QColor:
+        return self._left_hand_color
+
+    @leftHandColor.setter
+    def leftHandColor(self, c: QColor) -> None:
+        c = QColor(c)
+        c.setAlpha(210)
+        self._left_hand_color = c
+        self._invalidate()
+
+    @pyqtProperty(QColor)
+    def rightHandColor(self) -> QColor:
+        return self._right_hand_color
+
+    @rightHandColor.setter
+    def rightHandColor(self, c: QColor) -> None:
+        c = QColor(c)
+        c.setAlpha(210)
+        self._right_hand_color = c
+        self._invalidate()
+
+    @pyqtProperty(QColor)
+    def unknownColor(self) -> QColor:
+        return self._unknown_color
+
+    @unknownColor.setter
+    def unknownColor(self, c: QColor) -> None:
+        c = QColor(c)
+        c.setAlpha(160)
+        self._unknown_color = c
+        self._invalidate()
+
+    @pyqtProperty(QColor)
+    def cursorColor(self) -> QColor:
+        return self._cursor_color
+
+    @cursorColor.setter
+    def cursorColor(self, c: QColor) -> None:
+        self._cursor_color = QColor(c)
+        self.update()
+
+    @pyqtProperty(QColor)
+    def measureLineColor(self) -> QColor:
+        return self._measure_line_color
+
+    @measureLineColor.setter
+    def measureLineColor(self, c: QColor) -> None:
+        c = QColor(c)
+        c.setAlpha(30)
+        self._measure_line_color = c
+        self._invalidate()
+
+    @pyqtProperty(QColor)
+    def pedalColor(self) -> QColor:
+        return self._pedal_color
+
+    @pedalColor.setter
+    def pedalColor(self, c: QColor) -> None:
+        c = QColor(c)
+        c.setAlpha(180)
+        self._pedal_color = c
+        self._invalidate()
+
+    # -- State ----------------------------------------------------------------
 
     def set_data(self, notes: List[Note], duration: float, tempo_map: TempoMap = None):
         self.notes = notes
@@ -179,13 +332,13 @@ class TimelineWidget(QWidget):
 
         if self.cached_background is None or self.cached_background.size() != self.size():
             self.cached_background = QPixmap(self.size())
-            self.cached_background.fill(self.bg_color)
+            self.cached_background.fill(self._bg_color)
 
             cache_painter = QPainter(self.cached_background)
             cache_painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
             if self.tempo_map:
-                cache_painter.setPen(QPen(self.measure_line_color, 1))
+                cache_painter.setPen(QPen(self._measure_line_color, 1))
                 try:
                     boundaries = self.tempo_map.get_measure_boundaries(self.total_duration)
                     for start_t, end_t in boundaries:
@@ -213,11 +366,11 @@ class TimelineWidget(QWidget):
                     nh = 8
 
                     if note.hand == 'left':
-                        cache_painter.setBrush(QBrush(self.left_hand_color))
+                        cache_painter.setBrush(QBrush(self._left_hand_color))
                     elif note.hand == 'right':
-                        cache_painter.setBrush(QBrush(self.right_hand_color))
+                        cache_painter.setBrush(QBrush(self._right_hand_color))
                     else:
-                        cache_painter.setBrush(QBrush(self.unknown_color))
+                        cache_painter.setBrush(QBrush(self._unknown_color))
 
                     cache_painter.drawRect(QRectF(nx, ny, nw, nh))
 
@@ -226,7 +379,7 @@ class TimelineWidget(QWidget):
                 strip_h = 8
                 y = h - strip_h
                 cache_painter.setPen(Qt.PenStyle.NoPen)
-                cache_painter.setBrush(QBrush(self.pedal_color))
+                cache_painter.setBrush(QBrush(self._pedal_color))
                 for start, end in self.pedal_intervals:
                     px = (start / self.total_duration) * w
                     pw = max(1.0, (end - start) / self.total_duration * w)
@@ -240,5 +393,5 @@ class TimelineWidget(QWidget):
         painter.drawPixmap(0, 0, self.cached_background)
 
         cx = (self.current_time / self.total_duration) * w
-        painter.setPen(QPen(self.cursor_color, 2))
+        painter.setPen(QPen(self._cursor_color, 2))
         painter.drawLine(QPointF(cx, 0), QPointF(cx, h))

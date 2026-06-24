@@ -25,7 +25,7 @@ class TrackSelectionDialog(QDialog):
             "Optionally override the hand assignment for each track."
         )
         info_label.setWordWrap(True)
-        info_label.setProperty("role", "muted")
+        info_label.setProperty("variant", "muted")
         layout.addWidget(info_label)
 
         self.table = QTableWidget()
@@ -72,7 +72,7 @@ class TrackSelectionDialog(QDialog):
             self.table.setItem(i, 3, notes_item)
 
             combo = QComboBox()
-            combo.setStyleSheet("QComboBox { min-height: 0px; padding: 2px 8px; }")
+            combo.setProperty("variant", "compact")
             combo.setFixedHeight(28)
             combo.addItems(["Auto-Detect", "Left Hand", "Right Hand"])
             self.table.setCellWidget(i, 4, combo)

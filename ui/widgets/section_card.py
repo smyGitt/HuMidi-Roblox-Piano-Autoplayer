@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtProperty
 from PyQt6.QtGui import QPainter, QPen, QColor
 
 
@@ -7,8 +7,8 @@ class AnimatedDashedCard(QFrame):
     """QFrame subclass that draws an animated (marching-ants) dashed border.
 
     Used by make_card(dashed_border=True). The border is drawn entirely in
-    paintEvent; the CSS rule for section_card_dashed provides only the
-    background color. Call set_colors() on each theme change, and
+    paintEvent; the QSS rule for section_card_dashed provides the background
+    color and the borderColor/dragBorder via qproperty-*. Call
     set_drag_active() to switch to the accent-colored drag-over state.
     """
 
@@ -22,6 +22,7 @@ class AnimatedDashedCard(QFrame):
         self.setObjectName("section_card_dashed")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._dash_offset = 0.0
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._border_color = QColor("#32324a")
         self._drag_border  = QColor("#5b8dee")
         self._drag_bg      = QColor(91, 141, 238, 30)
@@ -30,10 +31,25 @@ class AnimatedDashedCard(QFrame):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
 
-    def set_colors(self, border: str, accent: str) -> None:
-        self._border_color = QColor(border)
-        self._drag_border  = QColor(accent)
-        drag_bg = QColor(accent)
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def borderColor(self) -> QColor:
+        return self._border_color
+
+    @borderColor.setter
+    def borderColor(self, c: QColor) -> None:
+        self._border_color = c
+        self.update()
+
+    @pyqtProperty(QColor)
+    def dragBorder(self) -> QColor:
+        return self._drag_border
+
+    @dragBorder.setter
+    def dragBorder(self, c: QColor) -> None:
+        self._drag_border = c
+        drag_bg = QColor(c)
         drag_bg.setAlphaF(0.12)
         self._drag_bg = drag_bg
         self.update()
@@ -107,7 +123,7 @@ def make_card(
 
     if title:
         lbl = QLabel(title)
-        lbl.setProperty("role", "section")
+        lbl.setProperty("variant", "section")
         if title_buttons:
             title_row = QHBoxLayout()
             title_row.setContentsMargins(row_h_pad, 0, row_h_pad, 0)

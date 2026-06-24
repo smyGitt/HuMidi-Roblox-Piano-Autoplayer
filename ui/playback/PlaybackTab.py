@@ -153,8 +153,7 @@ class PlaybackTab(QWidget):
         self.activity_log = QTextEdit()
         self.activity_log.setObjectName("activity_log")
         self.activity_log.setReadOnly(True)
-        self.activity_log.setFontFamily("JetBrains Mono")
-        self.activity_log.setFontPointSize(8)
+        self.activity_log.setProperty("variant", "mono_compact")
         self.activity_log.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -228,7 +227,7 @@ class PlaybackTab(QWidget):
         _invert_vbox.setSpacing(1)
         _invert_vbox.addWidget(self.invert_sway_check)
         _invert_desc = QLabel("flips the sway so the tempo slows down first, then speeds back up")
-        _invert_desc.setProperty("role", "muted")
+        _invert_desc.setProperty("variant", "muted")
         _invert_desc.setContentsMargins(36, 0, 0, 0)
         _invert_vbox.addWidget(_invert_desc)
         left_layout.addWidget(_invert_container)
@@ -367,10 +366,6 @@ class PlaybackTab(QWidget):
         self.all_humanization_checks['mistake_chance'].setChecked(False)
         self.all_humanization_spinboxes['mistake_chance'].setValue(0.5)
         self.update_enabled_states()
-
-    def redraw_saved_song_cards(self) -> None:
-        """Redraw saved song cards from cache with the current theme color."""
-        self._saved_panel.redraw_cards()
 
     def load_config(self, config: dict) -> None:
         self.tempo_spinbox.setValue(config.get('tempo', 100.0))

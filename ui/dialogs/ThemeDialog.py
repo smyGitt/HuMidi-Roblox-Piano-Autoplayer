@@ -144,11 +144,11 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
             return ("accent", "Accent")
         return ("text_secondary", "Muted Text")
 
-    if widget.property("role") == "card_reset":
+    if widget.property("variant") == "card_reset":
         return ("text_secondary", "Muted Text")
 
     if cls_name == "QLabel":
-        role = widget.property("role")
+        role = widget.property("variant")
         if role in ("muted", "placeholder", "section"):
             return ("text_secondary", "Muted Text")
         return ("text_primary", "Text")
@@ -388,14 +388,13 @@ class ThemeDialog(QDialog):
         QApplication.instance().installEventFilter(self._inspect_filter)
         self.finished.connect(self._cleanup_inspect)
 
-        _color_fn = lambda c: (c.text_secondary, c.text_primary)
         provider = IconProvider.instance()
         for _icon in (
             self._expand_panel_btn, self._collapse_panel_btn,
             self._new_btn, self._del_btn, self._rename_btn,
             self._export_btn, self._import_btn,
         ):
-            provider.register(_icon, _color_fn)
+            provider.register(_icon)
 
         self._apply_own_stylesheet()
         self._sync_toolbar_btn_widths()
@@ -413,14 +412,14 @@ class ThemeDialog(QDialog):
         toolbar.setSpacing(4)
 
         self._expand_panel_btn = PhIconLabel("palette", size=16, allow_vertical_expansion=True)
-        self._expand_panel_btn.setProperty("role", "icon_btn")
+        self._expand_panel_btn.setProperty("variant", "icon_btn")
         self._expand_panel_btn.setToolTip("Open color editor")
         self._expand_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._expand_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(True))
         toolbar.addWidget(self._expand_panel_btn)
 
         self._collapse_panel_btn = PhIconLabel("palette", size=16, allow_vertical_expansion=True)
-        self._collapse_panel_btn.setProperty("role", "icon_btn")
+        self._collapse_panel_btn.setProperty("variant", "icon_btn")
         self._collapse_panel_btn.setToolTip("Collapse color editor")
         self._collapse_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._collapse_panel_btn.clicked.connect(lambda: self._toggle_swatch_panel(False))
@@ -437,20 +436,20 @@ class ThemeDialog(QDialog):
         toolbar.addWidget(self._combo, 1)
 
         self._new_btn = PhIconLabel("new-theme", size=16, allow_vertical_expansion=True)
-        self._new_btn.setProperty("role", "icon_btn")
+        self._new_btn.setProperty("variant", "icon_btn")
         self._new_btn.setToolTip("Duplicate selected theme as a new custom preset")
         self._new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._new_btn.clicked.connect(self._on_new)
 
         self._del_btn = PhIconLabel("delete-theme", size=16, allow_vertical_expansion=True)
-        self._del_btn.setProperty("role", "icon_btn")
+        self._del_btn.setProperty("variant", "icon_btn")
         self._del_btn.setToolTip("Delete this custom theme (built-in themes cannot be deleted)")
         self._del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._del_btn.setEnabled(False)
         self._del_btn.clicked.connect(self._on_delete)
 
         self._rename_btn = PhIconLabel("rename-theme", size=16, allow_vertical_expansion=True)
-        self._rename_btn.setProperty("role", "icon_btn")
+        self._rename_btn.setProperty("variant", "icon_btn")
         self._rename_btn.setToolTip("Rename this custom theme")
         self._rename_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._rename_btn.setEnabled(False)
@@ -466,14 +465,14 @@ class ThemeDialog(QDialog):
         toolbar.addWidget(t_sep)
 
         self._export_btn = PhIconLabel("export-theme", size=16, allow_vertical_expansion=True)
-        self._export_btn.setProperty("role", "icon_btn")
+        self._export_btn.setProperty("variant", "icon_btn")
         self._export_btn.setToolTip("Export theme to JSON file")
         self._export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._export_btn.setEnabled(False)
         self._export_btn.clicked.connect(self._on_export)
 
         self._import_btn = PhIconLabel("import-theme", size=16, allow_vertical_expansion=True)
-        self._import_btn.setProperty("role", "icon_btn")
+        self._import_btn.setProperty("variant", "icon_btn")
         self._import_btn.setToolTip("Import theme from JSON file")
         self._import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._import_btn.clicked.connect(self._on_import)
@@ -553,7 +552,7 @@ class ThemeDialog(QDialog):
         header_h.setContentsMargins(8, 6, 8, 6)
         header_h.setSpacing(6)
         colors_lbl = QLabel("COLORS")
-        colors_lbl.setProperty("role", "section")
+        colors_lbl.setProperty("variant", "section")
         header_h.addWidget(colors_lbl)
         header_h.addStretch()
         content_v.addWidget(header_row)
@@ -579,7 +578,7 @@ class ThemeDialog(QDialog):
         for entry in _COLOR_GROUPS:
             if isinstance(entry, str):
                 group_lbl = QLabel(entry)
-                group_lbl.setProperty("role", "section")
+                group_lbl.setProperty("variant", "section")
                 group_lbl.setContentsMargins(0, 6 if grid_row == 0 else 10, 0, 2)
                 swatch_grid.addWidget(group_lbl, grid_row, 0, 1, 2)
                 grid_row += 1
@@ -618,7 +617,7 @@ class ThemeDialog(QDialog):
         outer.setSpacing(6)
 
         self._builtin_label = QLabel("Built-in (editing creates a copy)")
-        self._builtin_label.setProperty("role", "placeholder")
+        self._builtin_label.setProperty("variant", "placeholder")
         self._builtin_label.setVisible(False)
         outer.addWidget(self._builtin_label)
 
@@ -626,11 +625,11 @@ class ThemeDialog(QDialog):
         hdr_row.setContentsMargins(0, 0, 0, 0)
         hdr_row.setSpacing(6)
         preview_lbl = QLabel("PREVIEW")
-        preview_lbl.setProperty("role", "section")
+        preview_lbl.setProperty("variant", "section")
         hdr_row.addWidget(preview_lbl)
         hdr_row.addStretch()
         self._inspect_hint = QLabel("")
-        self._inspect_hint.setProperty("role", "muted")
+        self._inspect_hint.setProperty("variant", "muted")
         hdr_row.addWidget(self._inspect_hint)
         self._inspect_btn = QPushButton("  Right click edit mode")
         self._inspect_btn.setCheckable(True)
@@ -681,7 +680,7 @@ class ThemeDialog(QDialog):
         pedal_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         pedal_swatch.setFixedSize(14, 14)
         pedal_lbl = QLabel("Pedal Color")
-        pedal_lbl.setProperty("role", "muted")
+        pedal_lbl.setProperty("variant", "muted")
         swatch_strip.addWidget(pedal_swatch)
         swatch_strip.addWidget(pedal_lbl)
 
@@ -692,7 +691,7 @@ class ThemeDialog(QDialog):
         border_swatch.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         border_swatch.setFixedSize(14, 14)
         border_lbl = QLabel("Borders")
-        border_lbl.setProperty("role", "muted")
+        border_lbl.setProperty("variant", "muted")
         swatch_strip.addWidget(border_swatch)
         swatch_strip.addWidget(border_lbl)
 
@@ -769,7 +768,7 @@ class ThemeDialog(QDialog):
         title_h.addStretch()
         for sym in ("–", "□", "×"):  # en-dash, square, multiplication sign
             lbl = QLabel(sym)
-            lbl.setProperty("role", "muted")
+            lbl.setProperty("variant", "muted")
             title_h.addWidget(lbl)
         return title_bar
 
@@ -847,11 +846,11 @@ class ThemeDialog(QDialog):
         title_row = QHBoxLayout()
         title_row.setSpacing(3)
         title = QLabel("PERFORMANCE")
-        title.setProperty("role", "section")
+        title.setProperty("variant", "section")
         title_row.addWidget(title)
         title_row.addStretch()
         self._prev_reset_btn = QPushButton()
-        self._prev_reset_btn.setProperty("role", "card_reset")
+        self._prev_reset_btn.setProperty("variant", "card_reset")
         self._prev_reset_btn.setFixedSize(14, 14)
         self._prev_reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         title_row.addWidget(self._prev_reset_btn)
@@ -864,7 +863,7 @@ class ThemeDialog(QDialog):
         tempo_labels.setContentsMargins(0, 0, 0, 0)
         tempo_lbl = QLabel("Tempo")
         tempo_desc = QLabel("% of original")
-        tempo_desc.setProperty("role", "muted")
+        tempo_desc.setProperty("variant", "muted")
         tempo_labels.addWidget(tempo_lbl)
         tempo_labels.addWidget(tempo_desc)
         tempo_row.addLayout(tempo_labels)
@@ -887,7 +886,7 @@ class ThemeDialog(QDialog):
         pedal_labels.setContentsMargins(0, 0, 0, 0)
         pedal_lbl = QLabel("Pedal")
         pedal_desc = QLabel("generation algorithm")
-        pedal_desc.setProperty("role", "muted")
+        pedal_desc.setProperty("variant", "muted")
         pedal_labels.addWidget(pedal_lbl)
         pedal_labels.addWidget(pedal_desc)
         pedal_row.addLayout(pedal_labels)
@@ -905,13 +904,13 @@ class ThemeDialog(QDialog):
         v.setContentsMargins(6, 3, 6, 4)
         v.setSpacing(2)
         title = QLabel("OPTIONS")
-        title.setProperty("role", "section")
+        title.setProperty("variant", "section")
         v.addWidget(title)
         self._prev_check = ToggleSwitch("88-Key Layout")
         self._prev_check.setChecked(True)
         v.addWidget(self._prev_check)
         check_desc = QLabel("Map to the full 88-key piano")
-        check_desc.setProperty("role", "muted")
+        check_desc.setProperty("variant", "muted")
         check_desc.setContentsMargins(36, 0, 0, 0)
         v.addWidget(check_desc)
         return card
@@ -1202,15 +1201,10 @@ class ThemeDialog(QDialog):
     # ── Helpers ───────────────────────────────────────────────────────
 
     def _refresh_io_icons(self, colors: ThemeColors) -> None:
-        normal, hover = colors.text_secondary, colors.text_primary
-        self._new_btn.set_colors(normal, hover)
-        self._del_btn.set_colors(normal, hover)
-        self._rename_btn.set_colors(normal, hover)
-        self._export_btn.set_colors(normal, hover)
-        self._import_btn.set_colors(normal, hover)
-        self._expand_panel_btn.set_colors(normal, hover)
-        self._collapse_panel_btn.set_colors(normal, hover)
-        self._inspect_btn.setIcon(ph_icon("inspect-mode", normal))
+        # Toolbar PhIconLabels are recolored by the dialog stylesheet via
+        # qproperty-*. Only the inspect button (a plain QPushButton) needs an
+        # explicit icon render here.
+        self._inspect_btn.setIcon(ph_icon("inspect-mode", colors.text_secondary))
 
     def _preview(self, theme: ThemeColors) -> None:
         """Apply the previewed theme to the preview panel only."""
@@ -1247,14 +1241,8 @@ class ThemeDialog(QDialog):
         for icon_lbl, icon_name, is_active in self._prev_nav_icon_labels:
             color = theme.text_primary if is_active else theme.text_secondary
             icon_lbl.setPixmap(ph_icon(icon_name, color, _ni).pixmap(_ni * 2, _ni * 2))
-        self._prev_check.update_colors(
-            track_off=theme.toggle_off,
-            track_on=theme.toggle_on,
-            knob=theme.knob_color,
-            text_col=theme.text_primary,
-            dis_text=_mix(theme.text_primary, theme.bg_primary, 0.65),
-            dis_track=_mix(theme.border, theme.bg_primary, 0.50),
-        )
+        # _prev_check (ToggleSwitch) is re-colored by the preview stylesheet via
+        # qproperty-*; no manual color push is needed here.
         if self._hover_overlay is not None:
             self._hover_overlay.set_accent(theme.accent)
 
@@ -1289,7 +1277,8 @@ class ThemeDialog(QDialog):
         if active:
             self._inspect_hint.setText("Right-click any element to pick its color")
             shape = Qt.CursorShape.CrossCursor
-            accent = self._current_theme.accent if self._current_theme else "#5b8dee"
+            accent = (self._current_theme.accent if self._current_theme
+                      else ThemeManager.get_active().accent)
             self._hover_overlay = _HoverOverlay(self._preview_panel, accent)
             self._hover_overlay.show()
             self._last_polled_widget = None

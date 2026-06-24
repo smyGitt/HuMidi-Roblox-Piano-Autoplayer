@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, QTimer, QByteArray
+from PyQt6.QtCore import Qt, QTimer, QByteArray, pyqtProperty
 from PyQt6.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import QFrame, QLabel
@@ -95,7 +95,8 @@ class StatusIndicator(QFrame):
                   the last frame rotated 90 degrees to create a flip effect).
       READY    -- themed green dot, shown when a file is compiled and ready to play.
 
-    Call update_colors(icon_hex, ready_hex, unload_hex) on every theme change.
+    Colors are supplied by QSS via qproperty-* (iconColor, readyColor,
+    unloadColor, loadedColor); the status label color is styled via QSS.
     The icon slot is 22x22 at x=12 and the text label spans x=44 to x=244,
     matching NavButton geometry exactly so sidebar clipping is the only visibility
     mechanism needed.
@@ -114,10 +115,11 @@ class StatusIndicator(QFrame):
         self.setFixedHeight(48)
 
         self._state        = self.UNLOADED
-        self._icon_color   = "#888888"
-        self._ready_color  = "#52b752"
-        self._unload_color = "#c44b4b"
-        self._loaded_color = "#c9a535"
+        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
+        self._icon_color   = QColor("#888888")
+        self._ready_color  = QColor("#52b752")
+        self._unload_color = QColor("#c44b4b")
+        self._loaded_color = QColor("#c9a535")
 
         self._frames: list[QPixmap] = []
         self._frame_idx = 0
@@ -139,7 +141,7 @@ class StatusIndicator(QFrame):
         self._text_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-        self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color))
+        self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
 
     # -- Public API -----------------------------------------------------------
 
@@ -147,23 +149,55 @@ class StatusIndicator(QFrame):
     def state(self) -> str:
         return self._state
 
-    def update_colors(self, icon_hex: str, ready_hex: str, unload_hex: str, loaded_hex: str) -> None:
+    # -- QSS-driven color slots ----------------------------------------------
+
+    @pyqtProperty(QColor)
+    def iconColor(self) -> QColor:
+        return self._icon_color
+
+    @iconColor.setter
+    def iconColor(self, c: QColor) -> None:
+        self._icon_color = c
+        self._apply_visuals()
+
+    @pyqtProperty(QColor)
+    def readyColor(self) -> QColor:
+        return self._ready_color
+
+    @readyColor.setter
+    def readyColor(self, c: QColor) -> None:
+        self._ready_color = c
+        self._apply_visuals()
+
+    @pyqtProperty(QColor)
+    def unloadColor(self) -> QColor:
+        return self._unload_color
+
+    @unloadColor.setter
+    def unloadColor(self, c: QColor) -> None:
+        self._unload_color = c
+        self._apply_visuals()
+
+    @pyqtProperty(QColor)
+    def loadedColor(self) -> QColor:
+        return self._loaded_color
+
+    @loadedColor.setter
+    def loadedColor(self, c: QColor) -> None:
+        self._loaded_color = c
+        self._apply_visuals()
+
+    def _apply_visuals(self) -> None:
         """Rebuild animation frames and re-render the current state dot/icon."""
-        self._icon_color   = icon_hex
-        self._ready_color  = ready_hex
-        self._unload_color = unload_hex
-        self._loaded_color = loaded_hex
-        self._text_lbl.setStyleSheet(f"color: {icon_hex};")
-        self._frames = self._build_frames(icon_hex)
-        # Refresh displayed pixmap for the current state
+        self._frames = self._build_frames(self._icon_color.name())
         if self._state == self.LOADING and self._frames:
             self._icon_lbl.setPixmap(self._frames[self._frame_idx])
         elif self._state == self.READY:
-            self._icon_lbl.setPixmap(_dot_pixmap(ready_hex))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._ready_color.name()))
         elif self._state == self.LOADED:
-            self._icon_lbl.setPixmap(_dot_pixmap(loaded_hex))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._loaded_color.name()))
         else:
-            self._icon_lbl.setPixmap(_dot_pixmap(unload_hex))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
 
     def set_state(self, state: str, text: str | None = None) -> None:
         """Transition to state and optionally update the text label."""
@@ -176,16 +210,16 @@ class StatusIndicator(QFrame):
                 self._icon_lbl.setPixmap(self._frames[0])
                 self._timer.start()
             else:
-                self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color))
+                self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
         elif state == self.READY:
             self._timer.stop()
-            self._icon_lbl.setPixmap(_dot_pixmap(self._ready_color))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._ready_color.name()))
         elif state == self.LOADED:
             self._timer.stop()
-            self._icon_lbl.setPixmap(_dot_pixmap(self._loaded_color))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._loaded_color.name()))
         else:  # UNLOADED
             self._timer.stop()
-            self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color))
+            self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
 
     def set_text(self, text: str) -> None:
         """Update the label text without changing state."""

@@ -45,7 +45,7 @@ class HumRow(QWidget):
             check_vbox.setSpacing(1)
             check_vbox.addWidget(self.check)
             desc_label = QLabel(desc)
-            desc_label.setProperty("role", "muted")
+            desc_label.setProperty("variant", "muted")
             desc_label.setContentsMargins(36, 0, 0, 0)
             check_vbox.addWidget(desc_label)
             grid.addWidget(check_container, 0, 0)

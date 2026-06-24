@@ -10,7 +10,6 @@ from PyQt6.QtCore import Qt, pyqtSignal as Signal
 from ui.playback.clickable_save_card import ClickableSaveCard
 from ui.widgets.ph_icon_label import PhIconLabel
 from ui.widgets.section_card import make_card
-from ui.theme import ThemeManager
 
 
 class SavedSongsPanel(QWidget):
@@ -131,13 +130,9 @@ class SavedSongsPanel(QWidget):
 
         if not self._saves_cache:
             empty = QLabel("No saved songs.")
-            empty.setProperty("role", "muted")
+            empty.setProperty("variant", "muted")
             self._saved_songs_list_layout.addWidget(empty)
             return
-
-        themes = ThemeManager.all_themes()
-        active = themes.get(ThemeManager.get_active_name())
-        icon_color = active.text_secondary if active else "#888888"
 
         for save in self._saves_cache[:self._SAVE_CARD_MAX]:
             created_str = self._format_save_timestamp(save['created'])
@@ -148,7 +143,6 @@ class SavedSongsPanel(QWidget):
                 save['save_name'],
                 save['song_name'],
                 time_str=time_str,
-                icon_color=icon_color,
             )
             card.clicked.connect(
                 lambda fp=save['filepath'], sn=save['save_name'], mn=save['song_name']:
@@ -163,10 +157,6 @@ class SavedSongsPanel(QWidget):
             card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             self._saved_songs_list_layout.addWidget(card)
         self._saved_songs_list_layout.addStretch()
-
-    def redraw_cards(self) -> None:
-        """Redraw save cards from cache with the current theme color. Call after a theme change."""
-        self._render_saved_songs()
 
     @staticmethod
     def _format_save_timestamp(ts: str) -> str:
