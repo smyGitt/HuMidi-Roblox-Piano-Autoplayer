@@ -189,6 +189,12 @@ class MainWindow(QMainWindow):
         self.playback_controller.save_failed.connect(self._on_save_failed)
         self.playback_controller.preparation_started.connect(self._on_preparation_started)
         self.playback_controller.playback_started.connect(self._on_playback_started)
+        self.playback_controller.ai_pedal_thresholds_ready.connect(
+            self.ui.playback_tab.set_ai_thresholds
+        )
+        self.playback_controller.ai_pedal_stats_ready.connect(
+            self.ui.playback_tab.set_ai_pedal_stats
+        )
 
     # --- Windows Specific GUI Modifications ---
     def _toggle_always_on_top(self, checked):
@@ -349,6 +355,7 @@ class MainWindow(QMainWindow):
         self.state.parsed_tracks = None
         self.state.loaded_pedal_count = 0
         self.ui.playback_tab.clear_loaded_summary()
+        self.ui.playback_tab.update_bpm_display(0.0)
         self.ui.playback_tab.set_groups_enabled(True)
         self.ui.update_file_label(os.path.basename(filepath), filepath)
         self.ui.log_output.append(f"Selected file: {filepath}")
@@ -442,6 +449,18 @@ class MainWindow(QMainWindow):
         self.state.parsed_tracks = tracks
         self.state.loaded_pedal_count = pedal_count
         self.state.parsed_tempo_map = tempo_map
+
+        _events = tempo_map.events
+        # events[0] is always a synthetic default entry (GlobalTickMap always
+        # prepends it at tick 0 with 500000 us). The real first set_tempo event
+        # lands at events[1] when the MIDI places it even one tick after tick 0,
+        # which gives a tiny positive time_sec that get_tempo_at(0.0) misses.
+        # Using events[1] directly (if it starts within 5 s) avoids that gap.
+        if len(_events) > 1 and _events[1][0] <= 5.0:
+            _initial_tempo_us = _events[1][1]
+        else:
+            _initial_tempo_us = _events[0][1] if _events else 500000
+        self.ui.playback_tab.update_bpm_display(60_000_000 / _initial_tempo_us)
 
         dialog = TrackSelectionDialog(tracks, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:

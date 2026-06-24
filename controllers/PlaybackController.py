@@ -107,10 +107,12 @@ class _PrepareWorker(QObject):
     a window close mid-preparation bails out instead of pushing a Player onto a
     torn-down controller.
     """
-    status_updated  = Signal(str)
-    prepare_finished = Signal(object, object, object, float, object)  # notes, compiled_events, tempo_map, total_dur, pedal_intervals
-    error_occurred  = Signal(str)
-    finished        = Signal()
+    status_updated      = Signal(str)
+    prepare_finished    = Signal(object, object, object, float, object)  # notes, compiled_events, tempo_map, total_dur, pedal_intervals
+    ai_thresholds_ready = Signal(float, float)  # threshold_on, threshold_off (raw sigmoid)
+    pedal_stats_ready   = Signal(float, float, float, float)  # avg_dur, min_dur, max_dur, presses_per_min
+    error_occurred      = Signal(str)
+    finished            = Signal()
 
     def __init__(self, config: Dict, selected_tracks_info: List = None,
                  notes: List = None, tempo_map: TempoMap = None):
@@ -169,8 +171,11 @@ class _PrepareWorker(QObject):
         total_dur = max((n.end_time for n in final_notes), default=1.0) if final_notes else 1.0
 
         self.status_updated.emit("Compiling playback events...")
+        out_meta: dict = {}
         try:
-            compiled_events = compile_events(self.config, final_notes, sections, log=debug_log)
+            compiled_events = compile_events(
+                self.config, final_notes, sections, log=debug_log, out_meta=out_meta
+            )
         except Exception as e:
             self.error_occurred.emit(f"Error compiling playback:\n{e}")
             self.finished.emit()
@@ -183,6 +188,19 @@ class _PrepareWorker(QObject):
         pedal_intervals = _extract_pedal_intervals(
             [ev for ev in compiled_events if ev.action == 'pedal']
         )
+
+        if 'threshold_on' in out_meta and 'threshold_off' in out_meta:
+            self.ai_thresholds_ready.emit(
+                float(out_meta['threshold_on']),
+                float(out_meta['threshold_off']),
+            )
+            if pedal_intervals:
+                durations = [end - start for start, end in pedal_intervals]
+                avg_dur = sum(durations) / len(durations)
+                min_dur = min(durations)
+                max_dur = max(durations)
+                presses_per_min = len(pedal_intervals) / (total_dur / 60.0) if total_dur > 0 else 0.0
+                self.pedal_stats_ready.emit(avg_dur, min_dur, max_dur, presses_per_min)
 
         self.prepare_finished.emit(final_notes, compiled_events, tempo_map, total_dur, pedal_intervals)
         self.finished.emit()
@@ -332,6 +350,11 @@ class PlaybackController(QObject):
     preparation_started = Signal()   # emitted when heavy preparation begins (any play path)
     playback_started    = Signal()   # emitted just before the Player QThread starts
 
+    # AI pedal threshold feedback: emitted after successful AI inference so the
+    # UI can show the auto-computed values and allow user adjustment.
+    ai_pedal_thresholds_ready = Signal(float, float)        # threshold_on, threshold_off
+    ai_pedal_stats_ready      = Signal(float, float, float, float)  # avg_dur, min_dur, max_dur, presses_per_min
+
     def __init__(self):
         super().__init__()
         self.player         = None
@@ -472,6 +495,8 @@ class PlaybackController(QObject):
         self._prepare_thread.started.connect(self._prepare_worker.run)
         self._prepare_worker.status_updated.connect(self.status_updated)
         self._prepare_worker.prepare_finished.connect(self._on_prepare_finished)
+        self._prepare_worker.ai_thresholds_ready.connect(self.ai_pedal_thresholds_ready)
+        self._prepare_worker.pedal_stats_ready.connect(self.ai_pedal_stats_ready)
         self._prepare_worker.error_occurred.connect(self._on_prepare_error)
         self._prepare_worker.finished.connect(self._on_prepare_cleanup)
 

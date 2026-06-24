@@ -32,6 +32,8 @@ class PedalConfig(TypedDict, total=False):
     """Keys consumed by pedal_generator.generate_events."""
     pedal_style: str
     use_ai_pedal: bool
+    pedal_threshold_on: float   # raw sigmoid threshold for pedal-down edge; -1.0 = auto
+    pedal_threshold_off: float  # raw sigmoid threshold for pedal-up edge; -1.0 = auto
 
 
 class PlaybackOptions(TypedDict, total=False):

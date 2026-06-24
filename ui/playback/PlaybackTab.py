@@ -1,11 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QFrame, QStackedWidget, QScrollArea, QTextEdit, QSizePolicy)
+    QLabel, QFrame, QStackedWidget, QScrollArea, QSizePolicy, QDoubleSpinBox)
 from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
 from ui.widgets import make_card
 from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.ph_icon_label import PhIconLabel
+from ui.widgets.slider_spinbox import make_slider_spinbox
 from ui.playback.sub_tab_bar import SubTabBar
 from ui.playback.file_strip import FileStrip
 from ui.playback.midi_drop_zone import MidiDropZone
@@ -15,6 +16,7 @@ from ui.playback.performance_card import PerformanceCard
 from ui.playback.options_card import OptionsCard
 from ui.playback.humanize_master_row import HumanizeMasterRow
 from ui.playback.hum_row import HumRow
+from ui.playback.pedal_ai_card import PedalAICard
 
 
 class PlaybackTab(QWidget):
@@ -28,6 +30,7 @@ class PlaybackTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._original_bpm: float = 0.0
         self._setup_ui()
 
     def _setup_ui(self):
@@ -128,8 +131,6 @@ class PlaybackTab(QWidget):
         self._perf_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.tempo_slider      = self._perf_card.tempo_slider
-        self.tempo_spinbox     = self._perf_card.tempo_spinbox
         self.pedal_style_combo = self._perf_card.pedal_style_combo
         self.transpose_spinbox = self._perf_card.transpose_spinbox
         self.perf_reset_icon   = self._perf_card.reset_icon
@@ -148,24 +149,95 @@ class PlaybackTab(QWidget):
         row1.addWidget(self._perf_card, 1)
         row1.addWidget(self._opts_card, 1)
 
-        # Row 2: ACTIVITY log spanning full width, fills remaining height.
-        act_card, act_layout = make_card("ACTIVITY")
-        self.activity_log = QTextEdit()
-        self.activity_log.setObjectName("activity_log")
-        self.activity_log.setReadOnly(True)
-        self.activity_log.setProperty("variant", "mono_compact")
-        self.activity_log.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        self.activity_log.setMinimumHeight(60)
-        act_layout.addWidget(self.activity_log, 1)
-        act_card.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
+        # Row 2: TEMPO card spanning full width.
+        tempo_card, tempo_body = make_card("TEMPO")
+        tempo_row = QHBoxLayout()
+        tempo_row.setSpacing(8)
 
-        layout.addLayout(row1)
-        layout.addWidget(act_card, 1)
+        _label_container = QWidget()
+        _lbl_vbox = QVBoxLayout(_label_container)
+        _lbl_vbox.setContentsMargins(0, 0, 0, 0)
+        _lbl_vbox.setSpacing(1)
+        _lbl_vbox.addWidget(QLabel("Tempo"))
+        _tempo_desc = QLabel("speed multiplier")
+        _tempo_desc.setProperty("variant", "muted")
+        _lbl_vbox.addWidget(_tempo_desc)
+
+        self.tempo_slider, self.tempo_spinbox = make_slider_spinbox(
+            0.1, 10.0, 1.0, "x", factor=100.0, decimals=2
+        )
+        self.tempo_spinbox.setFixedWidth(72)
+        self.tempo_slider.setToolTip("Playback speed as a multiplier of the original tempo")
+        self.tempo_spinbox.setToolTip("Playback speed as a multiplier of the original tempo")
+
+        tempo_row.addWidget(_label_container)
+        tempo_row.addWidget(self.tempo_slider, 1)
+        tempo_row.addWidget(self.tempo_spinbox)
+        tempo_body.addLayout(tempo_row)
+
+        bpm_row = QHBoxLayout()
+        bpm_row.setContentsMargins(0, 2, 0, 0)
+        bpm_row.setSpacing(4)
+        bpm_row.addStretch(1)
+        _orig_prefix = QLabel("Original:")
+        _orig_prefix.setProperty("variant", "muted")
+        self._bpm_original_label = QLabel("-- BPM")
+        _sep = QLabel("·")
+        _sep.setProperty("variant", "muted")
+        _target_prefix = QLabel("Target:")
+        _target_prefix.setProperty("variant", "muted")
+        self.target_bpm_spinbox = QDoubleSpinBox()
+        self.target_bpm_spinbox.setRange(1.0, 9999.0)
+        self.target_bpm_spinbox.setDecimals(1)
+        self.target_bpm_spinbox.setSuffix(" BPM")
+        self.target_bpm_spinbox.setFixedWidth(100)
+        self.target_bpm_spinbox.setEnabled(False)
+        self.target_bpm_spinbox.setButtonSymbols(
+            QDoubleSpinBox.ButtonSymbols.NoButtons
+        )
+        bpm_row.addWidget(_orig_prefix)
+        bpm_row.addWidget(self._bpm_original_label)
+        bpm_row.addSpacing(8)
+        bpm_row.addWidget(_sep)
+        bpm_row.addSpacing(8)
+        bpm_row.addWidget(_target_prefix)
+        bpm_row.addWidget(self.target_bpm_spinbox)
+        bpm_row.addStretch(1)
+        tempo_body.addLayout(bpm_row)
+        tempo_body.addStretch()
+
+        self.tempo_spinbox.valueChanged.connect(self._update_result_bpm)
+        self.target_bpm_spinbox.editingFinished.connect(self._on_target_bpm_edited)
+
+        # Row 3: PEDAL AI THRESHOLDS card (full width; locked until first AI generation).
+        self._pedal_ai_card = PedalAICard()
+        self.pedal_ai_reset_icon = self._pedal_ai_card.reset_icon
+
+        layout.addLayout(row1, 1)
+        layout.addWidget(tempo_card)
+        layout.addWidget(self._pedal_ai_card)
         return page
+
+    # -- BPM display ----------------------------------------------------------
+
+    def update_bpm_display(self, original_bpm: float) -> None:
+        self._original_bpm = original_bpm
+        self.target_bpm_spinbox.setEnabled(original_bpm > 0)
+        self._update_result_bpm(self.tempo_spinbox.value())
+
+    def _update_result_bpm(self, multiplier: float) -> None:
+        if self._original_bpm > 0:
+            self._bpm_original_label.setText(f"{self._original_bpm:.1f} BPM")
+            self.target_bpm_spinbox.setValue(self._original_bpm * multiplier)
+        else:
+            self._bpm_original_label.setText("-- BPM")
+
+    def _on_target_bpm_edited(self) -> None:
+        if self._original_bpm <= 0:
+            return
+        multiplier = self.target_bpm_spinbox.value() / self._original_bpm
+        multiplier = max(0.1, min(10.0, multiplier))
+        self.tempo_slider.setValue(int(round(multiplier * 100.0)))
 
     # -- Tab III: Humanize ----------------------------------------------------
 
@@ -289,13 +361,22 @@ class PlaybackTab(QWidget):
 
     # -- Public API -----------------------------------------------------------
 
+    def set_ai_thresholds(self, threshold_on: float, threshold_off: float) -> None:
+        """Populate the PEDAL AI THRESHOLDS card with auto-computed values.
+
+        Called by MainWindow after the first successful AI pedal generation.
+        Enables the threshold spinboxes for user adjustment.
+        """
+        self._pedal_ai_card.set_thresholds(threshold_on, threshold_off)
+
+    def set_ai_pedal_stats(self, avg_dur: float, min_dur: float, max_dur: float, presses_per_min: float) -> None:
+        """Populate the pedal stats section of the PEDAL AI THRESHOLDS card."""
+        self._pedal_ai_card.set_stats(avg_dur, min_dur, max_dur, presses_per_min)
+
     def update_file_label(self, text: str, tooltip: str = "") -> None:
         self.file_path_label.setText(text)
         self.file_path_label.setToolTip(tooltip)
         self.file_strip.update_file(text)
-
-    def log_activity(self, msg: str) -> None:
-        self.activity_log.append(msg)
 
     def update_loaded_summary(self, parts: list, pedal_count: int) -> None:
         """Refresh the LOADED row from live (MidiTrack, role) pairs."""
@@ -318,6 +399,7 @@ class PlaybackTab(QWidget):
         if not skip_playback_humanization:
             self.tempo_slider.setEnabled(enabled)
             self.tempo_spinbox.setEnabled(enabled)
+            self.target_bpm_spinbox.setEnabled(enabled and self._original_bpm > 0)
             self.pedal_style_combo.setEnabled(enabled)
             self.transpose_spinbox.setEnabled(enabled)
             self.use_88_key_check.setEnabled(enabled)
@@ -328,6 +410,7 @@ class PlaybackTab(QWidget):
                      list(self.all_humanization_sliders.values()) + \
                      list(self.all_humanization_spinboxes.values()):
                 w.setEnabled(enabled)
+            self._pedal_ai_card.set_spinboxes_enabled(enabled)
 
     def update_enabled_states(self) -> None:
         for key, check in self.all_humanization_checks.items():
@@ -343,6 +426,8 @@ class PlaybackTab(QWidget):
         )
 
     def reset_to_default(self) -> None:
+        self.tempo_slider.setValue(int(1.0 * 100.0))
+        self.tempo_spinbox.setValue(1.0)
         self._perf_card.reset_to_default()
         self._opts_card.reset_to_default()
         self._humanize_master.reset_to_default()
@@ -368,7 +453,9 @@ class PlaybackTab(QWidget):
         self.update_enabled_states()
 
     def load_config(self, config: dict) -> None:
-        self.tempo_spinbox.setValue(config.get('tempo', 100.0))
+        _multiplier = config.get('tempo', 100.0) / 100.0
+        self.tempo_slider.setValue(int(_multiplier * 100.0))
+        self.tempo_spinbox.setValue(_multiplier)
         self.transpose_spinbox.setValue(config.get('transpose', 0))
         display = self.PEDAL_MAPPING_INV.get(
             config.get('pedal_style', 'hybrid'), "Auto (Default)"
@@ -425,13 +512,22 @@ class PlaybackTab(QWidget):
         internal = self.PEDAL_MAPPING.get(
             self.pedal_style_combo.currentText(), 'hybrid'
         )
+        uses_ai = internal in ('ai', 'hybrid')
+        if uses_ai and self._pedal_ai_card.has_thresholds:
+            t_on  = self._pedal_ai_card.get_threshold_on()
+            t_off = self._pedal_ai_card.get_threshold_off()
+        else:
+            t_on  = -1.0
+            t_off = -1.0
         return {
             'midi_file':               self.file_path_label.toolTip(),
-            'tempo':                   self.tempo_spinbox.value(),
+            'tempo':                   self.tempo_spinbox.value() * 100.0,
             'transpose':               self.transpose_spinbox.value(),
             'countdown':               self.countdown_check.isChecked(),
             'use_88_key_layout':       self.use_88_key_check.isChecked(),
             'pedal_style':             internal,
+            'pedal_threshold_on':      t_on,
+            'pedal_threshold_off':     t_off,
             'debug_mode':              self.debug_check.isChecked(),
             'simulate_hands':          self.all_humanization_checks['simulate_hands'].isChecked(),
             'vary_velocity':           False,
@@ -454,7 +550,7 @@ class PlaybackTab(QWidget):
             self.pedal_style_combo.currentText(), 'hybrid'
         )
         return {
-            'tempo':                      self.tempo_spinbox.value(),
+            'tempo':                      self.tempo_spinbox.value() * 100.0,
             'transpose':                  self.transpose_spinbox.value(),
             'pedal_style':                internal,
             'use_88_key_layout':          self.use_88_key_check.isChecked(),

@@ -24,6 +24,10 @@ class PedalStrategy(Protocol):
     list, and returns a sorted list of pedal KeyEvents. To add a new strategy:
     define a function with this signature and register it in _STRATEGY_MAP.
     generate_events never needs to change.
+
+    out_meta: optional dict populated by AI strategies with the thresholds that
+    were actually used (keys: 'threshold_on', 'threshold_off'). Ignored by
+    non-AI strategies. Only populated when AI pedal succeeds (not on fallback).
     """
 
     def __call__(
@@ -32,6 +36,7 @@ class PedalStrategy(Protocol):
         notes: List[Note],
         sections: List[MusicalSection],
         debug_log: Optional[Callable[[str], None]] = None,
+        out_meta: Optional[dict] = None,
     ) -> List[KeyEvent]: ...
 
 
@@ -161,8 +166,13 @@ def _otsu_threshold(preds: np.ndarray) -> float:
     return float(bin_edges[best_idx + 1])
 
 
-def _generate_ai_pedal(notes: List[Note],
-                       debug_log: Optional[Callable[[str], None]]) -> List[KeyEvent]:
+def _generate_ai_pedal(
+    notes: List[Note],
+    debug_log: Optional[Callable[[str], None]],
+    threshold_on: Optional[float] = None,
+    threshold_off: Optional[float] = None,
+    out_meta: Optional[dict] = None,
+) -> List[KeyEvent]:
     global _weights
     fps = 50.0
 
@@ -227,33 +237,41 @@ def _generate_ai_pedal(notes: List[Note],
     otsu_split = _otsu_threshold(normed)
     on_group  = normed[normed >  otsu_split]
     off_group = normed[normed <= otsu_split]
-    if len(on_group) > 0 and len(off_group) > 0:
-        on_min  = float(np.min(on_group));  on_max  = float(np.max(on_group))
-        on_median = float(np.median(on_group))
-        on_spread = on_max - on_min
-        on_ratio  = (on_median - on_min) / on_spread if on_spread > 0 else 0.0
-        on_pct    = on_ratio * 10.45
-
-        off_min = float(np.min(off_group)); off_max = float(np.max(off_group))
-        off_median = float(np.median(off_group))
-        off_spread = off_max - off_min
-        off_ratio  = (off_median - off_min) / off_spread if off_spread > 0 else 0.0
-        off_pct    = 100 - off_ratio * 6
-
-        norm_on  = float(np.percentile(on_group,  on_pct))
-        norm_off = float(np.percentile(off_group, off_pct))
-        threshold_on  = norm_on  * ap_range + ap_min
-        threshold_off = norm_off * ap_range + ap_min
+    using_custom = threshold_on is not None and threshold_off is not None
+    if using_custom:
+        if debug_log is not None:
+            debug_log(
+                f"[PEDAL] Using custom thresholds: on={threshold_on:.4f} off={threshold_off:.4f} "
+                f"(range: [{ap_min:.4f}, {ap_max:.4f}], active frames: {len(active_preds)})"
+            )
     else:
-        on_pct = 0.0; off_pct = 100.0
-        threshold_on  = otsu_split * ap_range + ap_min
-        threshold_off = threshold_on
-    if debug_log is not None:
-        debug_log(
-            f"[PEDAL] range: [{ap_min:.4f}, {ap_max:.4f}], Otsu (normed): {otsu_split:.4f}, "
-            f"on (P{on_pct:.1f}): {threshold_on:.4f}, off (P{off_pct:.1f}): {threshold_off:.4f} "
-            f"(active frames: {len(active_preds)})"
-        )
+        if len(on_group) > 0 and len(off_group) > 0:
+            on_min  = float(np.min(on_group));  on_max  = float(np.max(on_group))
+            on_median = float(np.median(on_group))
+            on_spread = on_max - on_min
+            on_ratio  = (on_median - on_min) / on_spread if on_spread > 0 else 0.0
+            on_pct    = on_ratio * 10.45
+
+            off_min = float(np.min(off_group)); off_max = float(np.max(off_group))
+            off_median = float(np.median(off_group))
+            off_spread = off_max - off_min
+            off_ratio  = (off_median - off_min) / off_spread if off_spread > 0 else 0.0
+            off_pct    = 100 - off_ratio * 6
+
+            norm_on  = float(np.percentile(on_group,  on_pct))
+            norm_off = float(np.percentile(off_group, off_pct))
+            threshold_on  = norm_on  * ap_range + ap_min
+            threshold_off = norm_off * ap_range + ap_min
+        else:
+            on_pct = 0.0; off_pct = 100.0
+            threshold_on  = otsu_split * ap_range + ap_min
+            threshold_off = threshold_on
+        if debug_log is not None:
+            debug_log(
+                f"[PEDAL] range: [{ap_min:.4f}, {ap_max:.4f}], Otsu (normed): {otsu_split:.4f}, "
+                f"on (P{on_pct:.1f}): {threshold_on:.4f}, off (P{off_pct:.1f}): {threshold_off:.4f} "
+                f"(active frames: {len(active_preds)})"
+            )
 
     events = []
     pedal_is_down = False
@@ -280,6 +298,10 @@ def _generate_ai_pedal(notes: List[Note],
     if debug_log is not None:
         downs = sum(1 for e in events if e.key_char == 'down')
         debug_log(f"[PEDAL] AI accepted: {len(events)} events ({downs} downs, {len(events) - downs} ups)")
+
+    if out_meta is not None:
+        out_meta['threshold_on']  = threshold_on
+        out_meta['threshold_off'] = threshold_off
 
     return events
 
@@ -400,6 +422,7 @@ def _rhythmic_strategy(
     notes: List[Note],
     sections: List[MusicalSection],
     debug_log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
     events: List[KeyEvent] = []
     sections_no_lh = 0
@@ -431,6 +454,7 @@ def _harmonic_strategy(
     notes: List[Note],
     sections: List[MusicalSection],
     debug_log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
     events: List[KeyEvent] = []
     sections_no_lh = 0
@@ -458,8 +482,16 @@ def _ai_strategy(
     notes: List[Note],
     sections: List[MusicalSection],
     debug_log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
-    ai_events = _generate_ai_pedal(notes, debug_log)
+    t_on  = config.get('pedal_threshold_on',  -1.0)
+    t_off = config.get('pedal_threshold_off', -1.0)
+    ai_events = _generate_ai_pedal(
+        notes, debug_log,
+        threshold_on=t_on  if t_on  >= 0 else None,
+        threshold_off=t_off if t_off >= 0 else None,
+        out_meta=out_meta,
+    )
     if ai_events:
         return ai_events
     if debug_log is not None:
@@ -476,9 +508,17 @@ def _hybrid_strategy(
     notes: List[Note],
     sections: List[MusicalSection],
     debug_log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
     if config.get('use_ai_pedal', True):
-        ai_events = _generate_ai_pedal(notes, debug_log)
+        t_on  = config.get('pedal_threshold_on',  -1.0)
+        t_off = config.get('pedal_threshold_off', -1.0)
+        ai_events = _generate_ai_pedal(
+            notes, debug_log,
+            threshold_on=t_on  if t_on  >= 0 else None,
+            threshold_off=t_off if t_off >= 0 else None,
+            out_meta=out_meta,
+        )
         if ai_events:
             return ai_events
         if debug_log is not None:
@@ -519,11 +559,15 @@ def generate_events(
     final_notes: List[Note],
     sections: List[MusicalSection],
     debug_log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
     """Dispatch to the registered PedalStrategy for config['pedal_style'].
 
     To add a new strategy: implement a function matching PedalStrategy and
     add it to _STRATEGY_MAP. This function never needs to change.
+
+    out_meta: optional dict; AI strategies populate it with 'threshold_on' and
+    'threshold_off' (raw sigmoid values) when AI pedal succeeds.
     """
     style = config.get('pedal_style', 'none')
     if style == 'none':
@@ -535,4 +579,4 @@ def generate_events(
         if debug_log is not None:
             debug_log(f"[PEDAL] Unknown pedal style '{style}', no events generated")
         return []
-    return fn(config, final_notes, sections, debug_log)
+    return fn(config, final_notes, sections, debug_log, out_meta)

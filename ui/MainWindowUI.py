@@ -3,7 +3,7 @@ import sys
 import webbrowser
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                             QSlider, QLabel, QStackedWidget, QFrame,
+                             QLabel, QStackedWidget, QFrame,
                              QSizePolicy, QScrollArea, QApplication)
 from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
@@ -12,6 +12,7 @@ from PyQt6.QtGui import QCursor, QPixmap, QShortcut, QKeySequence
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
 from ui.widgets.ph_icon_label import IconProvider
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.widgets.slider_spinbox import NoScrollSlider
 from ui.playback.PlaybackTab import PlaybackTab
 from ui.settings.SettingsTab import SettingsTab
 from ui.translator.TranslatorTab import TranslatorTab
@@ -221,7 +222,7 @@ class MainWindowUI(QObject):
                 sidebar_vbox.addWidget(self._discord_btn)
                 self._github_nav = NavButton("github-logo", "GitHub")
                 self._github_nav.clicked.connect(
-                    lambda: webbrowser.open("https://github.com/smyGitt/HuMidi")
+                    lambda: webbrowser.open("https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/tree/main")
                 )
                 sidebar_vbox.addWidget(self._github_nav)
         # Sidebar floats over the page stack; reserve its collapsed width as a left margin
@@ -292,7 +293,7 @@ class MainWindowUI(QObject):
         )
         self.time_start_label.setFixedWidth(38)
 
-        self.scrubber_slider = QSlider(Qt.Orientation.Horizontal)
+        self.scrubber_slider = NoScrollSlider(Qt.Orientation.Horizontal)
         self.scrubber_slider.setObjectName("scrubber_slider")
         self.scrubber_slider.setRange(0, 10000)
         self.scrubber_slider.sliderPressed.connect(self._on_scrubber_pressed)
@@ -412,6 +413,7 @@ class MainWindowUI(QObject):
             self.playback_tab.humanize_reset_icon,
             self.playback_tab.timing_reset_icon,
             self.playback_tab.hands_reset_icon,
+            self.playback_tab.pedal_ai_reset_icon,
         )
         # Default (hover-to-text_primary) decorative / section icons.
         default_icons = (

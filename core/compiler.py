@@ -21,6 +21,7 @@ def compile_events(
     notes: List[Note],
     sections: List[MusicalSection],
     log: Optional[Callable[[str], None]] = None,
+    out_meta: Optional[dict] = None,
 ) -> List[KeyEvent]:
     """Run humanization + event compilation for a set of notes.
 
@@ -29,10 +30,12 @@ def compile_events(
 
     Parameters
     ----------
-    config:   Full playback config dict.
-    notes:    Notes with hand assignments already applied.
-    sections: MusicalSection list from SectionAnalyzer.
-    log:      Optional callable for debug logging (e.g. signal.emit).
+    config:    Full playback config dict.
+    notes:     Notes with hand assignments already applied.
+    sections:  MusicalSection list from SectionAnalyzer.
+    log:       Optional callable for debug logging (e.g. signal.emit).
+    out_meta:  Optional dict forwarded to pedal_generator.generate_events; AI
+               strategies populate it with 'threshold_on' / 'threshold_off'.
     """
     def _log(msg: str) -> None:
         if log:
@@ -103,7 +106,7 @@ def compile_events(
                 notes_unmapped += 1
 
     _log(f"[COMPILE] Pedal style: {config.get('pedal_style', 'none')}")
-    for event in pedal_generator.generate_events(config, all_notes, sections, log):
+    for event in pedal_generator.generate_events(config, all_notes, sections, log, out_meta):
         heapq.heappush(temp_heap, event)
 
     compiled: List[KeyEvent] = []

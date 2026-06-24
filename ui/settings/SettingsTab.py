@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QLineEdit, QFrame, QStackedWidget)
 from PyQt6.QtCore import Qt
 
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.widgets.slider_spinbox import NoScrollSlider
 
 from ui.widgets import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -84,7 +85,7 @@ class SettingsTab(QWidget):
         opacity_row = QHBoxLayout()
         opacity_row.setSpacing(8)
         opacity_row.addWidget(QLabel("Opacity"))
-        self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.opacity_slider = NoScrollSlider(Qt.Orientation.Horizontal)
         self.opacity_slider.setRange(20, 100)
         self.opacity_slider.setValue(100)
         self.opacity_slider.setToolTip("Adjust window transparency (20-100%)")

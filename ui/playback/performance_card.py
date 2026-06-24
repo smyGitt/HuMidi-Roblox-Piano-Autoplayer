@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QLabel,
-    QSlider, QDoubleSpinBox, QSpinBox, QComboBox
+    QWidget, QVBoxLayout, QGridLayout, QLabel, QSpinBox, QComboBox
 )
 from PyQt6.QtCore import Qt
 
@@ -11,10 +10,9 @@ from ui.widgets.ph_icon_label import PhIconLabel
 class PerformanceCard(QWidget):
     """Left 'PERFORMANCE' card in PlaybackTab's Playback sub-tab.
 
-    Owns tempo_slider, tempo_spinbox, pedal_style_combo, and transpose_spinbox
-    inside a QGridLayout inside the section card. Also owns PEDAL_MAPPING and
-    PEDAL_MAPPING_INV; PlaybackTab re-exports them as class constants for
-    backward compatibility.
+    Owns pedal_style_combo and transpose_spinbox inside a QGridLayout inside
+    the section card. Also owns PEDAL_MAPPING and PEDAL_MAPPING_INV;
+    PlaybackTab re-exports them as class constants for backward compatibility.
     """
 
     PEDAL_MAPPING = {
@@ -48,17 +46,6 @@ class PerformanceCard(QWidget):
         grid.setColumnMinimumWidth(1, 8)
         grid.setColumnStretch(2, 1)
 
-        self.tempo_slider, self.tempo_spinbox = self._make_slider_spinbox(
-            10.0, 200.0, 100.0, "%", factor=10.0, decimals=1
-        )
-        self.tempo_spinbox.setFixedWidth(72)
-        self.tempo_slider.setToolTip("Playback speed as a percentage of the original tempo")
-        self.tempo_spinbox.setToolTip("Playback speed as a percentage of the original tempo")
-        grid.addWidget(self._make_label_pair("Tempo", "% of original"), 0, 0,
-                       Qt.AlignmentFlag.AlignVCenter)
-        grid.addWidget(self.tempo_slider,  0, 2, Qt.AlignmentFlag.AlignVCenter)
-        grid.addWidget(self.tempo_spinbox, 0, 3, Qt.AlignmentFlag.AlignVCenter)
-
         self.pedal_style_combo = QComboBox()
         self.pedal_style_combo.addItems(list(self.PEDAL_MAPPING.keys()))
         self.pedal_style_combo.setToolTip(
@@ -68,9 +55,9 @@ class PerformanceCard(QWidget):
             "Rhythmic: Release pedal on beat boundaries only\n"
             "None: No sustain pedal"
         )
-        grid.addWidget(self._make_label_pair("Pedal", "generation algorithm"), 1, 0,
+        grid.addWidget(self._make_label_pair("Pedal", "generation algorithm"), 0, 0,
                        Qt.AlignmentFlag.AlignVCenter)
-        grid.addWidget(self.pedal_style_combo, 1, 2, 1, 2)
+        grid.addWidget(self.pedal_style_combo, 0, 2, 1, 2)
 
         self.transpose_spinbox = QSpinBox()
         self.transpose_spinbox.setRange(-24, 24)
@@ -80,9 +67,9 @@ class PerformanceCard(QWidget):
         self.transpose_spinbox.setToolTip(
             "Shift all notes up or down by the given number of semitones"
         )
-        grid.addWidget(self._make_label_pair("Transpose", "semitones"), 2, 0,
+        grid.addWidget(self._make_label_pair("Transpose", "semitones"), 1, 0,
                        Qt.AlignmentFlag.AlignVCenter)
-        grid.addWidget(self.transpose_spinbox, 2, 2, 1, 2)
+        grid.addWidget(self.transpose_spinbox, 1, 2, 1, 2)
 
         body.addLayout(grid)
         body.addStretch()
@@ -102,24 +89,7 @@ class PerformanceCard(QWidget):
         vbox.addWidget(desc)
         return container
 
-    @staticmethod
-    def _make_slider_spinbox(min_val, max_val, default_val,
-                             text_suffix="", factor=10000.0, decimals=4):
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(int(min_val * factor), int(max_val * factor))
-        spinbox = QDoubleSpinBox()
-        spinbox.setDecimals(decimals)
-        spinbox.setRange(-2147483648, 2147483647)
-        spinbox.setSingleStep(1.0 / factor)
-        spinbox.setSuffix(text_suffix)
-        slider.setValue(int(default_val * factor))
-        spinbox.setValue(default_val)
-        slider.valueChanged.connect(lambda v: spinbox.setValue(v / factor))
-        spinbox.valueChanged.connect(lambda v: slider.setValue(int(v * factor)))
-        return slider, spinbox
-
     def reset_to_default(self) -> None:
-        self.tempo_spinbox.setValue(100.0)
         self.transpose_spinbox.setValue(0)
         self.pedal_style_combo.setCurrentText("Auto (Default)")
 

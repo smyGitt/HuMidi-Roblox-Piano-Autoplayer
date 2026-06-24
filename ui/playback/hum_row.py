@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QDoubleSpinBox, QSlider, QLabel)
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel
 
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.widgets.slider_spinbox import make_slider_spinbox
 
 
 class HumRow(QWidget):
@@ -21,7 +20,7 @@ class HumRow(QWidget):
 
     def _setup_ui(self, name, min_val, max_val, def_val, suffix, factor, decimals, tooltip, desc):
         self.check = ToggleSwitch(name)
-        self.slider, self.spinbox = self._make_slider_spinbox(
+        self.slider, self.spinbox = make_slider_spinbox(
             min_val, max_val, def_val, suffix, factor=factor, decimals=decimals
         )
         self.spinbox.setFixedWidth(80)
@@ -54,19 +53,3 @@ class HumRow(QWidget):
 
         grid.addWidget(self.spinbox, 0, 2)
         grid.addWidget(self.slider,  1, 0, 1, 3)
-
-    @staticmethod
-    def _make_slider_spinbox(min_val, max_val, default_val,
-                             text_suffix="", factor=10000.0, decimals=4):
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(int(min_val * factor), int(max_val * factor))
-        spinbox = QDoubleSpinBox()
-        spinbox.setDecimals(decimals)
-        spinbox.setRange(-2147483648, 2147483647)
-        spinbox.setSingleStep(1.0 / factor)
-        spinbox.setSuffix(text_suffix)
-        slider.setValue(int(default_val * factor))
-        spinbox.setValue(default_val)
-        slider.valueChanged.connect(lambda v: spinbox.setValue(v / factor))
-        spinbox.valueChanged.connect(lambda v: slider.setValue(int(v * factor)))
-        return slider, spinbox
