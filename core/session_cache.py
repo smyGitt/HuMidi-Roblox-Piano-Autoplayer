@@ -46,6 +46,7 @@ PEDAL_CONFIG_KEYS: frozenset = frozenset([
     'use_ai_pedal',
     'pedal_threshold_on',
     'pedal_threshold_off',
+    'use_midi_pedal',
 ])
 
 

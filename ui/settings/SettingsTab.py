@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QLineEdit, QFrame, QStackedWidget)
+    QLabel, QLineEdit, QFrame, QStackedWidget)
 from PyQt6.QtCore import Qt
 
 from ui.widgets.toggle_switch import ToggleSwitch
-from ui.widgets.slider_spinbox import NoScrollSlider
+from ui.widgets.slider_spinbox import NoScrollSlider, NoScrollComboBox
 
 from ui.widgets import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -110,7 +110,7 @@ class SettingsTab(QWidget):
         body.addWidget(self._section_label("Appearance"))
         theme_row = QHBoxLayout()
         theme_row.setSpacing(8)
-        self.theme_combo = QComboBox()
+        self.theme_combo = NoScrollComboBox()
         self.theme_combo.setToolTip("Switch the application colour theme")
         self._populate_theme_combo()
         self.theme_customize_btn = QPushButton("Customize...")
@@ -214,6 +214,17 @@ class SettingsTab(QWidget):
         hk_row.addWidget(self.hk_label, 1)
         hk_row.addWidget(self.hk_btn)
         body.addLayout(hk_row)
+
+        body.addSpacing(8)
+        body.addWidget(self._section_label("Save Playback"))
+        save_hk_row = QHBoxLayout()
+        save_hk_row.setSpacing(8)
+        self.save_hk_label = QLabel("Hotkey: ")
+        self.save_hk_btn = QPushButton("Change")
+        self.save_hk_btn.setToolTip("Click to bind a new hotkey for saving the current playback")
+        save_hk_row.addWidget(self.save_hk_label, 1)
+        save_hk_row.addWidget(self.save_hk_btn)
+        body.addLayout(save_hk_row)
         body.addStretch()
 
         page_layout.addWidget(card, 1)

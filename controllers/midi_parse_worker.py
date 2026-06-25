@@ -15,11 +15,10 @@ from core.core import MidiParser
 class MidiParseWorker(QObject):
     """Runs MidiParser.parse_structure on a QThread.
 
-    Emits `parsed(tracks, tempo_map, pedal_count)` on success or `failed(str)`
-    on any exception, and always `finished()` last so the owner can quit/join
-    the hosting thread.
+    Emits `parsed(tracks, tempo_map, pedal_count, midi_pedal_events)` on
+    success or `failed(str)` on any exception, and always `finished()` last.
     """
-    parsed   = Signal(object, object, int)  # tracks, tempo_map, pedal_count
+    parsed   = Signal(object, object, int, object)  # tracks, tempo_map, pedal_count, midi_pedal_events
     failed   = Signal(str)
     finished = Signal()
 
@@ -29,10 +28,12 @@ class MidiParseWorker(QObject):
 
     def run(self):
         try:
-            tracks, tempo_map, pedal_count = MidiParser.parse_structure(self.filepath, 1.0, None)
+            tracks, tempo_map, pedal_count, midi_pedal_events = MidiParser.parse_structure(
+                self.filepath, 1.0, None
+            )
         except Exception as e:
             self.failed.emit(str(e))
             self.finished.emit()
             return
-        self.parsed.emit(tracks, tempo_map, pedal_count)
+        self.parsed.emit(tracks, tempo_map, pedal_count, midi_pedal_events)
         self.finished.emit()

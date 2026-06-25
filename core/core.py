@@ -161,6 +161,7 @@ class MidiParser:
         # An on->off pair is one event; threshold matches the GM convention.
         pedal_state_by_channel: Dict[int, bool] = {}
         pedal_event_count = 0
+        midi_pedal_events: List[Tuple[float, bool]] = []
         skipped_zero_duration = 0
         total_raw_notes = 0
 
@@ -182,6 +183,9 @@ class MidiParser:
                 if msg.type == 'control_change' and msg.control == 64:
                     is_on = msg.value >= 64
                     was_on = pedal_state_by_channel.get(msg.channel, False)
+                    if is_on != was_on:
+                        msg_time = global_map.tick_to_time(current_abs_tick) / tempo_scale
+                        midi_pedal_events.append((msg_time, is_on))
                     if was_on and not is_on:
                         pedal_event_count += 1
                     pedal_state_by_channel[msg.channel] = is_on
@@ -215,6 +219,7 @@ class MidiParser:
                 debug_log(f"[MIDI] Track {i} ({track_name}): empty (no notes), skipped")
         # Any pedal still held at EOF counts as one event.
         pedal_event_count += sum(1 for held in pedal_state_by_channel.values() if held)
+        midi_pedal_events.sort(key=lambda x: x[0])
 
         if debug_log is not None:
             debug_log(
@@ -223,7 +228,7 @@ class MidiParser:
                 f"zero-duration notes skipped={skipped_zero_duration}"
             )
 
-        return tracks, tempo_map, pedal_event_count
+        return tracks, tempo_map, pedal_event_count, midi_pedal_events
 
 class KeyMapper:
     SYMBOL_MAP = {'!': '1', '@': '2', '#': '3', '$': '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0'}

@@ -679,6 +679,10 @@ QFrame#section_card {
     border: 0.75px solid %(border)s;
     border-radius: 5px;
 }
+QFrame#section_card QStackedWidget,
+QFrame#section_card QStackedWidget > QWidget {
+    background-color: transparent;
+}
 
 /* -- Loaded-row part cards (one per MIDI part, plus pedal summary) --------- */
 QFrame#part_card {
@@ -744,6 +748,29 @@ QPushButton#collapse_btn:hover {
     color: %(text_primary)s;
 }
 QPushButton#collapse_btn[strip_mode="true"] {
+    color: %(text_primary)s;
+}
+
+/* -- Pedal AI diagnostic panel --------------------------------------------- */
+QWidget#pedal_diag {
+    background-color: %(bg_primary)s;
+    border-radius: 4px;
+}
+QPushButton[variant="diag_action"] {
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: %(text_secondary)s;
+    text-align: left;
+}
+QPushButton[variant="diag_action"]:hover {
+    background-color: %(btn_hover)s;
+    border: 1px solid %(border)s;
+    color: %(text_primary)s;
+}
+QPushButton[variant="diag_action"]:pressed {
+    background-color: %(btn_pressed)s;
     color: %(text_primary)s;
 }
 

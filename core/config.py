@@ -34,6 +34,7 @@ class PedalConfig(TypedDict, total=False):
     use_ai_pedal: bool
     pedal_threshold_on: float   # raw sigmoid threshold for pedal-down edge; -1.0 = auto
     pedal_threshold_off: float  # raw sigmoid threshold for pedal-up edge; -1.0 = auto
+    use_midi_pedal: bool        # True = use CC 64 events from the MIDI file directly
 
 
 class PlaybackOptions(TypedDict, total=False):

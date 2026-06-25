@@ -112,11 +112,14 @@ class MainWindow(QMainWindow):
         loaded_cfg = self.config_manager.load()
         if loaded_cfg:
             self.ui.load_config_to_ui(loaded_cfg, self.config_manager.save_dir)
-            self.ui.settings_tab.hk_label.setText(
-                f"Hotkey: {self.hotkey_manager.format_hotkey_string()}"
-            )
         else:
             self.ui.reset_controls_to_default()
+        self.ui.settings_tab.hk_label.setText(
+            f"Hotkey: {self.hotkey_manager.format_hotkey_string()}"
+        )
+        self.ui.settings_tab.save_hk_label.setText(
+            f"Hotkey: {self.hotkey_manager.format_save_hotkey_string()}"
+        )
 
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
 
@@ -143,6 +146,7 @@ class MainWindow(QMainWindow):
         self.ui._collapsed_load_btn.clicked.connect(self.select_file)
         self.ui._collapsed_load_saved_btn.clicked.connect(self.open_load_dialog)
         self.ui.settings_tab.hk_btn.clicked.connect(self._change_hotkey)
+        self.ui.settings_tab.save_hk_btn.clicked.connect(self._change_save_hotkey)
         self.ui.settings_tab.check_update_btn.clicked.connect(self._manual_check_update)
 
         # View manipulations bound to Window behavior
@@ -167,6 +171,8 @@ class MainWindow(QMainWindow):
         # External IO bridging
         self.hotkey_manager.toggle_requested.connect(self.toggle_playback_state)
         self.hotkey_manager.bound_updated.connect(self._on_hotkey_bound)
+        self.hotkey_manager.save_requested.connect(self.handle_save)
+        self.hotkey_manager.bound_save_updated.connect(self._on_save_hotkey_bound)
 
         # File strip reveal action
         self.ui.playback_tab.file_strip.reveal_requested.connect(self._reveal_in_explorer)
@@ -206,6 +212,7 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.config_changed.connect(self._on_playback_tab_shown)
         self.ui.playback_tab.apply_requested.connect(self._on_apply_requested)
         self.ui.playback_tab.discard_requested.connect(self._on_discard_requested)
+        self.ui.playback_tab.generate_pedal_requested.connect(self._on_generate_pedal_requested)
 
         # Pending flag for auto-pedal after notes compile (Apply path with notes dirty)
         self._auto_compile_pedal_after_notes: bool = False
@@ -262,6 +269,17 @@ class MainWindow(QMainWindow):
         self.ui.settings_tab.hk_btn.setText("Change")
         self.ui.settings_tab.hk_btn.setEnabled(True)
         self._sync_play_button()
+
+    def _change_save_hotkey(self):
+        QMessageBox.information(self, "Bind Key", "Press the key you want to bind now.")
+        self.ui.settings_tab.save_hk_btn.setText("Listening...")
+        self.ui.settings_tab.save_hk_btn.setEnabled(False)
+        self.hotkey_manager.start_save_binding()
+
+    def _on_save_hotkey_bound(self, key_str):
+        self.ui.settings_tab.save_hk_label.setText(f"Hotkey: {key_str}")
+        self.ui.settings_tab.save_hk_btn.setText("Change")
+        self.ui.settings_tab.save_hk_btn.setEnabled(True)
 
     def _sync_play_button(self):
         """Single authoritative update for the play button, derived from current playback state."""
@@ -368,7 +386,10 @@ class MainWindow(QMainWindow):
         self.state.loaded_save_filename = None
         self.state.parsed_tracks = None
         self.state.loaded_pedal_count = 0
+        self.state.midi_pedal_events = []
+        self.ui.playback_tab.set_midi_pedal_available(False)
         self.ui.playback_tab.clear_loaded_summary()
+        self.ui.playback_tab.reset_pedal_ai_card()
         self.ui.playback_tab.update_bpm_display(0.0)
         self.ui.playback_tab.set_groups_enabled(True)
         self.ui.update_file_label(os.path.basename(filepath), filepath)
@@ -393,8 +414,11 @@ class MainWindow(QMainWindow):
         self.state.loaded_save_filename = os.path.basename(filepath)
         self.state.parsed_tracks = None
         self.state.loaded_pedal_count = 0
+        self.state.midi_pedal_events = []
         track_details = data.get('metadata', {}).get('track_details', [])
         compiled_pedal_count = data.get('metadata', {}).get('compiled_pedal_count', 0)
+        self.ui.playback_tab.set_midi_pedal_available(False)
+        self.ui.playback_tab.reset_pedal_ai_card()
         self.ui.playback_tab.update_loaded_summary_from_save(track_details, compiled_pedal_count)
         if self.ui.playback_tab.debug_check.isChecked():
             self.ui.log_output.append(
@@ -459,10 +483,12 @@ class MainWindow(QMainWindow):
         self._parse_worker.finished.connect(self._on_parse_cleanup)
         self._parse_thread.start()
 
-    def _on_midi_parsed(self, tracks, tempo_map, pedal_count):
+    def _on_midi_parsed(self, tracks, tempo_map, pedal_count, midi_pedal_events):
         self.state.parsed_tracks = tracks
         self.state.loaded_pedal_count = pedal_count
+        self.state.midi_pedal_events = midi_pedal_events
         self.state.parsed_tempo_map = tempo_map
+        self.ui.playback_tab.set_midi_pedal_available(pedal_count > 0)
 
         _events = tempo_map.events
         # events[0] is always a synthetic default entry (GlobalTickMap always
@@ -615,6 +641,7 @@ class MainWindow(QMainWindow):
 
     def _on_preparation_started(self):
         self.ui._status_indicator.set_state(StatusIndicator.LOADING, "PREPPING")
+        self.ui.playback_tab.set_generate_pedal_enabled(False)
 
     def _on_playback_started(self):
         self.ui.play_button.setEnabled(True)
@@ -648,10 +675,13 @@ class MainWindow(QMainWindow):
             self._auto_compile_pedal_after_notes = False
             config = self.ui.gather_playback_config()
             self.playback_controller.compile_pedal(config)
+        else:
+            self.ui.playback_tab.set_generate_pedal_enabled(True)
 
     def _on_pedal_phase_done(self) -> None:
         """Phase 2 complete (MIDI path): pedal generated and merged. Status -> READY."""
         self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
+        self.ui.playback_tab.set_generate_pedal_enabled(True)
 
     def _on_session_ready(self) -> None:
         """Translator monolithic path done. Status -> READY."""
@@ -691,6 +721,15 @@ class MainWindow(QMainWindow):
             self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
         else:
             self.playback_controller.compile_pedal(config)
+
+    def _on_generate_pedal_requested(self) -> None:
+        """Generate button in PedalAI card pressed: re-run phase-2 pedal compilation."""
+        if self.playback_controller.is_preparing() or self.playback_controller.is_playing():
+            return
+        if not self.playback_controller.has_compiled_notes():
+            return
+        config = self.ui.gather_playback_config()
+        self.playback_controller.compile_pedal(config)
 
     def _on_discard_requested(self) -> None:
         """Discard button pressed: restore UI to the last compiled snapshot."""
@@ -786,6 +825,9 @@ class MainWindow(QMainWindow):
         self._sync_play_button()
         self.ui.piano_widget.set_pedal_active(False)
         self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
+        self.ui.playback_tab.set_generate_pedal_enabled(
+            self.playback_controller.has_compiled_notes()
+        )
 
     # --- Update ---
     def _manual_check_update(self):

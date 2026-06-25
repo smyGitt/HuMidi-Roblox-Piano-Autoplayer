@@ -65,6 +65,12 @@ class LoadedRow(QWidget):
 
         outer.addWidget(scroll, 1)
 
+        self._pedal_card_slot = QHBoxLayout()
+        self._pedal_card_slot.setContentsMargins(0, 0, 0, 0)
+        pedal_slot_widget = QWidget()
+        pedal_slot_widget.setLayout(self._pedal_card_slot)
+        outer.addWidget(pedal_slot_widget, 0)
+
         self.edit_selection_btn = QPushButton("Edit Selection")
         self.edit_selection_btn.setEnabled(False)
         self.edit_selection_btn.setToolTip(
@@ -79,6 +85,10 @@ class LoadedRow(QWidget):
     def _clear_loaded_cards(self) -> None:
         while self._loaded_cards_layout.count():
             item = self._loaded_cards_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        while self._pedal_card_slot.count():
+            item = self._pedal_card_slot.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
@@ -108,10 +118,7 @@ class LoadedRow(QWidget):
             meta = f"{track.note_count} {self._NOTE_GLYPH}   {hand_label}   {range_str}"
             self._loaded_cards_layout.addWidget(PartCard(title, meta))
 
-        self._loaded_cards_layout.addWidget(
-            PartCard("Pedal", f"{pedal_count} events")
-        )
-        self._loaded_cards_layout.addStretch()
+        self._pedal_card_slot.addWidget(PartCard("Pedal", f"{pedal_count} events"))
         self.edit_selection_btn.setEnabled(True)
 
     def update_loaded_summary_from_save(self, track_details: list, pedal_count: int) -> None:
@@ -145,10 +152,7 @@ class LoadedRow(QWidget):
             meta = f"{note_count} {self._NOTE_GLYPH}   {hand_label}   {range_str}"
             self._loaded_cards_layout.addWidget(PartCard(title, meta))
 
-        self._loaded_cards_layout.addWidget(
-            PartCard("Pedal", f"{pedal_count} events")
-        )
-        self._loaded_cards_layout.addStretch()
+        self._pedal_card_slot.addWidget(PartCard("Pedal", f"{pedal_count} events"))
 
     def clear_loaded_summary(self) -> None:
         """Reset to the empty 'No file loaded.' state and disable the edit button."""

@@ -17,6 +17,7 @@ class AppState:
     selected_tracks_info: Optional[List] = None
     parsed_tracks: Optional[List] = None
     loaded_pedal_count: int = 0
+    midi_pedal_events: List = field(default_factory=list)
     current_notes: List = field(default_factory=list)
     note_start_times: List = field(default_factory=list)
     total_song_duration_sec: float = 1.0

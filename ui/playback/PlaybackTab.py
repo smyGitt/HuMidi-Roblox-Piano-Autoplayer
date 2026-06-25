@@ -1,12 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QFrame, QStackedWidget, QScrollArea, QSizePolicy, QDoubleSpinBox)
+    QLabel, QFrame, QStackedWidget, QScrollArea, QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal as Signal
 
 from ui.widgets import make_card
 from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.ph_icon_label import PhIconLabel
-from ui.widgets.slider_spinbox import make_slider_spinbox
+from ui.widgets.slider_spinbox import make_slider_spinbox, NoScrollDoubleSpinBox
 from ui.playback.sub_tab_bar import SubTabBar
 from ui.playback.file_strip import FileStrip
 from ui.playback.midi_drop_zone import MidiDropZone
@@ -23,11 +23,12 @@ from ui.playback.apply_toast import ApplyToast
 class PlaybackTab(QWidget):
 
     edit_selection_requested = Signal()
-    save_card_clicked = Signal(str, str, str)  # (filepath, save_name, song_name)
-    apply_requested   = Signal()
-    discard_requested = Signal()
-    tab_shown         = Signal()
-    config_changed    = Signal()
+    save_card_clicked        = Signal(str, str, str)  # (filepath, save_name, song_name)
+    apply_requested          = Signal()
+    discard_requested        = Signal()
+    tab_shown                = Signal()
+    config_changed           = Signal()
+    generate_pedal_requested = Signal()
 
     # Re-exported from PerformanceCard for backward-compatible callers.
     PEDAL_MAPPING     = PerformanceCard.PEDAL_MAPPING
@@ -86,6 +87,7 @@ class PlaybackTab(QWidget):
             spinbox.valueChanged.connect(emit)
         self._pedal_ai_card.threshold_on_spinbox.valueChanged.connect(emit)
         self._pedal_ai_card.threshold_off_spinbox.valueChanged.connect(emit)
+        self.use_midi_pedal_check.toggled.connect(emit)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -220,9 +222,10 @@ class PlaybackTab(QWidget):
         self._perf_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.pedal_style_combo = self._perf_card.pedal_style_combo
-        self.transpose_spinbox = self._perf_card.transpose_spinbox
-        self.perf_reset_icon   = self._perf_card.reset_icon
+        self.pedal_style_combo    = self._perf_card.pedal_style_combo
+        self.transpose_spinbox    = self._perf_card.transpose_spinbox
+        self.perf_reset_icon      = self._perf_card.reset_icon
+        self.use_midi_pedal_check = self._perf_card.use_midi_pedal_check
 
         # Right column: OPTIONS card (includes auto-detect hands).
         self._opts_card = OptionsCard()
@@ -275,14 +278,14 @@ class PlaybackTab(QWidget):
         _sep.setProperty("variant", "muted")
         _target_prefix = QLabel("Target:")
         _target_prefix.setProperty("variant", "muted")
-        self.target_bpm_spinbox = QDoubleSpinBox()
+        self.target_bpm_spinbox = NoScrollDoubleSpinBox()
         self.target_bpm_spinbox.setRange(1.0, 9999.0)
         self.target_bpm_spinbox.setDecimals(1)
         self.target_bpm_spinbox.setSuffix(" BPM")
         self.target_bpm_spinbox.setFixedWidth(100)
         self.target_bpm_spinbox.setEnabled(False)
         self.target_bpm_spinbox.setButtonSymbols(
-            QDoubleSpinBox.ButtonSymbols.NoButtons
+            NoScrollDoubleSpinBox.ButtonSymbols.NoButtons
         )
         bpm_row.addWidget(_orig_prefix)
         bpm_row.addWidget(self._bpm_original_label)
@@ -300,6 +303,7 @@ class PlaybackTab(QWidget):
 
         # Row 3: PEDAL AI THRESHOLDS card (full width; locked until first AI generation).
         self._pedal_ai_card = PedalAICard()
+        self._pedal_ai_card.generate_requested.connect(self.generate_pedal_requested.emit)
         self.pedal_ai_reset_icon = self._pedal_ai_card.reset_icon
 
         layout.addLayout(row1, 1)
@@ -451,6 +455,10 @@ class PlaybackTab(QWidget):
 
     # -- Public API -----------------------------------------------------------
 
+    def set_midi_pedal_available(self, available: bool) -> None:
+        """Show or hide the 'Use MIDI Pedal' toggle based on CC 64 event presence."""
+        self._perf_card.set_midi_pedal_available(available)
+
     def set_ai_thresholds(self, threshold_on: float, threshold_off: float) -> None:
         """Populate the PEDAL AI THRESHOLDS card with auto-computed values.
 
@@ -462,6 +470,18 @@ class PlaybackTab(QWidget):
     def set_ai_pedal_stats(self, avg_dur: float, min_dur: float, max_dur: float, presses_per_min: float) -> None:
         """Populate the pedal stats section of the PEDAL AI THRESHOLDS card."""
         self._pedal_ai_card.set_stats(avg_dur, min_dur, max_dur, presses_per_min)
+
+    def set_generate_pedal_enabled(self, enabled: bool) -> None:
+        """Enable or disable the Generate button in the PEDAL AI THRESHOLDS card."""
+        self._pedal_ai_card.set_generate_enabled(enabled)
+
+    def reset_pedal_ai_card(self) -> None:
+        """Reset the PEDAL AI THRESHOLDS card to its pre-generate state.
+
+        Call whenever the active song changes (new MIDI opened or save loaded)
+        so stale thresholds and stats from the previous song are not shown.
+        """
+        self._pedal_ai_card.reset()
 
     def update_file_label(self, text: str, tooltip: str = "") -> None:
         self.file_path_label.setText(text)
@@ -557,6 +577,8 @@ class PlaybackTab(QWidget):
                      list(self.all_humanization_spinboxes.values()):
                 w.setEnabled(enabled)
             self._pedal_ai_card.set_spinboxes_enabled(enabled)
+            if not enabled:
+                self._pedal_ai_card.set_generate_enabled(False)
 
     def update_enabled_states(self) -> None:
         for key, check in self.all_humanization_checks.items():
@@ -652,6 +674,8 @@ class PlaybackTab(QWidget):
         self.all_humanization_checks['invert_tempo_sway'].setChecked(
             config.get('invert_tempo_sway', False)
         )
+        if 'use_midi_pedal' in config:
+            self.use_midi_pedal_check.setChecked(config['use_midi_pedal'])
         self.update_enabled_states()
 
     def gather_playback_config(self) -> dict:
@@ -689,6 +713,7 @@ class PlaybackTab(QWidget):
             'enable_tempo_sway':       self.all_humanization_checks['tempo_sway'].isChecked(),
             'tempo_sway_intensity':    self.all_humanization_spinboxes['tempo_sway'].value(),
             'invert_tempo_sway':       self.all_humanization_checks['invert_tempo_sway'].isChecked(),
+            'use_midi_pedal':          self.use_midi_pedal_check.isChecked(),
         }
 
     def gather_app_config(self) -> dict:
@@ -716,4 +741,5 @@ class PlaybackTab(QWidget):
             'enable_tempo_sway':          self.all_humanization_checks['tempo_sway'].isChecked(),
             'value_tempo_sway_intensity': self.all_humanization_spinboxes['tempo_sway'].value(),
             'invert_tempo_sway':          self.all_humanization_checks['invert_tempo_sway'].isChecked(),
+            'use_midi_pedal':             self.use_midi_pedal_check.isChecked(),
         }

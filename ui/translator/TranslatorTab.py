@@ -1,10 +1,11 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QTextEdit, QSpinBox, QPushButton, QFrame, QStackedWidget
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QTextEdit, QPushButton, QFrame, QStackedWidget
 )
 from PyQt6.QtCore import pyqtSignal as Signal, Qt
 
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.widgets.slider_spinbox import NoScrollSpinBox, NoScrollComboBox
 
 from core.translator import FormatRegistry
 from ui.widgets import make_card
@@ -53,7 +54,7 @@ class TranslatorTab(QWidget):
 
         fmt_lbl = QLabel("Format")
         fmt_lbl.setProperty("variant", "muted")
-        self.format_combo = QComboBox()
+        self.format_combo = NoScrollComboBox()
         self.format_combo.addItems(FormatRegistry.names())
         self.format_combo.setToolTip("Select the Roblox piano sheet format")
         tbl.addWidget(fmt_lbl)
@@ -118,7 +119,7 @@ class TranslatorTab(QWidget):
         ab.setSpacing(8)
         bpm_lbl = QLabel("BPM")
         bpm_lbl.setProperty("variant", "muted")
-        self.bpm_spinbox = QSpinBox()
+        self.bpm_spinbox = NoScrollSpinBox()
         self.bpm_spinbox.setRange(20, 400)
         self.bpm_spinbox.setValue(120)
         self.bpm_spinbox.setFixedWidth(70)

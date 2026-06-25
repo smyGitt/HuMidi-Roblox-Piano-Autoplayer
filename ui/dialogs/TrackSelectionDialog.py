@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTableWidget,
                              QTableWidgetItem, QHeaderView, QAbstractItemView,
-                             QComboBox, QDialogButtonBox)
+                             QDialogButtonBox)
 from PyQt6.QtCore import Qt
 
 from ui.theme import ThemeManager, generate_stylesheet
+from ui.widgets.slider_spinbox import NoScrollComboBox
 
 
 class TrackSelectionDialog(QDialog):
@@ -71,7 +72,7 @@ class TrackSelectionDialog(QDialog):
             notes_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(i, 3, notes_item)
 
-            combo = QComboBox()
+            combo = NoScrollComboBox()
             combo.setProperty("variant", "compact")
             combo.setFixedHeight(28)
             combo.addItems(["Auto-Detect", "Left Hand", "Right Hand"])

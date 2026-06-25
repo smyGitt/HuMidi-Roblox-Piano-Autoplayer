@@ -28,6 +28,7 @@ from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THE
 from ui.widgets.ph_icon import ph_icon
 from ui.widgets.ph_icon_label import PhIconLabel, IconProvider
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.widgets.slider_spinbox import NoScrollComboBox, NoScrollDoubleSpinBox
 
 
 # ── Preview scale ─────────────────────────────────────────────────────────────
@@ -426,9 +427,9 @@ class ThemeDialog(QDialog):
         self._collapse_panel_btn.setVisible(False)
         toolbar.addWidget(self._collapse_panel_btn)
 
-        self._combo = QComboBox()
+        self._combo = NoScrollComboBox()
         self._combo.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            NoScrollComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         )
         self._combo.setMinimumContentsLength(0)
         self._combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -871,7 +872,7 @@ class ThemeDialog(QDialog):
         self._prev_slider.setRange(0, 200)
         self._prev_slider.setValue(100)
         tempo_row.addWidget(self._prev_slider, 1)
-        self._prev_spin = QDoubleSpinBox()
+        self._prev_spin = NoScrollDoubleSpinBox()
         self._prev_spin.setRange(0, 200)
         self._prev_spin.setValue(100.0)
         self._prev_spin.setSuffix(" %")
@@ -890,7 +891,7 @@ class ThemeDialog(QDialog):
         pedal_labels.addWidget(pedal_lbl)
         pedal_labels.addWidget(pedal_desc)
         pedal_row.addLayout(pedal_labels)
-        self._prev_combo = QComboBox()
+        self._prev_combo = NoScrollComboBox()
         self._prev_combo.addItems(["Auto (Default)", "PedalAI", "Harmonic"])
         pedal_row.addWidget(self._prev_combo, 1)
         v.addLayout(pedal_row)

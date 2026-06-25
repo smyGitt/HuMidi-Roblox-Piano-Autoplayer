@@ -123,19 +123,44 @@ def compile_note_events(
     return note_events, all_notes
 
 
+def compile_midi_pedal_events(
+    midi_pedal_events: List[Tuple[float, bool]],
+) -> List[KeyEvent]:
+    """Convert raw (time_sec, is_on) CC 64 pairs from the MIDI file into pedal KeyEvents.
+
+    Priority matches the values used by all generated strategies: down=1, up=0.
+    Events are returned in time order (input is assumed sorted; no extra sort needed).
+    """
+    result: List[KeyEvent] = []
+    for time_sec, is_on in midi_pedal_events:
+        key_char = 'down' if is_on else 'up'
+        priority = 1 if is_on else 0
+        result.append(KeyEvent(time_sec, priority, 'pedal', key_char))
+    return result
+
+
 def compile_pedal_events(
     config: PlaybackConfig,
     humanized_notes: List[Note],
     sections: List[MusicalSection],
     log: Optional[Callable[[str], None]] = None,
     out_meta: Optional[dict] = None,
+    midi_pedal_events: Optional[List[Tuple[float, bool]]] = None,
 ) -> List[KeyEvent]:
     """Generate pedal KeyEvents from humanized notes.
 
     humanized_notes must be the list returned by compile_note_events (same
     timing as what the player will execute). Passing the raw pre-humanizer
     notes will cause the pedal to be misaligned with playback.
+
+    When midi_pedal_events is non-empty and config['use_midi_pedal'] is True,
+    the raw CC 64 events from the MIDI file are converted directly rather than
+    running the generation algorithm.
     """
+    if midi_pedal_events and config.get('use_midi_pedal', False):
+        if log:
+            log(f"[COMPILE] Pedal source: MIDI file CC 64 ({len(midi_pedal_events)} events)")
+        return compile_midi_pedal_events(midi_pedal_events)
     if log:
         log(f"[COMPILE] Pedal style: {config.get('pedal_style', 'none')}")
     return pedal_generator.generate_events(config, humanized_notes, sections, log, out_meta)
@@ -196,6 +221,7 @@ def compile_events(
     sections: List[MusicalSection],
     log: Optional[Callable[[str], None]] = None,
     out_meta: Optional[dict] = None,
+    midi_pedal_events: Optional[List[Tuple[float, bool]]] = None,
 ) -> List[KeyEvent]:
     """One-shot wrapper: humanize + pedal generation + merge.
 
@@ -205,9 +231,14 @@ def compile_events(
 
     out_meta is forwarded to compile_pedal_events; AI strategies populate it
     with 'threshold_on' / 'threshold_off' on success.
+
+    midi_pedal_events -- when provided and config['use_midi_pedal'] is True,
+    bypasses generation and uses the raw CC 64 events from the MIDI file.
     """
     note_events, humanized_notes = compile_note_events(config, notes, sections, log)
-    pedal_events = compile_pedal_events(config, humanized_notes, sections, log, out_meta)
+    pedal_events = compile_pedal_events(
+        config, humanized_notes, sections, log, out_meta, midi_pedal_events
+    )
     return merge_compiled(note_events, pedal_events, log)
 
 

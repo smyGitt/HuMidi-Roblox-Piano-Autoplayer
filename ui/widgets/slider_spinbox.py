@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QSlider, QDoubleSpinBox, QAbstractSpinBox
+from PyQt6.QtWidgets import QSlider, QDoubleSpinBox, QSpinBox, QComboBox, QAbstractSpinBox
 from PyQt6.QtCore import Qt
 
 
@@ -14,9 +14,30 @@ class NoScrollSlider(QSlider):
         event.ignore()
 
 
+class NoScrollSpinBox(QSpinBox):
+    """QSpinBox whose value cannot be changed with the mouse wheel."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox whose value cannot be changed with the mouse wheel."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollComboBox(QComboBox):
+    """QComboBox whose selection cannot be changed with the mouse wheel."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 def make_slider_spinbox(min_val, max_val, default_val,
                         text_suffix="", factor=10000.0, decimals=4):
-    """Build a NoScrollSlider bound two-way to a buttonless QDoubleSpinBox value preview.
+    """Build a NoScrollSlider bound two-way to a buttonless NoScrollDoubleSpinBox value preview.
 
     The spinbox stores the real (unscaled) value; the slider works in integer
     units of ``value * factor``. Step arrows are removed (NoButtons) because the
@@ -24,7 +45,7 @@ def make_slider_spinbox(min_val, max_val, default_val,
     """
     slider = NoScrollSlider(Qt.Orientation.Horizontal)
     slider.setRange(int(min_val * factor), int(max_val * factor))
-    spinbox = QDoubleSpinBox()
+    spinbox = NoScrollDoubleSpinBox()
     spinbox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
     spinbox.setDecimals(decimals)
     spinbox.setRange(-2147483648, 2147483647)

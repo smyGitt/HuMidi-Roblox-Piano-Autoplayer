@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QLabel, QSpinBox, QComboBox
+    QWidget, QVBoxLayout, QGridLayout, QLabel
 )
 from PyQt6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
+from ui.widgets.slider_spinbox import NoScrollSpinBox, NoScrollComboBox
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
 class PerformanceCard(QWidget):
@@ -46,7 +48,7 @@ class PerformanceCard(QWidget):
         grid.setColumnMinimumWidth(1, 8)
         grid.setColumnStretch(2, 1)
 
-        self.pedal_style_combo = QComboBox()
+        self.pedal_style_combo = NoScrollComboBox()
         self.pedal_style_combo.addItems(list(self.PEDAL_MAPPING.keys()))
         self.pedal_style_combo.setToolTip(
             "Auto (Default): Adaptive hybrid of rhythmic and harmonic analysis\n"
@@ -59,7 +61,7 @@ class PerformanceCard(QWidget):
                        Qt.AlignmentFlag.AlignVCenter)
         grid.addWidget(self.pedal_style_combo, 0, 2, 1, 2)
 
-        self.transpose_spinbox = QSpinBox()
+        self.transpose_spinbox = NoScrollSpinBox()
         self.transpose_spinbox.setRange(-24, 24)
         self.transpose_spinbox.setValue(0)
         self.transpose_spinbox.setSuffix(" st")
@@ -70,6 +72,18 @@ class PerformanceCard(QWidget):
         grid.addWidget(self._make_label_pair("Transpose", "semitones"), 1, 0,
                        Qt.AlignmentFlag.AlignVCenter)
         grid.addWidget(self.transpose_spinbox, 1, 2, 1, 2)
+
+        self._midi_pedal_label = self._make_label_pair("Use MIDI Pedal", "from the loaded file")
+        self.use_midi_pedal_check = ToggleSwitch()
+        self.use_midi_pedal_check.setChecked(True)
+        self.use_midi_pedal_check.setToolTip(
+            "When checked, sustain pedal events embedded in the MIDI file are used directly.\n"
+            "When unchecked, the pedal generation algorithm is used instead."
+        )
+        self._midi_pedal_label.setVisible(False)
+        self.use_midi_pedal_check.setVisible(False)
+        grid.addWidget(self._midi_pedal_label, 2, 0, Qt.AlignmentFlag.AlignVCenter)
+        grid.addWidget(self.use_midi_pedal_check, 2, 2, 1, 2)
 
         body.addLayout(grid)
         body.addStretch()
@@ -88,6 +102,13 @@ class PerformanceCard(QWidget):
         vbox.addWidget(lbl)
         vbox.addWidget(desc)
         return container
+
+    def set_midi_pedal_available(self, available: bool) -> None:
+        """Show or hide the 'Use MIDI Pedal' row based on whether the loaded MIDI has CC 64 events."""
+        self._midi_pedal_label.setVisible(available)
+        self.use_midi_pedal_check.setVisible(available)
+        if available:
+            self.use_midi_pedal_check.setChecked(True)
 
     def reset_to_default(self) -> None:
         self.transpose_spinbox.setValue(0)

@@ -59,13 +59,15 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     Shared by _NotesCompileWorker.run() and _SaveWorker.run() to eliminate the
     duplicated note-preparation pipeline that previously existed in both places.
 
-    Returns (final_notes, tempo_map). Raises on MIDI parse failure -- callers
-    should catch and surface the exception appropriately.
+    Returns (final_notes, tempo_map, midi_pedal_events). Raises on MIDI parse
+    failure -- callers should catch and surface the exception appropriately.
     """
     tempo_scale = config.get('tempo', 100.0) / 100.0
     if log:
         log(f"[PREP] Parsing MIDI: tempo_scale={tempo_scale:.3f} ({config.get('tempo', 100.0):.1f}%)")
-    tracks, tempo_map, pedal_cc_count = MidiParser.parse_structure(config['midi_file'], tempo_scale, log)
+    tracks, tempo_map, pedal_cc_count, midi_pedal_events = MidiParser.parse_structure(
+        config['midi_file'], tempo_scale, log
+    )
     selected_indices = [t.index for t, _ in selected_tracks_info]
     role_map = {t.index: r for t, r in selected_tracks_info}
     final_notes = []
@@ -90,7 +92,7 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
         r_count = sum(1 for n in final_notes if n.hand == 'right')
         log(f"[PREP] Final note set: {len(final_notes)} notes | L={l_count} R={r_count} | source pedal CC events={pedal_cc_count}")
 
-    return final_notes, tempo_map
+    return final_notes, tempo_map, midi_pedal_events
 
 
 # ---------------------------------------------------------------------------
@@ -107,8 +109,8 @@ class _NotesCompileWorker(QObject):
     and populate the timeline visualizer. Always emits finished last.
     """
     status_updated = Signal(str)
-    notes_compiled = Signal(object, object, object, object, float)
-    # (final_notes, humanized_notes, note_events, tempo_map, total_dur)
+    notes_compiled = Signal(object, object, object, object, float, object)
+    # (final_notes, humanized_notes, note_events, tempo_map, total_dur, midi_pedal_events)
     error_occurred = Signal(str)
     finished       = Signal()
 
@@ -140,13 +142,14 @@ class _NotesCompileWorker(QObject):
                 debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role} | Instrument: {t.instrument_name}")
             debug_log("\n=== RAW MIDI DATA (Selected Tracks) ===")
 
+        midi_pedal_events = []
         try:
             if self._prebuilt_notes is not None:
                 final_notes = self._prebuilt_notes
                 tempo_map = self._prebuilt_tempo_map
                 _apply_hand_assignment(final_notes, self.config, debug_log)
             else:
-                final_notes, tempo_map = _prepare_notes(
+                final_notes, tempo_map, midi_pedal_events = _prepare_notes(
                     self.config, self.selected_tracks_info, log=debug_log
                 )
         except Exception as e:
@@ -182,7 +185,9 @@ class _NotesCompileWorker(QObject):
             self.finished.emit()
             return
 
-        self.notes_compiled.emit(final_notes, humanized_notes, note_events, tempo_map, total_dur)
+        self.notes_compiled.emit(
+            final_notes, humanized_notes, note_events, tempo_map, total_dur, midi_pedal_events
+        )
         self.finished.emit()
 
 
@@ -218,6 +223,7 @@ class _PedalCompileWorker(QObject):
         tempo_map: TempoMap,
         total_dur: float,
         auto_play: bool = False,
+        midi_pedal_events: Optional[List] = None,
     ):
         super().__init__()
         self.config = config
@@ -227,6 +233,7 @@ class _PedalCompileWorker(QObject):
         self._tempo_map = tempo_map
         self._total_dur = total_dur
         self._auto_play = auto_play
+        self._midi_pedal_events = midi_pedal_events or []
         self._cancelled = False
 
     def cancel(self):
@@ -249,6 +256,7 @@ class _PedalCompileWorker(QObject):
             pedal_events = compile_pedal_events(
                 self.config, self._humanized_notes, sections,
                 log=debug_log, out_meta=out_meta,
+                midi_pedal_events=self._midi_pedal_events,
             )
         except Exception as e:
             self.error_occurred.emit(f"Error generating pedal events:\n{e}")
@@ -316,13 +324,14 @@ class _PrepareWorker(QObject):
     def run(self):
         debug_log = self.status_updated.emit if self.config.get('debug_mode') else None
 
+        midi_pedal_events = []
         try:
             if self._prebuilt_notes is not None:
                 final_notes = self._prebuilt_notes
                 tempo_map = self._prebuilt_tempo_map
                 _apply_hand_assignment(final_notes, self.config, debug_log)
             else:
-                final_notes, tempo_map = _prepare_notes(
+                final_notes, tempo_map, midi_pedal_events = _prepare_notes(
                     self.config, self.selected_tracks_info, log=debug_log
                 )
         except Exception as e:
@@ -348,7 +357,8 @@ class _PrepareWorker(QObject):
         out_meta: dict = {}
         try:
             compiled_events = compile_events(
-                self.config, final_notes, sections, log=debug_log, out_meta=out_meta
+                self.config, final_notes, sections, log=debug_log, out_meta=out_meta,
+                midi_pedal_events=midi_pedal_events,
             )
         except Exception as e:
             self.error_occurred.emit(f"Error compiling playback:\n{e}")
@@ -412,7 +422,9 @@ class _SaveWorker(QObject):
                 debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role}")
 
         try:
-            final_notes, tempo_map = _prepare_notes(self.config, self.selected_tracks_info, log=debug_log)
+            final_notes, tempo_map, midi_pedal_events = _prepare_notes(
+                self.config, self.selected_tracks_info, log=debug_log
+            )
         except Exception as e:
             if debug_log:
                 debug_log(f"[SAVE] FAILED at _prepare_notes: {e}")
@@ -426,6 +438,7 @@ class _SaveWorker(QObject):
         events_to_serialize = compile_events(
             self.config, final_notes, sections,
             log=self.status_updated.emit if self.config.get('debug_mode') else None,
+            midi_pedal_events=midi_pedal_events,
         )
 
         if not events_to_serialize:
@@ -568,10 +581,14 @@ class PlaybackController(QObject):
         self._cached_merged_events: Optional[List[KeyEvent]] = None
         self._cached_tempo_map: Optional[TempoMap] = None
         self._cached_total_dur: float = 1.0
+        self._cached_midi_pedal_events: Optional[List] = None
 
         # Config snapshots for freshness checking
         self._notes_config_snapshot: Optional[dict] = None
         self._pedal_config_snapshot: Optional[dict] = None
+
+        # Holds AI-computed thresholds between ai_thresholds_ready and _on_pedal_compiled
+        self._pending_ai_thresholds: Optional[tuple] = None
 
     # -- State queries --------------------------------------------------------
 
@@ -620,6 +637,7 @@ class PlaybackController(QObject):
         self._cached_merged_events    = None
         self._cached_tempo_map        = None
         self._cached_total_dur        = 1.0
+        self._cached_midi_pedal_events = None
         self._notes_config_snapshot   = None
         self._pedal_config_snapshot   = None
 
@@ -762,18 +780,19 @@ class PlaybackController(QObject):
         note_events: List[KeyEvent],
         tempo_map: TempoMap,
         total_dur: float,
+        midi_pedal_events: list,
     ) -> None:
         config = self._pending_config
 
-        self._cached_final_notes     = final_notes
-        self._cached_humanized_notes = humanized_notes
-        self._cached_note_events     = note_events
-        self._cached_tempo_map       = tempo_map
-        self._cached_total_dur       = total_dur
-        self._notes_config_snapshot  = extract_notes_config(config)
+        self._cached_final_notes       = final_notes
+        self._cached_humanized_notes   = humanized_notes
+        self._cached_note_events       = note_events
+        self._cached_tempo_map         = tempo_map
+        self._cached_total_dur         = total_dur
+        self._cached_midi_pedal_events = midi_pedal_events
+        self._notes_config_snapshot    = extract_notes_config(config)
 
         self.timeline_data_ready.emit(final_notes, total_dur, tempo_map)
-        self.notes_phase_done.emit()
 
     def _on_notes_error(self, error_msg: str) -> None:
         self.error_occurred.emit(error_msg)
@@ -785,6 +804,9 @@ class PlaybackController(QObject):
         self._notes_worker   = None
         self._notes_thread   = None
         self._pending_config = None
+        # Emit after the thread is fully torn down so is_compiling_notes() returns
+        # False when _on_notes_phase_done attempts to chain compile_pedal.
+        self.notes_phase_done.emit()
 
     # -- Phase-2: compile pedal (MIDI path) -----------------------------------
 
@@ -820,6 +842,7 @@ class PlaybackController(QObject):
             self._cached_tempo_map,
             self._cached_total_dur,
             auto_play=auto_play,
+            midi_pedal_events=self._cached_midi_pedal_events,
         )
         self._pending_config  = config
         self._pedal_thread    = QThread()
@@ -829,12 +852,16 @@ class PlaybackController(QObject):
         self._pedal_thread.started.connect(worker.run)
         worker.status_updated.connect(self.status_updated)
         worker.pedal_compiled.connect(self._on_pedal_compiled)
-        worker.ai_thresholds_ready.connect(self.ai_pedal_thresholds_ready)
+        worker.ai_thresholds_ready.connect(self._on_ai_thresholds_ready)
         worker.pedal_stats_ready.connect(self.ai_pedal_stats_ready)
         worker.error_occurred.connect(self._on_pedal_error)
         worker.finished.connect(self._on_pedal_cleanup)
 
         self._pedal_thread.start()
+
+    def _on_ai_thresholds_ready(self, on: float, off: float) -> None:
+        self._pending_ai_thresholds = (on, off)
+        self.ai_pedal_thresholds_ready.emit(on, off)
 
     def _on_pedal_compiled(
         self,
@@ -848,6 +875,11 @@ class PlaybackController(QObject):
         self._cached_pedal_events  = pedal_only
         self._cached_merged_events = merged_events
         self._pedal_config_snapshot = extract_pedal_config(config)
+        if self._pending_ai_thresholds is not None:
+            on, off = self._pending_ai_thresholds
+            self._pedal_config_snapshot['pedal_threshold_on'] = on
+            self._pedal_config_snapshot['pedal_threshold_off'] = off
+            self._pending_ai_thresholds = None
 
         # Write session cache asynchronously.
         write_cache(
