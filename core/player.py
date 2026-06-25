@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QObject, pyqtSignal as Signal
-from pynput.keyboard import Key, Controller
+from pynput.keyboard import Key
 import time
 import threading
 import traceback
@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Tuple
 
 from core.models import Note, KeyEvent, MusicalSection, KeyState
 from core.core import TempoMap, KeyMapper
-from core.keyboard_driver import KeyboardDriver
+from core.keyboard_driver import KeyboardDriver, build_driver
 
 class Player(QObject):
     status_updated = Signal(str)
@@ -32,7 +32,7 @@ class Player(QObject):
         self.notes = notes
         self.sections = sections
         self.tempo_map = tempo_map
-        self.keyboard: KeyboardDriver = keyboard_driver if keyboard_driver is not None else Controller()
+        self.keyboard: KeyboardDriver = keyboard_driver if keyboard_driver is not None else build_driver()
         self.mapper = KeyMapper(use_88_key_layout=self.config.get('use_88_key_layout', False))
         
         self.compiled_events: List[KeyEvent] = []

@@ -926,7 +926,11 @@ class PlaybackController(QObject):
             return
         used_config = config if config is not None else (self._pending_config or {})
         compiled_dur = self._cached_merged_events[-1].time if self._cached_merged_events else self._cached_total_dur
-        self.player = Player(used_config, [], [], self._cached_tempo_map)
+        try:
+            self.player = Player(used_config, [], [], self._cached_tempo_map)
+        except PermissionError as exc:
+            self.error_occurred.emit(str(exc))
+            return
         self.player.load_compiled_events(self._cached_merged_events, compiled_dur)
         self._wire_and_start_player(self.player, self.player.play_compiled)
 
@@ -969,7 +973,11 @@ class PlaybackController(QObject):
         self.session_ready.emit()
 
         compiled_dur = compiled_events[-1].time if compiled_events else total_dur
-        self.player = Player(config, [], [], tempo_map)
+        try:
+            self.player = Player(config, [], [], tempo_map)
+        except PermissionError as exc:
+            self.error_occurred.emit(str(exc))
+            return
         self.player.load_compiled_events(compiled_events, compiled_dur)
         self._wire_and_start_player(self.player, self.player.play_compiled)
 
@@ -1055,6 +1063,10 @@ class PlaybackController(QObject):
         _pedal_evs = [ev for ev in reconstructed_events if ev.action == 'pedal']
         self.pedal_data_ready.emit(_extract_pedal_intervals(_pedal_evs))
 
-        self.player = Player(config, [], [], dummy_tempo)
+        try:
+            self.player = Player(config, [], [], dummy_tempo)
+        except PermissionError as exc:
+            self.error_occurred.emit(str(exc))
+            return
         self.player.load_compiled_events(reconstructed_events, total_dur)
         self._wire_and_start_player(self.player, self.player.play_saved_events)

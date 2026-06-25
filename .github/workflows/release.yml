@@ -10,6 +10,11 @@ on:
         description: "Tag to release (e.g. v1.4) — the tag must already exist in the repo"
         required: true
         type: string
+      dry_run:
+        description: "Build only — skip creating the GitHub Release"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   check-version:
@@ -118,14 +123,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build HuMidi
-        run: >
-          pyinstaller
-          --onefile
-          --noconsole
-          --name HuMidi
-          --icon icon.ico
-          --add-data "icon.ico;."
-          main.py
+        run: pyinstaller HuMidi.spec
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -149,16 +147,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pillow
+        run: pip install -r requirements.txt
 
       - name: Build .app bundle
-        run: >
-          pyinstaller
-          --windowed
-          --name HuMidi
-          --icon icon.icns
-          --add-data "icon.ico:."
-          main.py
+        run: pyinstaller HuMidi.spec
 
       - name: Create DMG from .app bundle
         working-directory: dist
@@ -200,13 +192,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build HuMidi
-        run: >
-          pyinstaller
-          --onefile
-          --windowed
-          --name HuMidi
-          --add-data "icon.ico:."
-          main.py
+        run: pyinstaller HuMidi.spec
 
       - name: Package as HuMidi.tar.gz
         working-directory: dist
@@ -223,6 +209,7 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-windows, build-macos, build-linux]
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
     permissions:
       contents: write
 
