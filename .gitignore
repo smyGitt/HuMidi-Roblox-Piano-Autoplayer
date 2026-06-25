@@ -19,3 +19,4 @@ __pycache__/
 *.pt
 *.onnx
 *.npz
+!pedal_bilstm.npz
