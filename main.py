@@ -26,7 +26,7 @@ from ui.dialogs.LoadSaveDialog import LoadSaveDialog
 from ui.widgets import StatusIndicator
 from ui.theme import ThemeManager
 
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
 
 
 def _validate_save_data(data: dict) -> tuple[bool, str]:
