@@ -15,6 +15,7 @@ __pycache__/
 !README.md
 
 *.spec
+!HuMidi.spec
 *.pt
 *.onnx
 *.npz
