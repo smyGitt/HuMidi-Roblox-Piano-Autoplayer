@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal as Signal
+from PySide6.QtCore import QObject, QThread, Signal
 
 from core.models import Note, KeyEvent
 from core.core import MidiParser, TempoMap

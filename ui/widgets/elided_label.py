@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtCore import Qt, QSize
+from PySide6.QtWidgets import QLabel
+from PySide6.QtCore import Qt, QSize
 
 
 class ElidedLabel(QLabel):

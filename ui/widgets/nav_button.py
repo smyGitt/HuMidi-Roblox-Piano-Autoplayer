@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QFrame, QLabel
-from PyQt6.QtCore import Qt, QEvent, pyqtProperty, pyqtSignal as Signal
-from PyQt6.QtGui import QPixmap, QColor
+from PySide6.QtWidgets import QFrame, QLabel
+from PySide6.QtCore import Qt, QEvent, Property, Signal
+from PySide6.QtGui import QPixmap, QColor
 
 
 class NavButton(QFrame):
@@ -55,7 +55,7 @@ class NavButton(QFrame):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconColorNormal(self) -> QColor:
         return self._icon_normal
 
@@ -64,7 +64,7 @@ class NavButton(QFrame):
         self._icon_normal = c
         self._render_icons()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconColorActive(self) -> QColor:
         return self._icon_active
 

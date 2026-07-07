@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt
 
 
 class PartCard(QFrame):

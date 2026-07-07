@@ -1,11 +1,11 @@
 from typing import Callable
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
     QPushButton, QStackedWidget,
 )
 from ui.widgets.slider_spinbox import NoScrollDoubleSpinBox
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -202,9 +202,15 @@ class PedalAICard(QWidget):
         return self._has_thresholds
 
     def set_thresholds(self, on: float, off: float) -> None:
-        """Populate controls, reveal the post-generate view, and enable editing."""
-        self._default_on  = on
-        self._default_off = off
+        """Populate controls, reveal the post-generate view, and enable editing.
+
+        Only the first call (per reset() cycle) captures _default_on/_default_off,
+        so reset_to_default() always restores the original Otsu-computed values
+        from the first generation, not whatever was most recently regenerated.
+        """
+        if not self._has_thresholds:
+            self._default_on  = on
+            self._default_off = off
         self._has_thresholds = True
         self.threshold_on_spinbox.blockSignals(True)
         self.threshold_off_spinbox.blockSignals(True)
@@ -218,7 +224,8 @@ class PedalAICard(QWidget):
         self.reset_icon.setVisible(True)
 
     def reset_to_default(self) -> None:
-        """Restore the last applied threshold values."""
+        """Restore the original Otsu-computed threshold values from the
+        first generation of this song (see set_thresholds)."""
         if not self._has_thresholds:
             return
         self.threshold_on_spinbox.blockSignals(True)

@@ -7,7 +7,7 @@ parse. `MidiParseWorker` moves that parse onto a QThread; the owning window open
 the modal dialog from the `parsed` slot once results are in.
 """
 
-from PyQt6.QtCore import QObject, pyqtSignal as Signal
+from PySide6.QtCore import QObject, Signal
 
 from core.core import MidiParser
 

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QSlider, QDoubleSpinBox, QSpinBox, QComboBox, QAbstractSpinBox
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QSlider, QDoubleSpinBox, QSpinBox, QComboBox, QAbstractSpinBox
+from PySide6.QtCore import Qt
 
 
 class NoScrollSlider(QSlider):

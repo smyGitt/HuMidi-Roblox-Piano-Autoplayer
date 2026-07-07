@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QObject, pyqtSignal as Signal
+from PySide6.QtCore import QObject, Signal
 from pynput.keyboard import Key
 import time
 import threading
@@ -147,12 +147,18 @@ class Player(QObject):
             # shutdown() is called by _execute_playback()'s finally block once the loop exits.
 
     def toggle_pause(self):
-        if self.pause_event.is_set():
-            try:
-                self.keyboard.release(Key.space)
-            except Exception:
-                pass
+        """GUI-thread entry point. Flips pause_event immediately (a
+        threading.Event, safe to toggle from either thread) so is_paused()
+        and the play/pause button stay in sync with no latency.
 
+        Does NOT touch self.keyboard. The Space-key release that used to run
+        here on resume was redundant: shutdown() (called by the player thread
+        the first time it notices the pause) already released it, and a
+        second keyboard.release() call from the GUI thread would race the
+        player thread's own concurrent use of the same keyboard driver in
+        _execute_chord_event / _sync_active_keys_at_resume.
+        """
+        if self.pause_event.is_set():
             pause_duration = time.perf_counter() - self.last_pause_timestamp
             self.total_paused_time += pause_duration
             self.pause_event.clear()

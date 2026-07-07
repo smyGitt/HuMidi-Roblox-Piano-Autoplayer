@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QPushButton
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton
+from PySide6.QtCore import Qt, Signal
 
 
 class _SubTabButton(QPushButton):

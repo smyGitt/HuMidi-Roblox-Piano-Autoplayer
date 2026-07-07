@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer, pyqtProperty
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtCore import Qt, QTimer, Property
+from PySide6.QtGui import QPainter, QPen, QColor
 
 
 class AnimatedDashedCard(QFrame):
@@ -33,7 +33,7 @@ class AnimatedDashedCard(QFrame):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def borderColor(self) -> QColor:
         return self._border_color
 
@@ -42,7 +42,7 @@ class AnimatedDashedCard(QFrame):
         self._border_color = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def dragBorder(self) -> QColor:
         return self._drag_border
 

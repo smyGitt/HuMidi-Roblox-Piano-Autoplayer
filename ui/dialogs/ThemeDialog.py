@@ -11,18 +11,18 @@ from dataclasses import replace
 import json
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout, QGridLayout,
     QLabel, QLineEdit, QPushButton, QScrollArea, QWidget,
     QFrame, QMessageBox, QFileDialog, QSizePolicy,
     QSlider, QSpinBox, QDoubleSpinBox, QComboBox,
     QApplication, QColorDialog, QInputDialog,
 )
-from PyQt6.QtCore import (
-    Qt, QSize, pyqtSignal as Signal, QEvent, QObject,
+from PySide6.QtCore import (
+    Qt, QSize, Signal, QEvent, QObject,
     QPoint, QPropertyAnimation, QEasingCurve, QRect, QTimer,
 )
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QCursor
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QCursor
 
 from ui.theme import ThemeColors, ThemeManager, generate_stylesheet, BUILTIN_THEMES, _mix
 from ui.widgets.ph_icon import ph_icon

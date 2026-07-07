@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QStackedWidget, QScrollArea, QSizePolicy)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets import make_card
 from ui.widgets.toggle_switch import ToggleSwitch
@@ -227,16 +227,15 @@ class PlaybackTab(QWidget):
         self.perf_reset_icon      = self._perf_card.reset_icon
         self.use_midi_pedal_check = self._perf_card.use_midi_pedal_check
 
-        # Right column: OPTIONS card (includes auto-detect hands).
+        # Right column: OPTIONS card.
         self._opts_card = OptionsCard()
         self._opts_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.use_88_key_check         = self._opts_card.use_88_key_check
-        self.countdown_check          = self._opts_card.countdown_check
-        self.debug_check              = self._opts_card.debug_check
-        self._auto_detect_hands_check = self._opts_card.auto_detect_hands_check
-        self.opts_reset_icon          = self._opts_card.reset_icon
+        self.use_88_key_check = self._opts_card.use_88_key_check
+        self.countdown_check  = self._opts_card.countdown_check
+        self.debug_check      = self._opts_card.debug_check
+        self.opts_reset_icon  = self._opts_card.reset_icon
 
         row1.addWidget(self._perf_card, 1)
         row1.addWidget(self._opts_card, 1)
@@ -626,7 +625,7 @@ class PlaybackTab(QWidget):
         self.tempo_spinbox.setValue(_multiplier)
         self.transpose_spinbox.setValue(config.get('transpose', 0))
         display = self.PEDAL_MAPPING_INV.get(
-            config.get('pedal_style', 'hybrid'), "Auto (Default)"
+            config.get('pedal_style', 'ai'), "PedalAI"
         )
         self.pedal_style_combo.setCurrentText(display)
         self.use_88_key_check.setChecked(config.get('use_88_key_layout', False))

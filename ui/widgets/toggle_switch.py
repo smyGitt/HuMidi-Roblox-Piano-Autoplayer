@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QAbstractButton, QSizePolicy
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal, QRectF, QSize
-from PyQt6.QtGui import QPainter, QColor
+from PySide6.QtWidgets import QAbstractButton, QSizePolicy
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, Property, Signal, QRectF, QSize
+from PySide6.QtGui import QPainter, QColor
 
 
 class ToggleSwitch(QAbstractButton):
@@ -17,7 +17,7 @@ class ToggleSwitch(QAbstractButton):
     stateChanged(int), text(), setText(), setEnabled(), blockSignals().
     """
 
-    stateChanged = pyqtSignal(int)
+    stateChanged = Signal(int)
 
     _TRACK_H = 16
     _KNOB_MARGIN = 2
@@ -45,7 +45,7 @@ class ToggleSwitch(QAbstractButton):
         self.toggled.connect(self._on_toggled)
         self.toggled.connect(lambda checked: self.stateChanged.emit(2 if checked else 0))
 
-    @pyqtProperty(float)
+    @Property(float)
     def _anim_pos(self) -> float:
         return self._pos
 
@@ -56,7 +56,7 @@ class ToggleSwitch(QAbstractButton):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def trackOff(self) -> QColor:
         return self._track_off
 
@@ -65,7 +65,7 @@ class ToggleSwitch(QAbstractButton):
         self._track_off = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def trackOn(self) -> QColor:
         return self._track_on
 
@@ -74,7 +74,7 @@ class ToggleSwitch(QAbstractButton):
         self._track_on = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def knob(self) -> QColor:
         return self._knob
 
@@ -83,7 +83,7 @@ class ToggleSwitch(QAbstractButton):
         self._knob = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def textColor(self) -> QColor:
         return self._text_col
 
@@ -92,7 +92,7 @@ class ToggleSwitch(QAbstractButton):
         self._text_col = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def disText(self) -> QColor:
         return self._dis_text
 
@@ -101,7 +101,7 @@ class ToggleSwitch(QAbstractButton):
         self._dis_text = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def disTrack(self) -> QColor:
         return self._dis_track
 

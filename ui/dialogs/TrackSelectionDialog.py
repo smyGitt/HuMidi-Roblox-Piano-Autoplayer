@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTableWidget,
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTableWidget,
                              QTableWidgetItem, QHeaderView, QAbstractItemView,
                              QDialogButtonBox)
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ui.theme import ThemeManager, generate_stylesheet
 from ui.widgets.slider_spinbox import NoScrollComboBox

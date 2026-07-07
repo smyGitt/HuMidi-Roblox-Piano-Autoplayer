@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -50,6 +50,7 @@ class PerformanceCard(QWidget):
 
         self.pedal_style_combo = NoScrollComboBox()
         self.pedal_style_combo.addItems(list(self.PEDAL_MAPPING.keys()))
+        self.pedal_style_combo.setCurrentText("PedalAI")
         self.pedal_style_combo.setToolTip(
             "Auto (Default): Adaptive hybrid of rhythmic and harmonic analysis\n"
             "AI Pedal: BiLSTM model-generated pedal with adaptive fallback\n"
@@ -75,7 +76,7 @@ class PerformanceCard(QWidget):
 
         self._midi_pedal_label = self._make_label_pair("Use MIDI Pedal", "from the loaded file")
         self.use_midi_pedal_check = ToggleSwitch()
-        self.use_midi_pedal_check.setChecked(True)
+        self.use_midi_pedal_check.setChecked(False)
         self.use_midi_pedal_check.setToolTip(
             "When checked, sustain pedal events embedded in the MIDI file are used directly.\n"
             "When unchecked, the pedal generation algorithm is used instead."
@@ -104,13 +105,18 @@ class PerformanceCard(QWidget):
         return container
 
     def set_midi_pedal_available(self, available: bool) -> None:
-        """Show or hide the 'Use MIDI Pedal' row based on whether the loaded MIDI has CC 64 events."""
+        """Show or hide the 'Use MIDI Pedal' row based on whether the loaded MIDI has CC 64 events.
+
+        Always resets the toggle to unchecked (off by default). MainWindow
+        decides whether to check it afterward: automatically for a small
+        number of pedal events, or via an explicit Yes/No prompt when the
+        file has a significant number of them (see MainWindow._on_midi_parsed).
+        """
         self._midi_pedal_label.setVisible(available)
         self.use_midi_pedal_check.setVisible(available)
-        if available:
-            self.use_midi_pedal_check.setChecked(True)
+        self.use_midi_pedal_check.setChecked(False)
 
     def reset_to_default(self) -> None:
         self.transpose_spinbox.setValue(0)
-        self.pedal_style_combo.setCurrentText("Auto (Default)")
+        self.pedal_style_combo.setCurrentText("PedalAI")
 

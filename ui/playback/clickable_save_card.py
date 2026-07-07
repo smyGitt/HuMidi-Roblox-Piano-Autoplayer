@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets.elided_label import ElidedLabel
 from ui.widgets.ph_icon_label import PhIconLabel

@@ -1,10 +1,10 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QLineEdit, QFrame, QStackedWidget)
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ui.widgets.toggle_switch import ToggleSwitch
-from ui.widgets.slider_spinbox import NoScrollSlider, NoScrollComboBox
+from ui.widgets.slider_spinbox import NoScrollSlider, NoScrollComboBox, NoScrollSpinBox
 
 from ui.widgets import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -12,6 +12,11 @@ from ui.theme import ThemeManager
 
 
 class SettingsTab(QWidget):
+
+    # Default minimum embedded MIDI CC 64 (sustain pedal) event count before
+    # MainWindow._on_midi_parsed prompts the user to use the file's own pedal
+    # data instead of generating new pedal events.
+    DEFAULT_PEDAL_PROMPT_THRESHOLD = 8
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -245,6 +250,21 @@ class SettingsTab(QWidget):
         body.addWidget(self.check_update_btn)
 
         body.addSpacing(12)
+        body.addWidget(self._section_label("MIDI Import"))
+        pedal_prompt_row = QHBoxLayout()
+        pedal_prompt_row.setSpacing(8)
+        pedal_prompt_row.addWidget(QLabel("Pedal Prompt Threshold"), 1)
+        self.pedal_prompt_threshold_spinbox = NoScrollSpinBox()
+        self.pedal_prompt_threshold_spinbox.setRange(1, 200)
+        self.pedal_prompt_threshold_spinbox.setValue(self.DEFAULT_PEDAL_PROMPT_THRESHOLD)
+        self.pedal_prompt_threshold_spinbox.setToolTip(
+            "Minimum number of embedded MIDI sustain-pedal events before HuMidi asks "
+            "whether to use them directly instead of generating new pedal events"
+        )
+        pedal_prompt_row.addWidget(self.pedal_prompt_threshold_spinbox)
+        body.addLayout(pedal_prompt_row)
+
+        body.addSpacing(12)
         body.addWidget(self._section_label("Reset"))
         reset_desc = QLabel("Restore all playback and humanization settings to their defaults.")
         reset_desc.setProperty("variant", "muted")
@@ -297,6 +317,9 @@ class SettingsTab(QWidget):
         self.opacity_slider.setValue(config.get('opacity', 100))
         self.timeline_vis_check.setChecked(config.get('show_timeline_visualizer', True))
         self.piano_vis_check.setChecked(config.get('show_piano_visualizer', True))
+        self.pedal_prompt_threshold_spinbox.setValue(
+            config.get('pedal_prompt_threshold', self.DEFAULT_PEDAL_PROMPT_THRESHOLD)
+        )
         self.save_path_input.setText(save_dir)
 
     def gather_config(self) -> dict:
@@ -305,4 +328,5 @@ class SettingsTab(QWidget):
             'opacity':                  self.opacity_slider.value(),
             'show_timeline_visualizer': self.timeline_vis_check.isChecked(),
             'show_piano_visualizer':    self.piano_vis_check.isChecked(),
+            'pedal_prompt_threshold':   self.pedal_prompt_threshold_spinbox.value(),
         }

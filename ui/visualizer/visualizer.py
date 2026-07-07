@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QSizePolicy
-from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtProperty, pyqtSignal as Signal
-from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
+from PySide6.QtWidgets import QWidget, QSizePolicy
+from PySide6.QtCore import Qt, QRectF, QPointF, Property, Signal
+from PySide6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
 from typing import List
 from core.models import Note
 from core.core import TempoMap
@@ -32,7 +32,7 @@ class PianoWidget(QWidget):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def whiteKey(self) -> QColor:
         return self._white_key
 
@@ -41,7 +41,7 @@ class PianoWidget(QWidget):
         self._white_key = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def blackKey(self) -> QColor:
         return self._black_key
 
@@ -50,7 +50,7 @@ class PianoWidget(QWidget):
         self._black_key = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def whiteBorder(self) -> QColor:
         return self._white_border
 
@@ -59,7 +59,7 @@ class PianoWidget(QWidget):
         self._white_border = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def blackBorder(self) -> QColor:
         return self._black_border
 
@@ -68,7 +68,7 @@ class PianoWidget(QWidget):
         self._black_border = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def activeKey(self) -> QColor:
         return self._active_key
 
@@ -77,7 +77,7 @@ class PianoWidget(QWidget):
         self._active_key = c
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def pedalColor(self) -> QColor:
         return self._pedal_color
 
@@ -198,7 +198,7 @@ class TimelineWidget(QWidget):
         self.cached_background = None
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def bgColor(self) -> QColor:
         return self._bg_color
 
@@ -207,7 +207,7 @@ class TimelineWidget(QWidget):
         self._bg_color = QColor(c)
         self._invalidate()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def leftHandColor(self) -> QColor:
         return self._left_hand_color
 
@@ -218,7 +218,7 @@ class TimelineWidget(QWidget):
         self._left_hand_color = c
         self._invalidate()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def rightHandColor(self) -> QColor:
         return self._right_hand_color
 
@@ -229,7 +229,7 @@ class TimelineWidget(QWidget):
         self._right_hand_color = c
         self._invalidate()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def unknownColor(self) -> QColor:
         return self._unknown_color
 
@@ -240,7 +240,7 @@ class TimelineWidget(QWidget):
         self._unknown_color = c
         self._invalidate()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def cursorColor(self) -> QColor:
         return self._cursor_color
 
@@ -249,7 +249,7 @@ class TimelineWidget(QWidget):
         self._cursor_color = QColor(c)
         self.update()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def measureLineColor(self) -> QColor:
         return self._measure_line_color
 
@@ -260,7 +260,7 @@ class TimelineWidget(QWidget):
         self._measure_line_color = c
         self._invalidate()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def pedalColor(self) -> QColor:
         return self._pedal_color
 

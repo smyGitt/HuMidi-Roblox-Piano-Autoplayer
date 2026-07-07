@@ -1,8 +1,8 @@
 import webbrowser
 
-from PyQt6.QtWidgets import QFrame, QLabel
-from PyQt6.QtCore import Qt, pyqtProperty
-from PyQt6.QtGui import QColor
+from PySide6.QtWidgets import QFrame, QLabel
+from PySide6.QtCore import Qt, Property
+from PySide6.QtGui import QColor
 
 from ui.widgets.ph_icon import ph_icon
 
@@ -58,7 +58,7 @@ class DiscordNavButton(QFrame):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def colorDim(self) -> QColor:
         return self._color_dim
 
@@ -67,7 +67,7 @@ class DiscordNavButton(QFrame):
         self._color_dim = c
         self._refresh_icon()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def colorHi(self) -> QColor:
         return self._color_hi
 

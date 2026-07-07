@@ -2,10 +2,10 @@ import json
 import os
 from datetime import datetime
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFrame, QScrollArea, QLabel, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtCore import Qt, Signal
 
 from ui.playback.clickable_save_card import ClickableSaveCard
 from ui.widgets.ph_icon_label import PhIconLabel

@@ -5,8 +5,8 @@ The parent (PlaybackTab) is responsible for positioning and resizing on
 parent resize events via _reposition_toast().
 """
 
-from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, pyqtSignal as Signal
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
 
 _MSG = (
@@ -32,6 +32,7 @@ class ApplyToast(QFrame):
         self._slide_anim = QPropertyAnimation(self, b"pos")
         self._slide_anim.setDuration(220)
         self._slide_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._finished_connected_to_hide = False
         self._shake_anim = None
         self.hide()
 
@@ -73,10 +74,9 @@ class ApplyToast(QFrame):
         self.move(0, hidden_y)
         self.show()
         self._visible = True
-        try:
-            self._slide_anim.finished.disconnect()
-        except TypeError:
-            pass
+        if self._finished_connected_to_hide:
+            self._slide_anim.finished.disconnect(self.hide)
+            self._finished_connected_to_hide = False
         self._slide_anim.stop()
         self._slide_anim.setStartValue(QPoint(0, hidden_y))
         self._slide_anim.setEndValue(QPoint(0, shown_y))
@@ -93,11 +93,9 @@ class ApplyToast(QFrame):
         self._slide_anim.stop()
         self._slide_anim.setStartValue(QPoint(0, ph - self.HEIGHT))
         self._slide_anim.setEndValue(QPoint(0, ph))
-        try:
-            self._slide_anim.finished.disconnect()
-        except TypeError:
-            pass
-        self._slide_anim.finished.connect(self.hide)
+        if not self._finished_connected_to_hide:
+            self._slide_anim.finished.connect(self.hide)
+            self._finished_connected_to_hide = True
         self._slide_anim.start()
 
     # -- Shake ----------------------------------------------------------------

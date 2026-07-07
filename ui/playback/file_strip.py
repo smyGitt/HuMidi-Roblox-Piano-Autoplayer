@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
+from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton, QSizePolicy, QWidget)
-from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets.ph_icon_label import PhIconLabel
 

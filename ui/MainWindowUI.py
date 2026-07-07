@@ -2,12 +2,12 @@ import os
 import sys
 import webbrowser
 
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QStackedWidget, QFrame,
                              QSizePolicy, QScrollArea, QApplication)
-from PyQt6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
+from PySide6.QtCore import (Qt, QObject, QSize, QEvent, QTimer,
                           QVariantAnimation, QEasingCurve)
-from PyQt6.QtGui import QCursor, QPixmap, QShortcut, QKeySequence
+from PySide6.QtGui import QCursor, QPixmap, QShortcut, QKeySequence
 
 from ui.widgets import NavButton, DiscordNavButton, HuMidiButton, StatusIndicator
 from ui.widgets.ph_icon_label import IconProvider

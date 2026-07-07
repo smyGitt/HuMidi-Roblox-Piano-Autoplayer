@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtCore import Qt, QSize, pyqtProperty
-from PyQt6.QtGui import QColor
+from PySide6.QtWidgets import QPushButton
+from PySide6.QtCore import Qt, QSize, Property
+from PySide6.QtGui import QColor
 
 
 class HuMidiButton(QPushButton):
@@ -34,7 +34,7 @@ class HuMidiButton(QPushButton):
 
     # -- QSS-driven icon color -----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconColor(self) -> QColor:
         return self._icon_color
 

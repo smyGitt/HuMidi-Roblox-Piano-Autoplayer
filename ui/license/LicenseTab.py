@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QPushButton, QTextEdit, QStackedWidget
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ui.widgets import make_card
 
@@ -68,9 +68,9 @@ URL     : https://github.com/bytedance/GiantMIDI-Piano
 """,
 
     "Third-Party Libraries": """\
-PyQt6
-  License : GPL v3 / Commercial (Riverbank Computing)
-  URL     : https://riverbankcomputing.com/software/pyqt/
+PySide6
+  License : LGPL v3 / Commercial (The Qt Company)
+  URL     : https://www.qt.io/qt-for-python
 
 mido
   License : MIT

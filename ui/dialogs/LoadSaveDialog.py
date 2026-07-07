@@ -1,11 +1,11 @@
 import os
 import json
 from datetime import datetime
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QSplitter,
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QSplitter,
                              QTreeWidget, QTreeWidgetItem, QWidget,
                              QScrollArea, QPushButton,
                              QLabel, QFrame, QGridLayout, QMessageBox, QInputDialog)
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ui.theme import ThemeManager, generate_stylesheet
 

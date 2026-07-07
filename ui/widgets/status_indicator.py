@@ -1,7 +1,7 @@
-from PyQt6.QtCore import Qt, QTimer, QByteArray, pyqtProperty
-from PyQt6.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
-from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtWidgets import QFrame, QLabel
+from PySide6.QtCore import Qt, QTimer, QByteArray, Property
+from PySide6.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import QFrame, QLabel
 
 # Hourglass animation frames (Phosphor-style duotone SVGs, 256x256 viewBox).
 # Frame 0: sand full in top half (top polygon shaded, top line).
@@ -151,7 +151,7 @@ class StatusIndicator(QFrame):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconColor(self) -> QColor:
         return self._icon_color
 
@@ -160,7 +160,7 @@ class StatusIndicator(QFrame):
         self._icon_color = c
         self._apply_visuals()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def readyColor(self) -> QColor:
         return self._ready_color
 
@@ -169,7 +169,7 @@ class StatusIndicator(QFrame):
         self._ready_color = c
         self._apply_visuals()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def unloadColor(self) -> QColor:
         return self._unload_color
 
@@ -178,7 +178,7 @@ class StatusIndicator(QFrame):
         self._unload_color = c
         self._apply_visuals()
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def loadedColor(self) -> QColor:
         return self._loaded_color
 

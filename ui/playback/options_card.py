@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt
 
 from ui.widgets.section_card import make_card
 from ui.widgets.ph_icon_label import PhIconLabel
@@ -53,18 +53,12 @@ class OptionsCard(QWidget):
         self.debug_check.setToolTip(
             "Print verbose event logs to the Debug tab during playback"
         )
-        self.auto_detect_hands_check = ToggleSwitch("Auto-detect hands")
-        self.auto_detect_hands_check.setToolTip(
-            "Use MIDI track names to assign left/right hand zones automatically"
-        )
 
         body.addWidget(_make_check_pair(self.use_88_key_check,
                                         "Full piano, disable if range is limited"))
         body.addWidget(_make_check_pair(self.countdown_check,
                                         "3 second countdown before starting playback"))
         body.addWidget(_make_check_pair(self.debug_check, "Enable debug output"))
-        body.addWidget(_make_check_pair(self.auto_detect_hands_check,
-                                        "Auto-detect hand zones from MIDI track names"))
         body.addStretch()
 
         outer.addWidget(card)

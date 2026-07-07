@@ -1,6 +1,6 @@
 import threading
 
-from PyQt6.QtCore import QObject, pyqtSignal as Signal
+from PySide6.QtCore import QObject, Signal
 from pynput import keyboard
 from pynput.keyboard import Key
 

@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel
 
 from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.slider_spinbox import make_slider_spinbox

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame
-from PyQt6.QtCore import Qt, QSize
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame
+from PySide6.QtCore import Qt, QSize
 
 from core.core import KeyMapper
 from ui.playback.part_card import PartCard

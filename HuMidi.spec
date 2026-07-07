@@ -10,10 +10,13 @@ a = Analysis(
         ('pedal_bilstm.npz', '.'),
         ('icon.ico', '.'),
     ],
-    hiddenimports=[
-        'pynput.keyboard._win32',
-        'pynput.mouse._win32',
-    ],
+    hiddenimports=(
+        ['pynput.keyboard._win32', 'pynput.mouse._win32']
+        if sys.platform == 'win32'
+        else ['pynput.keyboard._xorg', 'pynput.mouse._xorg']
+        if sys.platform.startswith('linux')
+        else ['pynput.keyboard._darwin', 'pynput.mouse._darwin']
+    ),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

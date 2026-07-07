@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QLabel, QWidget
-from PyQt6.QtCore import Qt, pyqtProperty, pyqtSignal as Signal
-from PyQt6.QtGui import QPixmap, QColor, QMouseEvent
+from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtCore import Qt, Property, Signal
+from PySide6.QtGui import QPixmap, QColor, QMouseEvent
 
 from ui.widgets.event_injectable import EventInjectableMixin
 
@@ -71,7 +71,7 @@ class PhIconLabel(EventInjectableMixin, QLabel):
 
     # -- QSS-driven color slots ----------------------------------------------
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconColor(self) -> QColor:
         return self._icon_color
 
@@ -80,7 +80,7 @@ class PhIconLabel(EventInjectableMixin, QLabel):
         self._icon_color = c
         self.set_colors(self._icon_color.name(), self._icon_hover_color.name())
 
-    @pyqtProperty(QColor)
+    @Property(QColor)
     def iconHoverColor(self) -> QColor:
         return self._icon_hover_color
 

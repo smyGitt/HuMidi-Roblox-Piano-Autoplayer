@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QPushButton, QFrame, QStackedWidget
 )
-from PyQt6.QtCore import pyqtSignal as Signal, Qt
+from PySide6.QtCore import Signal, Qt
 
 from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.slider_spinbox import NoScrollSpinBox, NoScrollComboBox
@@ -222,7 +222,7 @@ class TranslatorTab(QWidget):
         self.export_requested.emit(self.format_combo.currentText())
 
     def _on_copy_clicked(self):
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         QApplication.clipboard().setText(self.export_text.toPlainText())
 
     # ── Public API ────────────────────────────────────────────────────────────

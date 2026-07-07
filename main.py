@@ -6,16 +6,17 @@ import bisect
 import tempfile
 import threading
 from datetime import datetime
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QDialog
-from PyQt6.QtCore import Qt, QThread
-from PyQt6.QtGui import QIcon
+import pynput  # noqa: F401  (must precede PySide6: shiboken's signature loader crashes on six.moves.queue if pynput imports it first)
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog, QDialog
+from PySide6.QtCore import Qt, QThread
+from PySide6.QtGui import QIcon
 
 from core.core import KeyMapper, TempoMap
 from core.translator import FormatRegistry
 import core.session_cache as session_cache
 from managers.HotkeyManager import HotkeyManager
 import webbrowser
-from managers.UpdateManager import UpdateChecker
+from managers.UpdateManager import UpdateChecker, REQUEST_TIMEOUT_SECONDS
 from controllers.PlaybackController import PlaybackController
 from controllers.midi_parse_worker import MidiParseWorker
 from controllers.app_state import AppState
@@ -159,6 +160,7 @@ class MainWindow(QMainWindow):
         self.ui.settings_tab.opacity_slider.valueChanged.connect(self._save_config)
         self.ui.settings_tab.timeline_vis_check.toggled.connect(self._save_config)
         self.ui.settings_tab.piano_vis_check.toggled.connect(self._save_config)
+        self.ui.settings_tab.pedal_prompt_threshold_spinbox.valueChanged.connect(self._save_config)
 
         # Translator tab
         self.ui.translator_tab.play_sheet_requested.connect(self._on_play_sheet)
@@ -489,6 +491,19 @@ class MainWindow(QMainWindow):
         self.state.midi_pedal_events = midi_pedal_events
         self.state.parsed_tempo_map = tempo_map
         self.ui.playback_tab.set_midi_pedal_available(pedal_count > 0)
+        pedal_prompt_threshold = self.ui.settings_tab.pedal_prompt_threshold_spinbox.value()
+        if pedal_count >= pedal_prompt_threshold:
+            reply = QMessageBox.question(
+                self, "Use MIDI Pedal?",
+                f"This MIDI file contains {pedal_count} sustain pedal events from the "
+                "source performance. Use these directly instead of generating new pedal "
+                "events?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            self.ui.playback_tab.use_midi_pedal_check.setChecked(
+                reply == QMessageBox.StandardButton.Yes
+            )
 
         _events = tempo_map.events
         # events[0] is always a synthetic default entry (GlobalTickMap always
@@ -868,13 +883,16 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Join every background thread (bounded) so none outlives the window and
-        # later emits a signal into a destroyed MainWindow.
-        self._update_checker.quit()
-        self._update_checker.wait(2000)
+        # later emits a signal into a destroyed MainWindow. UpdateChecker overrides
+        # run() with a single blocking network call and never starts an event loop,
+        # so quit() would be a no-op for it; the wait() bound must cover the
+        # request's own timeout (see UpdateManager.REQUEST_TIMEOUT_SECONDS) to
+        # actually join rather than merely give up after an arbitrary duration.
+        update_join_ms = int(REQUEST_TIMEOUT_SECONDS * 1000) + 500
+        self._update_checker.wait(update_join_ms)
         manual_checker = getattr(self, '_manual_checker', None)
         if manual_checker is not None:
-            manual_checker.quit()
-            manual_checker.wait(2000)
+            manual_checker.wait(update_join_ms)
         if self._parse_thread and self._parse_thread.isRunning():
             self._parse_thread.quit()
             self._parse_thread.wait(2000)
