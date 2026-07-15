@@ -47,6 +47,7 @@ class KeyEvent:
     action: str = field(compare=False)
     key_char: str = field(compare=False)
     pitch: Optional[int] = field(default=None, compare=False)
+    velocity: Optional[int] = field(default=None, compare=False)
 
 @dataclass
 class MusicalSection:

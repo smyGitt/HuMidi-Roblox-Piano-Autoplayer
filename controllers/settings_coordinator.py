@@ -2,7 +2,7 @@ import os
 import subprocess
 import webbrowser
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 
 from managers.UpdateManager import UpdateChecker, REQUEST_TIMEOUT_SECONDS
@@ -18,12 +18,22 @@ def _auto_check_enabled(loaded_cfg: dict) -> bool:
     return loaded_cfg.get('auto_check_updates', True)
 
 
-class SettingsCoordinator:
+class SettingsCoordinator(QObject):
     """Bridges SettingsTab/ConfigManager/HotkeyManager for directories, hotkeys,
     window chrome toggles, config persistence, and the update-check flow.
+
+    Must be a QObject (not a plain Python object): `UpdateChecker` (a QThread
+    subclass) emits its signals from inside its own overridden run(), i.e. on
+    the checker's thread. Qt can only auto-queue that connection back to the
+    GUI thread when it can read the receiver's thread affinity off a QObject;
+    a plain-object receiver has no thread affinity, so Qt falls back to a
+    direct connection and runs the slot (which builds a QMessageBox) on the
+    update-check thread. See the identical fix and explanation on
+    LoadCoordinator.
     """
 
     def __init__(self, window, ui, config_manager, hotkey_manager, playback_coordinator, app_version):
+        super().__init__()
         self.window = window
         self.ui = ui
         self.config_manager = config_manager

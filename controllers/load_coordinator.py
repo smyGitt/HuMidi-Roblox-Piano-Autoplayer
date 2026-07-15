@@ -4,7 +4,7 @@ import tempfile
 import threading
 from datetime import datetime
 
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QMessageBox, QFileDialog, QDialog
 
 from controllers.midi_parse_worker import MidiParseWorker
@@ -67,14 +67,27 @@ def _stamp_last_accessed_async(filepath: str, data: dict) -> None:
     ).start()
 
 
-class LoadCoordinator:
+class LoadCoordinator(QObject):
     """Bridges MainWindowUI/ConfigManager/PlaybackController for MIDI-open and save-load flows.
 
     Owns the threaded MIDI structure parse (MidiParseWorker on its own QThread)
     and the track-selection / save-file dialogs.
+
+    Must be a QObject (not a plain Python object): MidiParseWorker's signals
+    are connected directly to this class's bound methods (_on_midi_parsed,
+    _on_midi_parse_failed, _on_parse_cleanup), which build/exec GUI dialogs.
+    Qt can only auto-queue a cross-thread signal connection to the GUI thread
+    when it can determine the receiver's thread affinity from a QObject; a
+    plain-object receiver has no thread affinity, so Qt falls back to a
+    direct connection and runs the slot on the emitting worker thread. That
+    manifested as "QObject::setParent: Cannot set parent, new parent is in a
+    different thread" plus recursive-repaint/backing-store errors whenever
+    TrackSelectionDialog was built and exec'd from the parse thread instead
+    of the GUI thread.
     """
 
     def __init__(self, window, ui, config_manager, playback_controller, state):
+        super().__init__()
         self.window = window
         self.ui = ui
         self.config_manager = config_manager

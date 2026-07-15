@@ -446,7 +446,7 @@ class _SaveWorker(QObject):
 
         serialized_events = [
             {'time': ev.time, 'priority': ev.priority, 'action': ev.action,
-             'key_char': ev.key_char, 'pitch': ev.pitch}
+             'key_char': ev.key_char, 'pitch': ev.pitch, 'velocity': ev.velocity}
             for ev in events_to_serialize
         ]
 
@@ -1030,13 +1030,17 @@ class PlaybackController(QObject):
             pitch_val = ev.get('pitch')
             if pitch_val is not None:
                 pitch_val = int(pitch_val)
+            velocity_val = ev.get('velocity')
+            if velocity_val is not None:
+                velocity_val = int(velocity_val)
 
             reconstructed_events.append(KeyEvent(
                 time=float(ev['time']),
                 priority=int(ev['priority']),
                 action=str(ev['action']),
                 key_char=str(ev['key_char']),
-                pitch=pitch_val
+                pitch=pitch_val,
+                velocity=velocity_val
             ))
 
             if ev['action'] == 'press' and pitch_val is not None:

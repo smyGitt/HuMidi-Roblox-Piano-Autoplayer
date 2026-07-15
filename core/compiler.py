@@ -94,7 +94,7 @@ def compile_note_events(
                 key_data = mapper.get_key_data(mistake_pitch)
                 if key_data:
                     mk_char = key_data['key']
-                    heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', mk_char, pitch=mistake_pitch))
+                    heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', mk_char, pitch=mistake_pitch, velocity=note.velocity))
                     heapq.heappush(temp_heap, KeyEvent(note.start_time + note.duration, 4, 'release', mk_char, pitch=mistake_pitch))
                     scheduled = True
                     mistakes_injected += 1
@@ -103,7 +103,7 @@ def compile_note_events(
             key_data = mapper.get_key_data(note.pitch)
             if key_data:
                 key_char = key_data['key']
-                heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', key_char, pitch=note.pitch))
+                heapq.heappush(temp_heap, KeyEvent(note.start_time, 2, 'press', key_char, pitch=note.pitch, velocity=note.velocity))
                 heapq.heappush(temp_heap, KeyEvent(note.end_time,   4, 'release', key_char, pitch=note.pitch))
             else:
                 notes_unmapped += 1

@@ -86,6 +86,27 @@ class PerformanceCard(QWidget):
         grid.addWidget(self._midi_pedal_label, 2, 0, Qt.AlignmentFlag.AlignVCenter)
         grid.addWidget(self.use_midi_pedal_check, 2, 2, 1, 2)
 
+        self.use_velocity_accent_check = ToggleSwitch()
+        self.use_velocity_accent_check.setChecked(False)
+        self.use_velocity_accent_check.setToolTip(
+            "When checked, notes at or above the velocity threshold below are played\n"
+            "with Alt held down, for games (e.g. Visual Piano) that read Alt as an accent."
+        )
+        grid.addWidget(self._make_label_pair("Velocity Accent", "hold Alt on loud notes"), 3, 0,
+                       Qt.AlignmentFlag.AlignVCenter)
+        grid.addWidget(self.use_velocity_accent_check, 3, 2, 1, 2)
+
+        self.velocity_accent_threshold_spinbox = NoScrollSpinBox()
+        self.velocity_accent_threshold_spinbox.setRange(1, 127)
+        self.velocity_accent_threshold_spinbox.setValue(100)
+        self.velocity_accent_threshold_spinbox.setFixedWidth(72)
+        self.velocity_accent_threshold_spinbox.setToolTip(
+            "Minimum MIDI velocity (0-127) that triggers the Alt-key accent"
+        )
+        grid.addWidget(self._make_label_pair("Accent Threshold", "minimum velocity"), 4, 0,
+                       Qt.AlignmentFlag.AlignVCenter)
+        grid.addWidget(self.velocity_accent_threshold_spinbox, 4, 2, 1, 2)
+
         body.addLayout(grid)
         body.addStretch()
 
@@ -119,4 +140,6 @@ class PerformanceCard(QWidget):
     def reset_to_default(self) -> None:
         self.transpose_spinbox.setValue(0)
         self.pedal_style_combo.setCurrentText("PedalAI")
+        self.use_velocity_accent_check.setChecked(False)
+        self.velocity_accent_threshold_spinbox.setValue(100)
 
