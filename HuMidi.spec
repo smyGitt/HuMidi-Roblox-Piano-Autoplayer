@@ -13,7 +13,14 @@ a = Analysis(
     hiddenimports=(
         ['pynput.keyboard._win32', 'pynput.mouse._win32']
         if sys.platform == 'win32'
-        else ['pynput.keyboard._xorg', 'pynput.mouse._xorg']
+        else [
+            'pynput.keyboard._xorg', 'pynput.mouse._xorg',
+            # python-xlib loads its X extensions by name at Display.__init__
+            # time rather than via a static import, so PyInstaller's scanner
+            # misses them; XTEST is what pynput needs for fake_input() key
+            # injection to work in a frozen build.
+            'Xlib.ext.xtest', 'Xlib.ext.record', 'Xlib.ext.randr',
+        ]
         if sys.platform.startswith('linux')
         else ['pynput.keyboard._darwin', 'pynput.mouse._darwin']
     ),

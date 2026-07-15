@@ -317,11 +317,7 @@ class Player(QObject):
         key_data = self.mapper.get_key_data(event.pitch)
         if not key_data: return [], event.key_char
         modifiers = key_data['modifiers']
-        if (
-            self.config.get('use_velocity_accent', False)
-            and event.velocity is not None
-            and event.velocity >= self.config.get('velocity_accent_threshold', 100)
-        ):
+        if self.config.get('use_velocity_accent', False) and event.velocity is not None:
             modifiers = modifiers + [Key.alt]
         return modifiers, key_data['key']
         

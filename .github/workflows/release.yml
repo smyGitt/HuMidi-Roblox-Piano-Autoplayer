@@ -191,13 +191,24 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 libxtst6
+          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 libxtst6 libxcb-cursor0 xvfb
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Build HuMidi
         run: pyinstaller HuMidi.spec
+
+      - name: Smoke test built binary
+        run: |
+          xvfb-run --auto-servernum dist/HuMidi/HuMidi &
+          APP_PID=$!
+          sleep 5
+          if ! kill -0 $APP_PID 2>/dev/null; then
+            echo "::error::HuMidi exited within 5s of launch under Xvfb — build is likely broken at runtime."
+            exit 1
+          fi
+          kill $APP_PID
 
       - name: Package as HuMidi.tar.gz
         working-directory: dist

@@ -89,7 +89,6 @@ class PlaybackTab(QWidget):
         self._pedal_ai_card.threshold_off_spinbox.valueChanged.connect(emit)
         self.use_midi_pedal_check.toggled.connect(emit)
         self.use_velocity_accent_check.toggled.connect(emit)
-        self.velocity_accent_threshold_spinbox.valueChanged.connect(emit)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -228,8 +227,7 @@ class PlaybackTab(QWidget):
         self.transpose_spinbox    = self._perf_card.transpose_spinbox
         self.perf_reset_icon      = self._perf_card.reset_icon
         self.use_midi_pedal_check = self._perf_card.use_midi_pedal_check
-        self.use_velocity_accent_check         = self._perf_card.use_velocity_accent_check
-        self.velocity_accent_threshold_spinbox = self._perf_card.velocity_accent_threshold_spinbox
+        self.use_velocity_accent_check = self._perf_card.use_velocity_accent_check
 
         # Right column: OPTIONS card.
         self._opts_card = OptionsCard()
@@ -563,8 +561,6 @@ class PlaybackTab(QWidget):
             self.all_humanization_spinboxes['mistake_chance'].setValue(config['mistake_chance'])
         if 'use_velocity_accent' in config:
             self.use_velocity_accent_check.setChecked(config['use_velocity_accent'])
-        if 'velocity_accent_threshold' in config:
-            self.velocity_accent_threshold_spinbox.setValue(config['velocity_accent_threshold'])
         self.update_enabled_states()
 
     def set_groups_enabled(self, enabled: bool, skip_playback_humanization: bool = False) -> None:
@@ -576,7 +572,6 @@ class PlaybackTab(QWidget):
             self.pedal_style_combo.setEnabled(enabled)
             self.transpose_spinbox.setEnabled(enabled)
             self.use_velocity_accent_check.setEnabled(enabled)
-            self.velocity_accent_threshold_spinbox.setEnabled(enabled)
             self.use_88_key_check.setEnabled(enabled)
             self.countdown_check.setEnabled(enabled)
             self.debug_check.setEnabled(enabled)
@@ -686,7 +681,6 @@ class PlaybackTab(QWidget):
         if 'use_midi_pedal' in config:
             self.use_midi_pedal_check.setChecked(config['use_midi_pedal'])
         self.use_velocity_accent_check.setChecked(config.get('use_velocity_accent', False))
-        self.velocity_accent_threshold_spinbox.setValue(config.get('velocity_accent_threshold', 100))
         self.update_enabled_states()
 
     def gather_playback_config(self) -> dict:
@@ -726,7 +720,6 @@ class PlaybackTab(QWidget):
             'invert_tempo_sway':       self.all_humanization_checks['invert_tempo_sway'].isChecked(),
             'use_midi_pedal':          self.use_midi_pedal_check.isChecked(),
             'use_velocity_accent':     self.use_velocity_accent_check.isChecked(),
-            'velocity_accent_threshold': self.velocity_accent_threshold_spinbox.value(),
         }
 
     def gather_app_config(self) -> dict:
@@ -756,5 +749,4 @@ class PlaybackTab(QWidget):
             'invert_tempo_sway':          self.all_humanization_checks['invert_tempo_sway'].isChecked(),
             'use_midi_pedal':             self.use_midi_pedal_check.isChecked(),
             'use_velocity_accent':        self.use_velocity_accent_check.isChecked(),
-            'velocity_accent_threshold':  self.velocity_accent_threshold_spinbox.value(),
         }

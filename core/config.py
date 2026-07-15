@@ -26,8 +26,7 @@ class HumanizationConfig(TypedDict, total=False):
     enable_tempo_sway: bool
     tempo_sway_intensity: float
     invert_tempo_sway: bool
-    use_velocity_accent: bool       # True = hold Alt while pressing notes at/above the threshold
-    velocity_accent_threshold: int  # MIDI velocity 0-127; Alt is held for events at or above this
+    use_velocity_accent: bool       # True = hold Alt while pressing any note that has recorded velocity, played as-is (no threshold)
 
 
 class PedalConfig(TypedDict, total=False):

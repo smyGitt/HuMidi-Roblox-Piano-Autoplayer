@@ -268,6 +268,19 @@ class LoadCoordinator(QObject):
                 reply == QMessageBox.StandardButton.Yes
             )
 
+        distinct_velocities = {note.velocity for track in tracks for note in track.notes}
+        if len(distinct_velocities) > 1:
+            box = QMessageBox(self.window)
+            box.setWindowTitle("Use Velocity?")
+            box.setText("The MIDI might contain some velocity data, use it on your playback?")
+            sure_btn = box.addButton("Sure", QMessageBox.ButtonRole.YesRole)
+            box.addButton("No", QMessageBox.ButtonRole.NoRole)
+            box.setDefaultButton(sure_btn)
+            box.exec()
+            self.ui.playback_tab.use_velocity_accent_check.setChecked(
+                box.clickedButton() is sure_btn
+            )
+
         _events = tempo_map.events
         # events[0] is always a synthetic default entry (GlobalTickMap always
         # prepends it at tick 0 with 500000 us). The real first set_tempo event
