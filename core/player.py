@@ -91,9 +91,8 @@ class Player(QObject):
         Dedicated execution branch for running pre-compiled JSON events,
         completely skipping the internal compilation pipeline.
         """
-        self.status_updated.emit("Initiating saved playback sequence...")
-        self.status_updated.emit(f"Successfully loaded {len(self.compiled_events)} physical execution instructions.")
-        self.status_updated.emit("Playing from save!")
+        self.status_updated.emit("Starting playback from saved events...")
+        self._log_engine_summary()
         self._execute_playback()
 
     def play_compiled(self):
@@ -103,8 +102,18 @@ class Player(QObject):
         on its own QThread and injects the result via load_compiled_events, so the
         player thread only needs to execute. No compilation happens here.
         """
-        self.status_updated.emit("Playing!")
+        self.status_updated.emit("Starting playback...")
+        self._log_engine_summary()
         self._execute_playback()
+
+    def _log_engine_summary(self):
+        """Debug-mode summary of the execution state at playback start."""
+        self._log_debug(
+            f"[ENGINE] {len(self.compiled_events)} compiled events loaded | "
+            f"duration={self.total_duration:.2f}s | "
+            f"countdown={bool(self.config.get('countdown'))} | "
+            f"88_key={bool(self.config.get('use_88_key_layout'))}"
+        )
 
     def _execute_playback(self):
         """Shared playback execution: countdown → cursor loop → cleanup.
@@ -224,7 +233,7 @@ class Player(QObject):
             time.sleep(1)
 
     def _run_cursor_loop(self):
-        self._log_debug("\n=== ENTERING CURSOR LOOP ===")
+        self._log_debug(f"[ENGINE] Cursor loop started | events={len(self.compiled_events)}")
         self.current_section_idx = -1
         _was_paused = False
         self._key_net.clear()
@@ -257,7 +266,7 @@ class Player(QObject):
                 if playback_time >= self.sections[next_sec_idx].start_time:
                     self.current_section_idx = next_sec_idx
                     sec = self.sections[next_sec_idx]
-                    self._log_debug(f"\n--- SECTION {next_sec_idx} | Time: {sec.start_time:.2f}s | Style: {sec.articulation_label.upper()} ---")
+                    self._log_debug(f"[SECTION] {next_sec_idx} | start={sec.start_time:.2f}s | style={sec.articulation_label.upper()}")
 
             if self.event_index >= len(self.compiled_events):
                 if playback_time > self.total_duration + 0.1:
@@ -379,7 +388,11 @@ class Player(QObject):
                         self._log_debug(f"[ACT] {playback_time:.4f}s | PRESS   | {event.key_char} | [PHYSICAL] Re-struck '{base_key}' (overlap)")
                     else:
                         self.keyboard.press(base_key)
-                        self._log_debug(f"[ACT] {playback_time:.4f}s | PRESS   | {event.key_char} | [PHYSICAL] Pressed '{base_key}' {modifiers}")
+                        mod_names = '+'.join(m.name for m in modifiers)
+                        self._log_debug(
+                            f"[ACT] {playback_time:.4f}s | PRESS   | {event.key_char} | [PHYSICAL] Pressed '{base_key}'"
+                            + (f" with {mod_names}" if mod_names else "")
+                        )
             except Exception as e:
                 self._log_debug(f"[ACT] {playback_time:.4f}s | PRESS   | {event.key_char} | [PHYSICAL FAILURE] {e}")
 
@@ -456,8 +469,7 @@ class Player(QObject):
 
     def shutdown(self):
         active_keys = [k for k, s in self.key_states.items() if s.is_active]
-        self._log_debug(f"[SHUTDOWN] Releasing {len(active_keys)} active keys, pedal_down={self.pedal_is_down}")
-        self.status_updated.emit("Releasing all keys...")
+        self._log_debug(f"[SHUTDOWN] Releasing {len(active_keys)} active keys | pedal_down={self.pedal_is_down}")
         for key_char, state in self.key_states.items():
             try:
                 base_key = key_char
@@ -474,4 +486,3 @@ class Player(QObject):
         for key in [Key.shift, Key.ctrl, Key.alt]:
             try: self.keyboard.release(key)
             except Exception: pass
-        self.status_updated.emit("Shutdown complete.")

@@ -129,9 +129,7 @@ class _NotesCompileWorker(QObject):
     def run(self):
         debug_log = self.status_updated.emit if self.config.get('debug_mode') else None
         if debug_log and self.selected_tracks_info is not None:
-            debug_log("\n" + "=" * 60)
-            debug_log("=== NOTES COMPILE SESSION START (MIDI file) ===")
-            debug_log("=" * 60)
+            debug_log("[SESSION] Notes compilation started (MIDI file)")
             debug_log("[CONFIG] " + " | ".join(
                 f"{k}={v}" for k, v in sorted(self.config.items())
                 if k not in ('midi_file',)
@@ -139,8 +137,7 @@ class _NotesCompileWorker(QObject):
             debug_log(f"[CONFIG] midi_file: {self.config.get('midi_file', 'N/A')}")
             debug_log(f"[CONFIG] Tracks selected: {len(self.selected_tracks_info)}")
             for t, role in self.selected_tracks_info:
-                debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role} | Instrument: {t.instrument_name}")
-            debug_log("\n=== RAW MIDI DATA (Selected Tracks) ===")
+                debug_log(f"[CONFIG] Track {t.index} ({t.name}): {t.note_count} notes | Role: {role} | Instrument: {t.instrument_name}")
 
         midi_pedal_events = []
         try:
@@ -412,14 +409,12 @@ class _SaveWorker(QObject):
 
         debug_log = self.status_updated.emit if self.config.get('debug_mode') else None
         if debug_log:
-            debug_log("\n" + "=" * 60)
-            debug_log("=== SAVE SESSION START ===")
-            debug_log("=" * 60)
+            debug_log("[SESSION] Save compilation started")
             debug_log(f"[SAVE] Source: {self.original_filename}")
             debug_log(f"[SAVE] Target dir: {self.save_dir}")
             debug_log(f"[SAVE] Tracks selected: {len(self.selected_tracks_info)}")
             for t, role in self.selected_tracks_info:
-                debug_log(f"  Track {t.index} ({t.name}): {t.note_count} notes | Role: {role}")
+                debug_log(f"[SAVE] Track {t.index} ({t.name}): {t.note_count} notes | Role: {role}")
 
         try:
             final_notes, tempo_map, midi_pedal_events = _prepare_notes(
@@ -792,6 +787,12 @@ class PlaybackController(QObject):
         self._cached_midi_pedal_events = midi_pedal_events
         self._notes_config_snapshot    = extract_notes_config(config)
 
+        if config and config.get('debug_mode'):
+            self.status_updated.emit(
+                f"[CACHE] Phase-1 results cached: {len(note_events)} note events | "
+                f"{len(final_notes)} notes | duration={total_dur:.2f}s"
+            )
+
         self.timeline_data_ready.emit(final_notes, total_dur, tempo_map)
 
     def _on_notes_error(self, error_msg: str) -> None:
@@ -893,6 +894,12 @@ class PlaybackController(QObject):
             total_dur=self._cached_total_dur,
         )
 
+        if config and config.get('debug_mode'):
+            self.status_updated.emit(
+                f"[CACHE] Phase-2 results cached: {len(merged_events)} merged events | "
+                f"{len(pedal_intervals)} pedal intervals | session cache write queued"
+            )
+
         self.pedal_data_ready.emit(pedal_intervals)
         self.pedal_phase_done.emit()
 
@@ -926,6 +933,11 @@ class PlaybackController(QObject):
             return
         used_config = config if config is not None else (self._pending_config or {})
         compiled_dur = self._cached_merged_events[-1].time if self._cached_merged_events else self._cached_total_dur
+        if used_config.get('debug_mode'):
+            self.status_updated.emit(
+                f"[SESSION] Playback started from cached compilation | "
+                f"events={len(self._cached_merged_events)} | duration={compiled_dur:.2f}s"
+            )
         try:
             self.player = Player(used_config, [], [], self._cached_tempo_map)
         except PermissionError as exc:
@@ -1004,9 +1016,7 @@ class PlaybackController(QObject):
         debug_log = self.status_updated.emit if config.get('debug_mode') else None
         if debug_log:
             metadata = loaded_save_data.get('metadata', {})
-            debug_log("\n" + "=" * 60)
-            debug_log("=== PLAYBACK SESSION START (Saved file) ===")
-            debug_log("=" * 60)
+            debug_log("[SESSION] Playback from save started")
             debug_log(f"[SAVE] Source: {metadata.get('source_midi_filename', 'unknown')}")
             debug_log(f"[SAVE] Created: {metadata.get('creation_timestamp', 'unknown')}")
             debug_log(f"[SAVE] Raw events in file: {len(events_data)}")

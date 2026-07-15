@@ -13,7 +13,9 @@ class ConfigManager:
             
         self.save_dir = os.path.join(self.root_dir, 'saves')
         os.makedirs(self.save_dir, exist_ok=True)
-        
+
+        self.midi_dir = ""
+
         self.config_dir = Path.home() / ".humidi"
         self.config_path = self.config_dir / "config.json"
         self.config_dir.mkdir(exist_ok=True)
@@ -27,6 +29,8 @@ class ConfigManager:
                 config = json.load(f)
                 if config.get('save_dir') and os.path.exists(config.get('save_dir')):
                     self.save_dir = config.get('save_dir')
+                if config.get('midi_dir') and os.path.exists(config.get('midi_dir')):
+                    self.midi_dir = config.get('midi_dir')
                 return config
         except Exception:
             return {}
@@ -34,6 +38,7 @@ class ConfigManager:
     def save(self, config_data: dict):
         """Persists the current application state to JSON."""
         config_data['save_dir'] = self.save_dir
+        config_data['midi_dir'] = self.midi_dir
         try:
             with open(self.config_path, 'w') as f:
                 json.dump(config_data, f, indent=4)
@@ -42,3 +47,6 @@ class ConfigManager:
 
     def set_save_dir(self, new_dir: str):
         self.save_dir = new_dir
+
+    def set_midi_dir(self, new_dir: str):
+        self.midi_dir = new_dir

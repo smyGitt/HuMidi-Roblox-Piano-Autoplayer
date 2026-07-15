@@ -49,7 +49,7 @@ class SettingsTab(QWidget):
         nav_layout.setSpacing(0)
 
         self._tab_btns = []
-        for i, name in enumerate(["Display", "Files", "Hotkey", "System"]):
+        for i, name in enumerate(["Display", "Files", "Hotkey", "System", "Privacy"]):
             btn = QPushButton(name)
             btn.setObjectName("sub_tab_btn")
             btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -67,6 +67,7 @@ class SettingsTab(QWidget):
         self._stack.addWidget(self._make_files_page())
         self._stack.addWidget(self._make_hotkey_page())
         self._stack.addWidget(self._make_system_page())
+        self._stack.addWidget(self._make_privacy_page())
         outer.addWidget(self._stack, 1)
 
         self._switch_tab(0)
@@ -168,6 +169,35 @@ class SettingsTab(QWidget):
         body.addLayout(save_row)
 
         body.addSpacing(10)
+        midi_hdr = QHBoxLayout()
+        midi_hdr.setSpacing(4)
+        midi_hdr.setContentsMargins(0, 0, 0, 0)
+        self.midi_dir_icon = PhIconLabel("folder-open", size=14)
+        self.midi_dir_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        midi_hdr.addWidget(self.midi_dir_icon)
+        midi_hdr.addWidget(self._section_label("MIDI Directory"))
+        midi_hdr.addStretch()
+        body.addLayout(midi_hdr)
+
+        midi_row = QHBoxLayout()
+        midi_row.setSpacing(8)
+        self.midi_path_input = QLineEdit()
+        self.midi_path_input.setReadOnly(True)
+        self.midi_path_input.setToolTip("Default directory the MIDI file picker opens to")
+        self.midi_edit_btn = PhIconLabel("folder-closed", size=32, hover_icon_name="folder-open")
+        self.midi_edit_btn.setObjectName("folder_open_btn")
+        self.midi_edit_btn.setToolTip("Open MIDI directory in Explorer")
+        self.midi_edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.midi_browse_btn = PhIconLabel("rename-theme", size=32)
+        self.midi_browse_btn.setObjectName("folder_open_btn")
+        self.midi_browse_btn.setToolTip("Choose the default directory for opening MIDI files")
+        self.midi_browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        midi_row.addWidget(self.midi_path_input, 1)
+        midi_row.addWidget(self.midi_edit_btn)
+        midi_row.addWidget(self.midi_browse_btn)
+        body.addLayout(midi_row)
+
+        body.addSpacing(10)
         themes_hdr = QHBoxLayout()
         themes_hdr.setSpacing(4)
         themes_hdr.setContentsMargins(0, 0, 0, 0)
@@ -249,6 +279,10 @@ class SettingsTab(QWidget):
         self.check_update_btn.setToolTip("Check GitHub for a newer version of HuMidi")
         body.addWidget(self.check_update_btn)
 
+        self.auto_check_updates_toggle = ToggleSwitch("Automatically check for updates")
+        self.auto_check_updates_toggle.setToolTip("Check GitHub for a newer version each time HuMidi starts")
+        body.addWidget(self.auto_check_updates_toggle)
+
         body.addSpacing(12)
         body.addWidget(self._section_label("MIDI Import"))
         pedal_prompt_row = QHBoxLayout()
@@ -274,6 +308,38 @@ class SettingsTab(QWidget):
         self.reset_all_btn = QPushButton("Reset All Settings")
         self.reset_all_btn.setToolTip("Reset all playback and humanization settings to their default values")
         body.addWidget(self.reset_all_btn)
+        body.addStretch()
+
+        page_layout.addWidget(card, 1)
+        return page
+
+    def _make_privacy_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        page_layout.setSpacing(0)
+
+        card, body = make_card("")
+        body.setSpacing(6)
+
+        body.addWidget(self._section_label("Debug Log"))
+        self.redact_paths_check = ToggleSwitch("Redact file paths")
+        self.redact_paths_check.setChecked(True)
+        self.redact_paths_check.setToolTip(
+            "Collapse full file and folder paths in the Debug tab's log down to "
+            "just the file/folder name, so exported logs don't reveal your "
+            "Windows username or directory layout"
+        )
+        body.addWidget(self.redact_paths_check)
+        redact_desc = QLabel(
+            "When enabled, paths logged to the Debug console (MIDI file location, "
+            "save directory, etc.) are shortened to their final name instead of "
+            "showing the full path. Turn this off to see full paths while "
+            "debugging locally."
+        )
+        redact_desc.setProperty("variant", "muted")
+        redact_desc.setWordWrap(True)
+        body.addWidget(redact_desc)
         body.addStretch()
 
         page_layout.addWidget(card, 1)
@@ -312,7 +378,7 @@ class SettingsTab(QWidget):
         self._populate_theme_combo()
         self.theme_combo.blockSignals(False)
 
-    def load_config(self, config: dict, save_dir: str) -> None:
+    def load_config(self, config: dict, save_dir: str, midi_dir: str = "") -> None:
         self.always_top_check.setChecked(config.get('always_on_top', False))
         self.opacity_slider.setValue(config.get('opacity', 100))
         self.timeline_vis_check.setChecked(config.get('show_timeline_visualizer', True))
@@ -320,7 +386,10 @@ class SettingsTab(QWidget):
         self.pedal_prompt_threshold_spinbox.setValue(
             config.get('pedal_prompt_threshold', self.DEFAULT_PEDAL_PROMPT_THRESHOLD)
         )
+        self.auto_check_updates_toggle.setChecked(config.get('auto_check_updates', True))
+        self.redact_paths_check.setChecked(config.get('redact_debug_paths', True))
         self.save_path_input.setText(save_dir)
+        self.midi_path_input.setText(midi_dir)
 
     def gather_config(self) -> dict:
         return {
@@ -329,4 +398,6 @@ class SettingsTab(QWidget):
             'show_timeline_visualizer': self.timeline_vis_check.isChecked(),
             'show_piano_visualizer':    self.piano_vis_check.isChecked(),
             'pedal_prompt_threshold':   self.pedal_prompt_threshold_spinbox.value(),
+            'auto_check_updates':       self.auto_check_updates_toggle.isChecked(),
+            'redact_debug_paths':       self.redact_paths_check.isChecked(),
         }

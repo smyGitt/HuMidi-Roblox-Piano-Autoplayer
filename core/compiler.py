@@ -46,7 +46,7 @@ def compile_note_events(
         if log:
             log(msg)
 
-    _log("\n=== HUMANIZATION PIPELINE ===")
+    _log("[PIPELINE] Humanization started")
 
     debug_list: Optional[List[str]] = [] if config.get('debug_mode') else None
     humanizer = Humanizer(config, debug_list)
@@ -73,8 +73,6 @@ def compile_note_events(
     if debug_list and log:
         for msg in debug_list:
             log(msg)
-
-    _log("\n=== COMPILATION ===")
 
     mapper = KeyMapper(use_88_key_layout=config.get('use_88_key_layout', False))
     use_mistakes   = config.get('enable_mistakes', False)
@@ -110,7 +108,6 @@ def compile_note_events(
             else:
                 notes_unmapped += 1
 
-    press_count = sum(1 for e in temp_heap if e.action == 'press')
     _log(
         f"[COMPILE] Note events: {len(temp_heap)} | "
         f"Mistakes: {mistakes_injected} | Unmapped: {notes_unmapped}"

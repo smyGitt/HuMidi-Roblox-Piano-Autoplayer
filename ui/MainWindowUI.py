@@ -268,7 +268,6 @@ class MainWindowUI(QObject):
         self.tabs.addWidget(self.license_tab)                      # 5
 
         # Convenience aliases for frequently accessed sub-widgets
-        self.log_output      = self.debug_tab.log_output
         self.timeline_widget = self.visualizer_tab.timeline_widget
         self.piano_widget    = self.visualizer_tab.piano_widget
         self.scroll_area     = self.visualizer_tab.scroll_area
@@ -403,8 +402,10 @@ class MainWindowUI(QObject):
         accent_icons = (
             self.settings_tab.save_edit_btn,
             self.settings_tab.themes_edit_btn,
+            self.settings_tab.midi_edit_btn,
             self.settings_tab.save_browse_btn,
             self.settings_tab.themes_browse_btn,
+            self.settings_tab.midi_browse_btn,
         )
         # Hover-to-danger icons (destructive card resets).
         danger_icons = (
@@ -419,6 +420,7 @@ class MainWindowUI(QObject):
         default_icons = (
             self.settings_tab.save_dir_icon,
             self.settings_tab.themes_file_icon,
+            self.settings_tab.midi_dir_icon,
             self.playback_tab.file_strip.tile_icon,
             self.playback_tab.drop_zone.drop_icon,
             self.playback_tab.refresh_saved_songs_btn,
@@ -659,9 +661,9 @@ class MainWindowUI(QObject):
     def reset_controls_to_default(self) -> None:
         self.playback_tab.reset_to_default()
 
-    def load_config_to_ui(self, config: dict, save_dir: str) -> None:
+    def load_config_to_ui(self, config: dict, save_dir: str, midi_dir: str = "") -> None:
         self.playback_tab.load_config(config)
-        self.settings_tab.load_config(config, save_dir)
+        self.settings_tab.load_config(config, save_dir, midi_dir)
 
     def gather_playback_config(self) -> dict:
         cfg = self.playback_tab.gather_playback_config()

@@ -30,6 +30,15 @@ from ui.theme import ThemeManager
 APP_VERSION = "2.1"
 
 
+def _auto_check_enabled(loaded_cfg: dict) -> bool:
+    """Whether the automatic launch-time update check runs for this config.
+
+    Defaults to True when the key is absent (config predating this setting) or
+    the config is empty (no saved config yet).
+    """
+    return loaded_cfg.get('auto_check_updates', True)
+
+
 def _validate_save_data(data: dict) -> tuple[bool, str]:
     """Return (ok, reason). reason is empty when ok is True."""
     metadata = data.get('metadata')
@@ -103,6 +112,10 @@ class MainWindow(QMainWindow):
         # Global Application States
         self.state = AppState()
 
+        # Must exist before _bind_signals: load_config_to_ui fires settings
+        # toggle signals that call _save_config, which reads this attribute.
+        self._skipped_update_version = ''
+
         # Threaded track-selection parse (see _parse_and_select_tracks)
         self._parse_thread = None
         self._parse_worker = None
@@ -112,9 +125,12 @@ class MainWindow(QMainWindow):
         # Load initialization data
         loaded_cfg = self.config_manager.load()
         if loaded_cfg:
-            self.ui.load_config_to_ui(loaded_cfg, self.config_manager.save_dir)
+            self.ui.load_config_to_ui(loaded_cfg, self.config_manager.save_dir, self.config_manager.midi_dir)
         else:
             self.ui.reset_controls_to_default()
+        # Sync explicitly: load_config_to_ui only fires the toggled signal when
+        # the loaded value differs from the widget's built-in default.
+        self.ui.debug_tab.set_redact_paths(self.ui.settings_tab.redact_paths_check.isChecked())
         self.ui.settings_tab.hk_label.setText(
             f"Hotkey: {self.hotkey_manager.format_hotkey_string()}"
         )
@@ -124,9 +140,13 @@ class MainWindow(QMainWindow):
 
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
 
-        self._update_checker = UpdateChecker(APP_VERSION)
-        self._update_checker.update_available.connect(self._on_update_available)
-        self._update_checker.start()
+        self._skipped_update_version = loaded_cfg.get('skipped_update_version', '')
+        if _auto_check_enabled(loaded_cfg):
+            self._update_checker = UpdateChecker(APP_VERSION)
+            self._update_checker.update_available.connect(
+                lambda tag, url: self._on_update_available(tag, url, suppress_skipped=True)
+            )
+            self._update_checker.start()
 
         self.resize(self.ui._expanded_size)
 
@@ -142,6 +162,8 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.drop_zone.file_dropped.connect(self._open_midi)
         self.ui.settings_tab.save_browse_btn.clicked.connect(self._browse_save_dir)
         self.ui.settings_tab.save_edit_btn.clicked.connect(self._open_save_dir)
+        self.ui.settings_tab.midi_browse_btn.clicked.connect(self._browse_midi_dir)
+        self.ui.settings_tab.midi_edit_btn.clicked.connect(self._open_midi_dir)
         self.ui.settings_tab.themes_browse_btn.clicked.connect(self._browse_themes_dir)
         self.ui.settings_tab.themes_edit_btn.clicked.connect(self._open_themes_dir)
         self.ui._collapsed_load_btn.clicked.connect(self.select_file)
@@ -161,6 +183,10 @@ class MainWindow(QMainWindow):
         self.ui.settings_tab.timeline_vis_check.toggled.connect(self._save_config)
         self.ui.settings_tab.piano_vis_check.toggled.connect(self._save_config)
         self.ui.settings_tab.pedal_prompt_threshold_spinbox.valueChanged.connect(self._save_config)
+        self.ui.settings_tab.redact_paths_check.toggled.connect(self._save_config)
+
+        # Privacy: mirror the redact-paths toggle onto the DebugTab immediately
+        self.ui.settings_tab.redact_paths_check.toggled.connect(self.ui.debug_tab.set_redact_paths)
 
         # Translator tab
         self.ui.translator_tab.play_sheet_requested.connect(self._on_play_sheet)
@@ -184,7 +210,7 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.save_card_clicked.connect(self._on_save_card_quick_load)
 
         # System Logic bridging to the View representations
-        self.playback_controller.status_updated.connect(self.ui.log_output.append)
+        self.playback_controller.status_updated.connect(self.ui.debug_tab.append_log)
         self.playback_controller.status_updated.connect(self._on_status_for_indicator)
         self.playback_controller.progress_updated.connect(self.update_progress)
         self.playback_controller.playback_finished.connect(self.on_playback_finished)
@@ -232,6 +258,7 @@ class MainWindow(QMainWindow):
     # --- Standard Execution Behaviors ---
     def _save_config(self):
         config_data = self.ui.gather_app_config()
+        config_data['skipped_update_version'] = self._skipped_update_version
         self.config_manager.save(config_data)
 
     def _browse_save_dir(self):
@@ -244,6 +271,19 @@ class MainWindow(QMainWindow):
     def _open_save_dir(self):
         import subprocess
         path = self.config_manager.save_dir
+        if os.path.isdir(path):
+            subprocess.Popen(["explorer", os.path.normpath(path)])
+
+    def _browse_midi_dir(self):
+        path = QFileDialog.getExistingDirectory(self, "Select MIDI Directory", self.config_manager.midi_dir)
+        if path:
+            self.config_manager.set_midi_dir(path)
+            self.ui.settings_tab.midi_path_input.setText(path)
+            self._save_config()
+
+    def _open_midi_dir(self):
+        import subprocess
+        path = self.config_manager.midi_dir
         if os.path.isdir(path):
             subprocess.Popen(["explorer", os.path.normpath(path)])
 
@@ -328,7 +368,7 @@ class MainWindow(QMainWindow):
         self.ui.stop_button.setEnabled(True)
 
     def _on_timeline_seek(self, time):
-        self.ui.log_output.append(f"Seeking to {time:.2f}s...")
+        self.ui.debug_tab.append_log(f"Seeking to {time:.2f}s...")
         self.playback_controller.seek(time)
     
     def _on_visual_scrub(self, time):
@@ -354,12 +394,17 @@ class MainWindow(QMainWindow):
         self.state.total_song_duration_sec = total_dur
         self.ui.timeline_widget.set_data(notes, total_dur, tempo_map)
         self.ui.reset_timeline_position()
+        self.ui.debug_tab.update_snapshot({
+            'notes': len(notes),
+            'duration': f"{int(total_dur // 60)}:{int(total_dur % 60):02d}",
+        })
         # Status is set by notes_phase_done / pedal_phase_done / session_ready signals.
 
     def _on_pedal_data_ready(self, intervals: list):
         self.state.current_pedal_intervals = intervals
         self.state.pedal_interval_starts = [s for s, _ in intervals]
         self.ui.timeline_widget.set_pedal_intervals(intervals)
+        self.ui.debug_tab.update_snapshot({'pedal': f"{len(intervals)} presses"})
 
     def update_progress(self, current_time):
         self.ui.update_progress(current_time, self.state.total_song_duration_sec)
@@ -373,7 +418,9 @@ class MainWindow(QMainWindow):
 
     def select_file(self):
         if self.playback_controller.is_playing() or self.playback_controller.is_paused(): return
-        filepath, _ = QFileDialog.getOpenFileName(self, "Select MIDI File", "", "MIDI Files (*.mid *.midi)")
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Select MIDI File", self.config_manager.midi_dir, "MIDI Files (*.mid *.midi)"
+        )
         if filepath:
             self._open_midi(filepath)
 
@@ -395,7 +442,12 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.update_bpm_display(0.0)
         self.ui.playback_tab.set_groups_enabled(True)
         self.ui.update_file_label(os.path.basename(filepath), filepath)
-        self.ui.log_output.append(f"Selected file: {filepath}")
+        self.ui.debug_tab.append_log(f"Selected file: {filepath}")
+        self.ui.debug_tab.clear_snapshot()
+        self.ui.debug_tab.update_snapshot({
+            'file': os.path.basename(filepath),
+            'source': 'MIDI file',
+        })
         self._parse_and_select_tracks(filepath)
             
     def _apply_save(self, filepath: str, data: dict) -> None:
@@ -423,16 +475,23 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.reset_pedal_ai_card()
         self.ui.playback_tab.update_loaded_summary_from_save(track_details, compiled_pedal_count)
         if self.ui.playback_tab.debug_check.isChecked():
-            self.ui.log_output.append(
-                f"[DEBUG] Loaded save with {len(track_details)} track(s), "
-                f"{compiled_pedal_count} compiled pedal event(s)."
+            self.ui.debug_tab.append_log(
+                f"[SAVE] Loaded metadata: {len(track_details)} track(s) | "
+                f"{compiled_pedal_count} compiled pedal event(s)"
             )
+        self.ui.debug_tab.clear_snapshot()
+        self.ui.debug_tab.update_snapshot({
+            'file': self.state.loaded_save_filename,
+            'source': 'Save file',
+            'tracks': len(track_details),
+            'pedal': f"{compiled_pedal_count} presses",
+        })
         self.ui.update_file_label(self.state.loaded_save_filename, filepath)
         self.ui.playback_tab.set_groups_enabled(False)
         self.ui._set_save_enabled(False)
         self.ui.play_button.setEnabled(True)
         self.ui.scrubber_slider.setEnabled(True)
-        self.ui.log_output.append(f"Loaded save file: {self.state.loaded_save_filename}")
+        self.ui.debug_tab.append_log(f"Loaded save file: {self.state.loaded_save_filename}")
         self.ui.playback_tab.refresh_saved_songs(self.config_manager.save_dir)
         self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
 
@@ -473,7 +532,7 @@ class MainWindow(QMainWindow):
         """
         if self._parse_thread and self._parse_thread.isRunning():
             return
-        self.ui.log_output.append("Parsing MIDI structure...")
+        self.ui.debug_tab.append_log("Parsing MIDI structure...")
         self.ui._status_indicator.set_state(StatusIndicator.LOADING, "LOADING MIDI")
 
         self._parse_thread = QThread()
@@ -515,12 +574,15 @@ class MainWindow(QMainWindow):
             _initial_tempo_us = _events[1][1]
         else:
             _initial_tempo_us = _events[0][1] if _events else 500000
-        self.ui.playback_tab.update_bpm_display(60_000_000 / _initial_tempo_us)
+        _initial_bpm = 60_000_000 / _initial_tempo_us
+        self.ui.playback_tab.update_bpm_display(_initial_bpm)
+        self.ui.debug_tab.update_snapshot({'tempo': f"{_initial_bpm:.0f} BPM"})
 
         dialog = TrackSelectionDialog(tracks, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.state.selected_tracks_info = dialog.get_selection()
-            self.ui.log_output.append(f"Tracks selected: {len(self.state.selected_tracks_info)}")
+            self.ui.debug_tab.append_log(f"Tracks selected: {len(self.state.selected_tracks_info)}")
+            self.ui.debug_tab.update_snapshot({'tracks': len(self.state.selected_tracks_info)})
             self.ui.playback_tab.update_loaded_summary(
                 self.state.selected_tracks_info, self.state.loaded_pedal_count
             )
@@ -532,7 +594,7 @@ class MainWindow(QMainWindow):
             config = self.ui.gather_playback_config()
             self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
         else:
-            self.ui.log_output.append("Track selection cancelled.")
+            self.ui.debug_tab.append_log("Track selection cancelled.")
             self.state.selected_tracks_info = None
             self.ui.playback_tab.clear_loaded_summary()
             self.ui.play_button.setEnabled(False)
@@ -560,9 +622,10 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self.state.selected_tracks_info = dialog.get_selection()
-        self.ui.log_output.append(
+        self.ui.debug_tab.append_log(
             f"Track selection updated: {len(self.state.selected_tracks_info)}"
         )
+        self.ui.debug_tab.update_snapshot({'tracks': len(self.state.selected_tracks_info)})
         self.ui.playback_tab.update_loaded_summary(
             self.state.selected_tracks_info, self.state.loaded_pedal_count
         )
@@ -614,7 +677,13 @@ class MainWindow(QMainWindow):
                 'invert_tempo_sway': False, 'use_ai_pedal': False,
             }
 
-        self.ui.log_output.append(f"Importing sheet: {len(notes)} notes at {bpm} BPM ({format_name})")
+        self.ui.debug_tab.append_log(f"Importing sheet: {len(notes)} notes at {bpm} BPM ({format_name})")
+        self.ui.debug_tab.clear_snapshot()
+        self.ui.debug_tab.update_snapshot({
+            'file': '(pasted sheet)',
+            'source': f"{format_name} import",
+            'tempo': f"{bpm} BPM",
+        })
         self.playback_controller.play_from_notes(config, notes, tempo_map)
         self.ui.set_controls_enabled(False)
         self.ui.play_button.setEnabled(True)
@@ -646,10 +715,10 @@ class MainWindow(QMainWindow):
             return
 
         self.ui.translator_tab.set_export_text(text)
-        self.ui.log_output.append(f"Sheet exported: {format_name} ({len(text.splitlines())} lines)")
+        self.ui.debug_tab.append_log(f"Sheet exported: {format_name} ({len(text.splitlines())} lines)")
 
     def show_error_dialog(self, error_message: str):
-        self.ui.log_output.append("ERROR: Playback thread terminated unexpectedly due to an execution failure.")
+        self.ui.debug_tab.append_log("ERROR: Playback halted by an execution failure.")
         QMessageBox.critical(self, "Hardware/Execution Failure", error_message)
 
     # --- Status Indicator Slots ---
@@ -697,6 +766,9 @@ class MainWindow(QMainWindow):
         """Phase 2 complete (MIDI path): pedal generated and merged. Status -> READY."""
         self.ui._status_indicator.set_state(StatusIndicator.READY, "READY")
         self.ui.playback_tab.set_generate_pedal_enabled(True)
+        restore = self.playback_controller.get_restore_config()
+        if restore and restore.get('pedal_style'):
+            self.ui.debug_tab.update_snapshot({'pedal_style': restore['pedal_style']})
 
     def _on_session_ready(self) -> None:
         """Translator monolithic path done. Status -> READY."""
@@ -730,6 +802,10 @@ class MainWindow(QMainWindow):
             return
         config = self.ui.gather_playback_config()
         notes_dirty = not self.playback_controller.notes_match_config(config)
+        if config.get('debug_mode'):
+            self.ui.debug_tab.append_log(
+                f"[APPLY] Recompile requested | notes_dirty={notes_dirty}"
+            )
         if notes_dirty:
             # Notes must be recompiled; pedal must follow automatically.
             self._auto_compile_pedal_after_notes = True
@@ -827,6 +903,11 @@ class MainWindow(QMainWindow):
         self.ui.playback_tab.navigate_to_playback_sub_tab()
         notes_dirty = not notes_fresh
         pedal_dirty_independent = pedal_compiled and not pedal_fresh
+        if config.get('debug_mode'):
+            self.ui.debug_tab.append_log(
+                f"[PLAY] Blocked: compilation is stale | notes_dirty={notes_dirty} | "
+                f"pedal_dirty={pedal_dirty_independent}"
+            )
         self.ui.playback_tab.show_toast(notes_dirty, pedal_dirty_independent)
         self.ui.playback_tab.shake_toast()
 
@@ -834,7 +915,7 @@ class MainWindow(QMainWindow):
         self.playback_controller.stop()
 
     def on_playback_finished(self):
-        self.ui.log_output.append("Playback process finished.\n" + "="*50 + "\n")
+        self.ui.debug_tab.append_log("Playback finished.")
         self.ui.set_controls_enabled(True, bool(self.state.loaded_save_data))
         self.ui.stop_button.setEnabled(False)
         self._sync_play_button()
@@ -871,15 +952,30 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Update Check Failed",
             "Could not reach GitHub.\nPlease check your internet connection.")
 
-    def _on_update_available(self, latest_tag: str, releases_url: str):
-        reply = QMessageBox.question(
-            self, "Update Available",
-            f"Update available to {latest_tag}. Would you like to open the download page?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+    def _on_update_available(self, latest_tag: str, releases_url: str, suppress_skipped: bool = False):
+        # The automatic launch check passes suppress_skipped=True so a version the
+        # user chose to skip does not re-prompt on every start. The manual "Check
+        # for updates" button passes False, so an explicit check always shows the
+        # dialog even for a previously skipped version.
+        if suppress_skipped and latest_tag == self._skipped_update_version:
+            return
+
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setWindowTitle("Update Available")
+        msg.setText(f"Update available to {latest_tag}. Would you like to open the download page?")
+        yes_btn = msg.addButton(QMessageBox.StandardButton.Yes)
+        msg.addButton(QMessageBox.StandardButton.No)
+        skip_btn = msg.addButton("Skip this version", QMessageBox.ButtonRole.DestructiveRole)
+        msg.setDefaultButton(yes_btn)
+        msg.exec()
+
+        clicked = msg.clickedButton()
+        if clicked is yes_btn:
             webbrowser.open(releases_url)
+        elif clicked is skip_btn:
+            self._skipped_update_version = latest_tag
+            self._save_config()
 
     def closeEvent(self, event):
         # Join every background thread (bounded) so none outlives the window and
@@ -889,7 +985,10 @@ class MainWindow(QMainWindow):
         # request's own timeout (see UpdateManager.REQUEST_TIMEOUT_SECONDS) to
         # actually join rather than merely give up after an arbitrary duration.
         update_join_ms = int(REQUEST_TIMEOUT_SECONDS * 1000) + 500
-        self._update_checker.wait(update_join_ms)
+        # _update_checker only exists when the auto-check-on-launch setting is on.
+        update_checker = getattr(self, '_update_checker', None)
+        if update_checker is not None:
+            update_checker.wait(update_join_ms)
         manual_checker = getattr(self, '_manual_checker', None)
         if manual_checker is not None:
             manual_checker.wait(update_join_ms)
