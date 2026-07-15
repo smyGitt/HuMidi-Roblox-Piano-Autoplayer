@@ -6,10 +6,12 @@ from typing import Any, List, Optional
 class AppState:
     """All mutable application-level state for a HuMidi session.
 
-    Owned by MainWindow and mutated by its file-handling, save/load, and
-    playback-data slots. Grouping it here gives the state a single named
-    owner and makes it clear which fields belong to session logic vs window
-    behaviour vs playback routing.
+    Owned by MainWindow, which shares it by reference with the
+    PlaybackUICoordinator, LoadCoordinator, and TranslatorCoordinator. Each
+    coordinator mutates the fields relevant to its own domain (file-handling,
+    save/load, or playback-data). Grouping it here gives the state a single
+    named owner and makes it clear which fields belong to session logic vs
+    window behaviour vs playback routing.
     """
 
     loaded_save_data: Optional[dict] = None

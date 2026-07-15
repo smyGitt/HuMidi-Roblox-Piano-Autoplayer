@@ -14,8 +14,8 @@ from ui.theme import ThemeManager
 class SettingsTab(QWidget):
 
     # Default minimum embedded MIDI CC 64 (sustain pedal) event count before
-    # MainWindow._on_midi_parsed prompts the user to use the file's own pedal
-    # data instead of generating new pedal events.
+    # LoadCoordinator._on_midi_parsed prompts the user to use the file's own
+    # pedal data instead of generating new pedal events.
     DEFAULT_PEDAL_PROMPT_THRESHOLD = 8
 
     def __init__(self, parent=None):

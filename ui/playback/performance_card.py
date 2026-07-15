@@ -107,10 +107,10 @@ class PerformanceCard(QWidget):
     def set_midi_pedal_available(self, available: bool) -> None:
         """Show or hide the 'Use MIDI Pedal' row based on whether the loaded MIDI has CC 64 events.
 
-        Always resets the toggle to unchecked (off by default). MainWindow
+        Always resets the toggle to unchecked (off by default). LoadCoordinator
         decides whether to check it afterward: automatically for a small
         number of pedal events, or via an explicit Yes/No prompt when the
-        file has a significant number of them (see MainWindow._on_midi_parsed).
+        file has a significant number of them (see LoadCoordinator._on_midi_parsed).
         """
         self._midi_pedal_label.setVisible(available)
         self.use_midi_pedal_check.setVisible(available)
