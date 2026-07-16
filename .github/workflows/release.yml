@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      prerelease:
+        description: "Force-mark as a pre-release (in addition to auto-detecting a -suffix tag like v2.1-preview). Leave checked when in doubt — it keeps UpdateManager from offering this build to existing users."
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   check-version:
@@ -39,11 +44,15 @@ jobs:
           fi
           echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
-          # A tag like v1.5.0-rc1 (a SemVer pre-release suffix after the
-          # dotted version) marks this as a pre-release build: it skips the
-          # GitHub "latest release" endpoint used by UpdateManager, so
-          # existing installs are never prompted to update to it.
-          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-'; then
+          # A tag like v2.1-preview (a pre-release suffix after the dotted
+          # version, however many segments APP_VERSION uses) marks this as
+          # a pre-release build, and a workflow_dispatch run can force the
+          # same flag explicitly (defaults to checked). Either one being
+          # true is enough: a pre-release skips the GitHub "latest release"
+          # endpoint used by UpdateManager, so existing installs are never
+          # prompted to update to it.
+          FORCE_PRERELEASE="${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}"
+          if echo "$TAG" | grep -qE '^v[0-9]+(\.[0-9]+)*-' || [ "$FORCE_PRERELEASE" = "true" ]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
