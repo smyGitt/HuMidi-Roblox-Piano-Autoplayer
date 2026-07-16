@@ -44,13 +44,6 @@ jobs:
           fi
           echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
-          # A tag like v2.1-preview (a pre-release suffix after the dotted
-          # version, however many segments APP_VERSION uses) marks this as
-          # a pre-release build, and a workflow_dispatch run can force the
-          # same flag explicitly (defaults to checked). Either one being
-          # true is enough: a pre-release skips the GitHub "latest release"
-          # endpoint used by UpdateManager, so existing installs are never
-          # prompted to update to it.
           FORCE_PRERELEASE="${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}"
           if echo "$TAG" | grep -qE '^v[0-9]+(\.[0-9]+)*-' || [ "$FORCE_PRERELEASE" = "true" ]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
@@ -100,9 +93,6 @@ jobs:
           prerelease = os.environ["PRERELEASE"] == "true"
           token = os.environ["GH_TOKEN"]
 
-          # /releases/latest only ever returns the latest non-prerelease
-          # release, so a pre-release tag is compared against the same
-          # baseline a normal user's UpdateManager check would see.
           req = urllib.request.Request(
               "https://api.github.com/repos/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/latest",
               headers={
@@ -130,9 +120,6 @@ jobs:
           print(f"Latest release : v{latest_tag}")
           print(f"New tag        : v{new_tag}")
 
-          # A pre-release may share its base version with the latest stable
-          # release (e.g. testing v1.5.0-rc1 before v1.5.0 ships); only a
-          # full release must be strictly greater.
           if prerelease:
               if new_t < latest_t:
                   print(f"::error::v{new_tag} is older than the latest release v{latest_tag}.")
@@ -237,14 +224,15 @@ jobs:
 
       - name: Smoke test built binary
         run: |
-          xvfb-run --auto-servernum dist/HuMidi/HuMidi &
-          APP_PID=$!
-          sleep 5
-          if ! kill -0 $APP_PID 2>/dev/null; then
-            echo "::error::HuMidi exited within 5s of launch under Xvfb — build is likely broken at runtime."
+          set +e
+          timeout 5 xvfb-run --auto-servernum dist/HuMidi
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 124 ]; then
+            echo "::error::HuMidi exited within 5s of launch under Xvfb (exit code $STATUS) — build is likely broken at runtime."
             exit 1
           fi
-          kill $APP_PID
+          echo "HuMidi stayed running for 5s under Xvfb ✓"
 
       - name: Package as HuMidi.tar.gz
         working-directory: dist
