@@ -22,6 +22,8 @@ jobs:
     name: Verify version matches tag
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.tag != '' }}
+    outputs:
+      prerelease: ${{ steps.tag.outputs.prerelease }}
 
     steps:
       - name: Checkout repository
@@ -31,9 +33,20 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ github.event.inputs.tag }}"
           else
-            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+
+          # A tag like v1.5.0-rc1 (a SemVer pre-release suffix after the
+          # dotted version) marks this as a pre-release build: it skips the
+          # GitHub "latest release" endpoint used by UpdateManager, so
+          # existing installs are never prompted to update to it.
+          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract APP_VERSION from main.py
@@ -54,11 +67,12 @@ jobs:
         run: |
           TAG_VERSION="${{ steps.tag.outputs.name }}"
           TAG_VERSION="${TAG_VERSION#v}"
+          TAG_VERSION="${TAG_VERSION%%-*}"
           APP_VERSION="${{ steps.app_version.outputs.value }}"
           echo "Tag version : $TAG_VERSION"
           echo "APP_VERSION : $APP_VERSION"
           if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
-            echo "::error::Version mismatch — tag is 'v$TAG_VERSION' but APP_VERSION in main.py is '$APP_VERSION'. Update APP_VERSION before tagging."
+            echo "::error::Version mismatch — tag is '${{ steps.tag.outputs.name }}' but APP_VERSION in main.py is '$APP_VERSION'. Update APP_VERSION before tagging."
             exit 1
           fi
           echo "Versions match: $APP_VERSION ✓"
@@ -67,13 +81,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_TAG: ${{ steps.tag.outputs.name }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
         run: |
           python3 << 'EOF'
           import json, os, sys, urllib.request, urllib.error
 
-          new_version = os.environ["NEW_TAG"].lstrip("v")
+          new_tag = os.environ["NEW_TAG"].lstrip("v")
+          new_version = new_tag.split("-", 1)[0]
+          prerelease = os.environ["PRERELEASE"] == "true"
           token = os.environ["GH_TOKEN"]
 
+          # /releases/latest only ever returns the latest non-prerelease
+          # release, so a pre-release tag is compared against the same
+          # baseline a normal user's UpdateManager check would see.
           req = urllib.request.Request(
               "https://api.github.com/repos/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/latest",
               headers={
@@ -99,9 +119,16 @@ jobs:
           latest_t = parse(latest_tag)
 
           print(f"Latest release : v{latest_tag}")
-          print(f"New tag        : v{new_version}")
+          print(f"New tag        : v{new_tag}")
 
-          if new_t <= latest_t:
+          # A pre-release may share its base version with the latest stable
+          # release (e.g. testing v1.5.0-rc1 before v1.5.0 ships); only a
+          # full release must be strictly greater.
+          if prerelease:
+              if new_t < latest_t:
+                  print(f"::error::v{new_tag} is older than the latest release v{latest_tag}.")
+                  sys.exit(1)
+          elif new_t <= latest_t:
               print(f"::error::v{new_version} is not greater than the latest release v{latest_tag}. Bump APP_VERSION and use a higher tag.")
               sys.exit(1)
 
@@ -224,7 +251,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-windows, build-macos, build-linux]
+    needs: [check-version, build-windows, build-macos, build-linux]
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
     permissions:
       contents: write
@@ -250,7 +277,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.name }}
           name: "HuMidi ${{ steps.tag.outputs.name }}"
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.check-version.outputs.prerelease == 'true' }}
           files: |
             artifacts/windows-exe/HuMidi.exe
             artifacts/macos-dmg/HuMidi.dmg
