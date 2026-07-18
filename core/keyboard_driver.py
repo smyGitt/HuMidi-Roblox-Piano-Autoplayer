@@ -27,9 +27,12 @@ def build_driver() -> "KeyboardDriver":
     Unicode/ASCII code points, so ord(char) is the correct keysym for every character
     produced by KeyMapper.
 
-    On macOS, checks that Accessibility permissions are granted before returning
-    the Controller. Without them, pynput key injection silently does nothing.
-    Raises PermissionError with actionable instructions if the check fails.
+    On macOS, checks that Accessibility permissions are granted, then wraps the
+    Controller in _MacController so that the digit characters '0'-'9' are
+    dispatched as number-row keycodes instead of pynput's default numeric-keypad
+    keycodes. Without Accessibility permission pynput key injection silently does
+    nothing, so this raises PermissionError with actionable instructions if the
+    check fails.
 
     On Windows and all other platforms, returns the raw Controller unchanged.
     """
@@ -46,6 +49,7 @@ def build_driver() -> "KeyboardDriver":
                 "Open System Settings > Privacy & Security > Accessibility, "
                 "enable this application, then restart HuMidi."
             )
+        return _MacController(ctrl)
 
     return ctrl
 
@@ -93,6 +97,47 @@ class _LinuxController:
         from pynput.keyboard import KeyCode
         if isinstance(key, str) and len(key) == 1:
             return KeyCode(vk=ord(key), char=key)
+        return key
+
+    def press(self, key) -> None:
+        self._ctrl.press(self._coerce(key))
+
+    def release(self, key) -> None:
+        self._ctrl.release(self._coerce(key))
+
+
+_MAC_DIGIT_VK = {
+    '1': 0x12, '2': 0x13, '3': 0x14, '4': 0x15, '5': 0x17,
+    '6': 0x16, '7': 0x1A, '8': 0x1C, '9': 0x19, '0': 0x1D,
+}
+
+
+class _MacController:
+    """Thin wrapper around pynput Controller for macOS number-row fidelity.
+
+    pynput's darwin backend resolves the digit characters '0'-'9' to the
+    numeric-keypad virtual key codes, not the number-row codes. Applications that
+    bind input to the number row (e.g. the Roblox piano) never receive keypad
+    presses, so every digit-bearing keystroke is dropped. This wrapper coerces
+    the ten digit characters to KeyCode(vk=<number-row ANSI keycode>, char=char)
+    before dispatch. Letters already resolve to the correct code, and modifier
+    keys plus Key.space are Key enum values, so all of them pass through
+    unchanged. Every other attribute (including the pressed() context manager
+    used to hold modifiers) delegates to the underlying Controller via
+    __getattr__.
+    """
+
+    def __init__(self, ctrl) -> None:
+        self._ctrl = ctrl
+
+    def __getattr__(self, name):
+        return getattr(self._ctrl, name)
+
+    @staticmethod
+    def _coerce(key):
+        from pynput.keyboard import KeyCode
+        if isinstance(key, str) and key in _MAC_DIGIT_VK:
+            return KeyCode(vk=_MAC_DIGIT_VK[key], char=key)
         return key
 
     def press(self, key) -> None:
