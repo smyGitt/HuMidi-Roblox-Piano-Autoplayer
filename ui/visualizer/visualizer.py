@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QSizePolicy
-from PySide6.QtCore import Qt, QRectF, QPointF, Property, Signal
+from PySide6.QtCore import Qt, QRectF, QPointF, Property, Signal, QTimer
 from PySide6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
 from typing import List
 from core.models import Note
@@ -113,8 +113,9 @@ class PianoWidget(QWidget):
 
         width = self.width()
         height = self.height()
-        # Key area excludes pedal strip at bottom
-        key_area_height = (height - 12) if self.show_pedal else height
+        pedal_strip_h = 12
+        pedal_gap = 4
+        key_area_height = (height - pedal_strip_h - pedal_gap) if self.show_pedal else height
         key_width = width / self.white_keys_count
         black_key_width = key_width * 0.65
         black_key_height = key_area_height * 0.6
@@ -153,7 +154,7 @@ class PianoWidget(QWidget):
             painter.drawRect(rect)
 
         if self.show_pedal:
-            strip_rect = QRectF(0, height - 12, width, 12)
+            strip_rect = QRectF(0, height - pedal_strip_h, width, pedal_strip_h)
             if self.pedal_active:
                 painter.fillRect(strip_rect, self._pedal_color)
             else:
@@ -182,6 +183,11 @@ class TimelineWidget(QWidget):
         self.show_pedal = True
 
         self.cached_background = None
+        self._needs_rebuild = True
+        self._resize_debounce = QTimer(self)
+        self._resize_debounce.setSingleShot(True)
+        self._resize_debounce.setInterval(120)
+        self._resize_debounce.timeout.connect(self._on_resize_settled)
 
         # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._bg_color = QColor(24, 24, 40)
@@ -195,7 +201,11 @@ class TimelineWidget(QWidget):
     # -- QSS-driven color slots ----------------------------------------------
 
     def _invalidate(self) -> None:
-        self.cached_background = None
+        self._needs_rebuild = True
+        self.update()
+
+    def _on_resize_settled(self) -> None:
+        self._needs_rebuild = True
         self.update()
 
     @Property(QColor)
@@ -283,19 +293,16 @@ class TimelineWidget(QWidget):
         new_width = min(new_width, 16384)
         self.setFixedWidth(new_width)
 
-        self.cached_background = None
-        self.update()
+        self._invalidate()
 
     def set_pedal_intervals(self, intervals: list):
         self.pedal_intervals = intervals
-        self.cached_background = None
-        self.update()
+        self._invalidate()
 
     def set_show_pedal(self, visible: bool):
         if self.show_pedal != visible:
             self.show_pedal = visible
-            self.cached_background = None
-            self.update()
+            self._invalidate()
 
     def set_position(self, time: float):
         if not self.is_dragging:
@@ -323,14 +330,17 @@ class TimelineWidget(QWidget):
         self.update()
 
     def resizeEvent(self, event):
-        self.cached_background = None
+        if self.cached_background is None:
+            self._needs_rebuild = True
+        else:
+            self._resize_debounce.start()
         super().resizeEvent(event)
 
     def paintEvent(self, event):
         w = self.width()
         h = self.height()
 
-        if self.cached_background is None or self.cached_background.size() != self.size():
+        if self.cached_background is None or self._needs_rebuild:
             self.cached_background = QPixmap(self.size())
             self.cached_background.fill(self._bg_color)
 
@@ -346,14 +356,22 @@ class TimelineWidget(QWidget):
                         cache_painter.drawLine(QPointF(x, 0), QPointF(x, h))
                 except Exception: pass
 
+            min_p = 21
+            max_p = 108
+            range_p = max_p - min_p
+
+            top_margin = 5
+            min_note_h = 2.0
+            pedal_gap = 2
+            if self.show_pedal:
+                row_h = max(min_note_h, (h - top_margin - pedal_gap) / (range_p + 1))
+            else:
+                row_h = max(min_note_h, (h - top_margin) / range_p)
+            pedal_reserved = (row_h + pedal_gap) if self.show_pedal else 0
+            approx_area_h = h - top_margin - pedal_reserved
+            note_area_h = approx_area_h - row_h
+
             if self.notes:
-                min_p = 21
-                max_p = 108
-                range_p = max_p - min_p
-
-                # Reserve bottom 8px for pedal strip; top 5px margin
-                note_area_h = h - 13   # 5px top margin + 8px pedal strip
-
                 cache_painter.setPen(Qt.PenStyle.NoPen)
 
                 for note in self.notes:
@@ -362,8 +380,8 @@ class TimelineWidget(QWidget):
                     nw = max(1.0, nw)
 
                     ny_ratio = 1.0 - ((note.pitch - min_p) / range_p)
-                    ny = ny_ratio * note_area_h + 5
-                    nh = 8
+                    ny = ny_ratio * note_area_h + top_margin
+                    nh = row_h
 
                     if note.hand == 'left':
                         cache_painter.setBrush(QBrush(self._left_hand_color))
@@ -374,9 +392,8 @@ class TimelineWidget(QWidget):
 
                     cache_painter.drawRect(QRectF(nx, ny, nw, nh))
 
-            # Pedal strip at the bottom
             if self.show_pedal and self.pedal_intervals:
-                strip_h = 8
+                strip_h = row_h
                 y = h - strip_h
                 cache_painter.setPen(Qt.PenStyle.NoPen)
                 cache_painter.setBrush(QBrush(self._pedal_color))
@@ -386,11 +403,15 @@ class TimelineWidget(QWidget):
                     cache_painter.drawRect(QRectF(px, y, pw, strip_h))
 
             cache_painter.end()
+            self._needs_rebuild = False
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        painter.drawPixmap(0, 0, self.cached_background)
+        if self.cached_background.size() == self.size():
+            painter.drawPixmap(0, 0, self.cached_background)
+        else:
+            painter.drawPixmap(self.rect(), self.cached_background, self.cached_background.rect())
 
         cx = (self.current_time / self.total_duration) * w
         painter.setPen(QPen(self._cursor_color, 2))

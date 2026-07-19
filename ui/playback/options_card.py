@@ -14,6 +14,7 @@ def _make_check_pair(checkbox: ToggleSwitch, desc_text: str) -> QWidget:
     desc = QLabel(desc_text)
     desc.setProperty("variant", "muted")
     desc.setContentsMargins(36, 0, 0, 0)
+    desc.setWordWrap(True)
     vbox.addWidget(checkbox)
     vbox.addWidget(desc)
     return container

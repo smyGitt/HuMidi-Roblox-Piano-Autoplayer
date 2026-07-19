@@ -216,7 +216,7 @@ class PlaybackTab(QWidget):
 
         # Row 1: two equal columns
         row1 = QHBoxLayout()
-        row1.setSpacing(14)
+        row1.setSpacing(10)
 
         # Left column: PERFORMANCE card stretched to fill column height.
         self._perf_card = PerformanceCard()

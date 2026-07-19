@@ -512,7 +512,6 @@ class MainWindowUI(QObject):
 
     def _on_piano_toggle(self, checked: bool) -> None:
         self.piano_widget.setVisible(checked)
-        self.timeline_widget.set_show_pedal(checked)
         self._update_visualizer_availability()
 
     def _update_visualizer_availability(self) -> None:
@@ -529,7 +528,7 @@ class MainWindowUI(QObject):
                 ratio = current_time / total_duration
                 cursor_x = ratio * self.timeline_widget.width()
                 target_scroll = cursor_x - (self.scroll_area.width() / 2)
-                self.scroll_area.horizontalScrollBar().setValue(int(target_scroll))
+                self.scroll_area.horizontalScrollBar().setValue(round(target_scroll))
 
         if not self._scrubber_dragging and not self.timeline_widget.is_dragging:
             self.scrubber_slider.blockSignals(True)

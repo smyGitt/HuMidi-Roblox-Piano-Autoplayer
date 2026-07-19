@@ -116,6 +116,7 @@ class PerformanceCard(QWidget):
         lbl = QLabel(label_text)
         desc = QLabel(desc_text)
         desc.setProperty("variant", "muted")
+        desc.setWordWrap(True)
         vbox.addWidget(lbl)
         vbox.addWidget(desc)
         return container
