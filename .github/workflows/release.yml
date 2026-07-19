@@ -179,6 +179,10 @@ jobs:
       - name: Build .app bundle
         run: pyinstaller HuMidi.spec
 
+      - name: Ad-hoc codesign the app bundle
+        working-directory: dist
+        run: codesign --force --deep --sign - HuMidi.app
+
       - name: Create DMG from .app bundle
         working-directory: dist
         run: >
