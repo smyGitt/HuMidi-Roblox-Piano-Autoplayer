@@ -3,12 +3,6 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPixmap, QTransform
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QLabel
 
-# Hourglass animation frames (Phosphor-style duotone SVGs, 256x256 viewBox).
-# Frame 0: sand full in top half (top polygon shaded, top line).
-# Frame 1: sand at midpoint (equal halves, line dropping from center).
-# Frame 2: sand full in bottom half (bottom polygon shaded, bottom line).
-# Frame 3 is generated at runtime as frame 2 rotated 90 degrees, producing
-# the "flip" transition back to frame 0.
 _SVG_0 = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
     '<rect width="256" height="256" fill="none"/>'
@@ -80,7 +74,6 @@ def _dot_pixmap(hex_color: str) -> QPixmap:
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     p.setBrush(QBrush(QColor(hex_color)))
     p.setPen(Qt.PenStyle.NoPen)
-    # 28px diameter circle centered in 44px canvas
     p.drawEllipse(8, 8, 28, 28)
     p.end()
     return pix
@@ -115,7 +108,6 @@ class StatusIndicator(QFrame):
         self.setFixedHeight(48)
 
         self._state        = self.UNLOADED
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._icon_color   = QColor("#888888")
         self._ready_color  = QColor("#52b752")
         self._unload_color = QColor("#c44b4b")
@@ -143,13 +135,11 @@ class StatusIndicator(QFrame):
 
         self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
 
-    # -- Public API -----------------------------------------------------------
 
     @property
     def state(self) -> str:
         return self._state
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def iconColor(self) -> QColor:
@@ -217,7 +207,7 @@ class StatusIndicator(QFrame):
         elif state == self.LOADED:
             self._timer.stop()
             self._icon_lbl.setPixmap(_dot_pixmap(self._loaded_color.name()))
-        else:  # UNLOADED
+        else:
             self._timer.stop()
             self._icon_lbl.setPixmap(_dot_pixmap(self._unload_color.name()))
 
@@ -225,7 +215,6 @@ class StatusIndicator(QFrame):
         """Update the label text without changing state."""
         self._text_lbl.setText(text)
 
-    # -- Internal -------------------------------------------------------------
 
     def _advance(self) -> None:
         if not self._frames:
@@ -237,12 +226,10 @@ class StatusIndicator(QFrame):
     def _build_frames(color: str) -> list[QPixmap]:
         """Return 4 animation frames: SVG 0, 1, 2, then SVG 2 rotated 90 degrees."""
         frames = [_render_svg(svg, color) for svg in _ANIM_SVGS]
-        # Rotate the last frame 90 degrees clockwise to create the flip-back effect.
         rotated = frames[-1].transformed(
             QTransform().rotate(90),
             Qt.TransformationMode.SmoothTransformation,
         )
-        # QPixmap.transformed() may produce a different size for non-square; ensure 44x44.
         if rotated.size().width() != 44 or rotated.size().height() != 44:
             rotated = rotated.scaled(
                 44, 44,

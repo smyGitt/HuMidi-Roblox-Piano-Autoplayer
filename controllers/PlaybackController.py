@@ -95,9 +95,6 @@ def _prepare_notes(config: Dict, selected_tracks_info: List, log=None):
     return final_notes, tempo_map, midi_pedal_events
 
 
-# ---------------------------------------------------------------------------
-# Phase-1 worker: note preparation + humanization (MIDI path)
-# ---------------------------------------------------------------------------
 
 class _NotesCompileWorker(QObject):
     """Runs phase 1 off the GUI thread: note prep + SectionAnalyzer + compile_note_events.
@@ -110,7 +107,6 @@ class _NotesCompileWorker(QObject):
     """
     status_updated = Signal(str)
     notes_compiled = Signal(object, object, object, object, float, object)
-    # (final_notes, humanized_notes, note_events, tempo_map, total_dur, midi_pedal_events)
     error_occurred = Signal(str)
     finished       = Signal()
 
@@ -188,9 +184,6 @@ class _NotesCompileWorker(QObject):
         self.finished.emit()
 
 
-# ---------------------------------------------------------------------------
-# Phase-2 worker: pedal generation + merge (MIDI path)
-# ---------------------------------------------------------------------------
 
 class _PedalCompileWorker(QObject):
     """Runs phase 2 off the GUI thread: re-run SectionAnalyzer + compile_pedal_events + merge.
@@ -205,7 +198,7 @@ class _PedalCompileWorker(QObject):
                  When False (Apply button path), playback is NOT started.
     """
     status_updated    = Signal(str)
-    pedal_compiled    = Signal(object, object, bool)  # (merged_events, pedal_intervals, auto_play)
+    pedal_compiled    = Signal(object, object, bool)
     ai_thresholds_ready = Signal(float, float)
     pedal_stats_ready   = Signal(float, float, float, float)
     error_occurred    = Signal(str)
@@ -289,9 +282,6 @@ class _PedalCompileWorker(QObject):
         self.finished.emit()
 
 
-# ---------------------------------------------------------------------------
-# Legacy monolithic worker: kept for the translator (play_from_notes) path
-# ---------------------------------------------------------------------------
 
 class _PrepareWorker(QObject):
     """Runs the full off-thread preparation pipeline on a QThread.
@@ -387,9 +377,6 @@ class _PrepareWorker(QObject):
         self.finished.emit()
 
 
-# ---------------------------------------------------------------------------
-# Save worker (unchanged)
-# ---------------------------------------------------------------------------
 
 class _SaveWorker(QObject):
     status_updated = Signal(str)
@@ -510,12 +497,8 @@ class _SaveWorker(QObject):
         self.finished.emit()
 
 
-# ---------------------------------------------------------------------------
-# PlaybackController
-# ---------------------------------------------------------------------------
 
 class PlaybackController(QObject):
-    # Player signals (re-emitted)
     status_updated     = Signal(str)
     progress_updated   = Signal(float)
     playback_finished  = Signal()
@@ -524,51 +507,40 @@ class PlaybackController(QObject):
     error_occurred     = Signal(str)
     pedal_updated      = Signal(bool)
 
-    # Timeline data
     timeline_data_ready = Signal(list, float, object)
     pedal_data_ready    = Signal(list)
 
-    # Save signals
     save_successful = Signal(str, str)
     save_failed     = Signal(str)
 
-    # Lifecycle signals
     preparation_started = Signal()
     playback_started    = Signal()
 
-    # Phase-1 done: note events compiled and cached
     notes_phase_done = Signal()
 
-    # Phase-2 done: pedal events compiled and cached; full session ready
     pedal_phase_done = Signal()
 
-    # Translator-path: full monolithic compile done (sets READY like pedal_phase_done)
     session_ready = Signal()
 
-    # AI pedal feedback
     ai_pedal_thresholds_ready = Signal(float, float)
     ai_pedal_stats_ready      = Signal(float, float, float, float)
 
     def __init__(self):
         super().__init__()
-        # Player / prepare / save thread refs
         self.player          = None
         self.player_thread   = None
         self._save_worker    = None
         self._save_thread    = None
-        self._prepare_worker = None   # translator _PrepareWorker
+        self._prepare_worker = None
         self._prepare_thread = None
         self._pending_config: Optional[Dict] = None
 
-        # Phase-1 worker refs
         self._notes_worker: Optional[_NotesCompileWorker] = None
         self._notes_thread: Optional[QThread] = None
 
-        # Phase-2 worker refs
         self._pedal_worker: Optional[_PedalCompileWorker] = None
         self._pedal_thread: Optional[QThread] = None
 
-        # In-memory compiled state cache (MIDI path only)
         self._cached_final_notes: Optional[List[Note]] = None
         self._cached_humanized_notes: Optional[List[Note]] = None
         self._cached_note_events: Optional[List[KeyEvent]] = None
@@ -578,14 +550,11 @@ class PlaybackController(QObject):
         self._cached_total_dur: float = 1.0
         self._cached_midi_pedal_events: Optional[List] = None
 
-        # Config snapshots for freshness checking
         self._notes_config_snapshot: Optional[dict] = None
         self._pedal_config_snapshot: Optional[dict] = None
 
-        # Holds AI-computed thresholds between ai_thresholds_ready and _on_pedal_compiled
         self._pending_ai_thresholds: Optional[tuple] = None
 
-    # -- State queries --------------------------------------------------------
 
     def is_compiling_notes(self) -> bool:
         return self._notes_thread is not None and self._notes_thread.isRunning()
@@ -651,7 +620,6 @@ class PlaybackController(QObject):
             merged.update(self._pedal_config_snapshot)
         return merged
 
-    # -- Playback controls ----------------------------------------------------
 
     def toggle_pause(self):
         if self.player:
@@ -684,7 +652,6 @@ class PlaybackController(QObject):
             self._save_thread.quit()
             self._save_thread.wait(2000)
 
-    # -- Player finished ------------------------------------------------------
 
     def _on_playback_finished(self):
         if self.player_thread:
@@ -694,7 +661,6 @@ class PlaybackController(QObject):
         self.player_thread = None
         self.playback_finished.emit()
 
-    # -- Thread wiring --------------------------------------------------------
 
     def _wire_and_start_player(self, player: Player, entry_point) -> None:
         self.player_thread = QThread()
@@ -710,7 +676,6 @@ class PlaybackController(QObject):
         self.playback_started.emit()
         self.player_thread.start()
 
-    # -- Save -----------------------------------------------------------------
 
     def save(self, config: Dict, selected_tracks_info: List, save_dir: str, original_filename: str):
         if self._save_thread and self._save_thread.isRunning():
@@ -734,7 +699,6 @@ class PlaybackController(QObject):
         self._save_worker = None
         self._save_thread = None
 
-    # -- Phase-1: compile notes (MIDI path) -----------------------------------
 
     def compile_notes(self, config: Dict, selected_tracks_info: List) -> None:
         """Start phase-1 off the GUI thread: note prep + humanization.
@@ -745,7 +709,7 @@ class PlaybackController(QObject):
         if self.is_compiling_notes() or self.is_compiling_pedal() or self.is_playing():
             return
 
-        self._pedal_config_snapshot = None   # notes will change; pedal must follow
+        self._pedal_config_snapshot = None
         self._cached_pedal_events   = None
         self._cached_merged_events  = None
         self.preparation_started.emit()
@@ -805,11 +769,8 @@ class PlaybackController(QObject):
         self._notes_worker   = None
         self._notes_thread   = None
         self._pending_config = None
-        # Emit after the thread is fully torn down so is_compiling_notes() returns
-        # False when _on_notes_phase_done attempts to chain compile_pedal.
         self.notes_phase_done.emit()
 
-    # -- Phase-2: compile pedal (MIDI path) -----------------------------------
 
     def compile_pedal(self, config: Dict) -> None:
         """Start phase-2 off the GUI thread: pedal generation only.
@@ -882,7 +843,6 @@ class PlaybackController(QObject):
             self._pedal_config_snapshot['pedal_threshold_off'] = off
             self._pending_ai_thresholds = None
 
-        # Write session cache asynchronously.
         write_cache(
             notes_config=self._notes_config_snapshot,
             pedal_config=self._pedal_config_snapshot,
@@ -917,7 +877,6 @@ class PlaybackController(QObject):
         self._pedal_thread   = None
         self._pending_config = None
 
-    # -- Start playback from cached state -------------------------------------
 
     def start_playback(self, config: Optional[dict] = None) -> None:
         """Start the Player with the current cached compiled events.
@@ -946,7 +905,6 @@ class PlaybackController(QObject):
         self.player.load_compiled_events(self._cached_merged_events, compiled_dur)
         self._wire_and_start_player(self.player, self.player.play_compiled)
 
-    # -- Play (translator notes -- monolithic path) ---------------------------
 
     def play_from_notes(self, config: Dict, notes: List[Note], tempo_map: TempoMap):
         """Start playback from pre-built Note objects (Translator tab).
@@ -1004,7 +962,6 @@ class PlaybackController(QObject):
         self._prepare_thread = None
         self._pending_config = None
 
-    # -- Play (pre-compiled save) ---------------------------------------------
 
     def play_from_save(self, loaded_save_data: Dict):
         self.status_updated.emit("Initializing playback from pre-compiled serialization...")

@@ -103,7 +103,7 @@ class PlaybackUICoordinator:
 
     def toggle_playback_state(self) -> None:
         if self.playback_controller.is_preparing():
-            return  # no-op while the prepare worker is running
+            return
         if not self.playback_controller.is_paused():
             self.ui.piano_widget.clear()
 
@@ -133,8 +133,6 @@ class PlaybackUICoordinator:
             if note.end_time > time:
                 active_pitches.add(note.pitch)
         self.ui.piano_widget.set_active_pitches(list(active_pitches))
-        # Pedal intervals are non-overlapping and sorted by start, so a single
-        # bisect locates the only candidate interval instead of scanning all.
         starts = self.state.pedal_interval_starts
         idx = bisect.bisect_right(starts, time) - 1
         pedal_down = idx >= 0 and time < self.state.current_pedal_intervals[idx][1]
@@ -152,7 +150,6 @@ class PlaybackUICoordinator:
             'notes': len(notes),
             'duration': f"{int(total_dur // 60)}:{int(total_dur % 60):02d}",
         })
-        # Status is set by notes_phase_done / pedal_phase_done / session_ready signals.
 
     def _on_pedal_data_ready(self, intervals: list) -> None:
         self.state.current_pedal_intervals = intervals
@@ -237,7 +234,6 @@ class PlaybackUICoordinator:
                 f"[APPLY] Recompile requested | notes_dirty={notes_dirty}"
             )
         if notes_dirty:
-            # Notes must be recompiled; pedal must follow automatically.
             self._auto_compile_pedal_after_notes = True
             self.playback_controller.compile_notes(config, self.state.selected_tracks_info)
         else:
@@ -293,7 +289,6 @@ class PlaybackUICoordinator:
         if self.playback_controller.is_preparing():
             return
 
-        # Save path: unchanged.
         if self.state.loaded_save_data:
             try:
                 self._prepare_ui_for_playback()
@@ -305,7 +300,6 @@ class PlaybackUICoordinator:
                 self.ui.play_button.setEnabled(False)
             return
 
-        # MIDI path.
         if not self.state.selected_tracks_info:
             QMessageBox.warning(self.window, "No Tracks", "Please select a MIDI file and choose tracks first.")
             return
@@ -317,19 +311,15 @@ class PlaybackUICoordinator:
         pedal_fresh = pedal_compiled and pc.pedal_match_config(config)
 
         if notes_fresh and not pedal_compiled:
-            # Notes ready but pedal never generated: compile pedal then play.
             self._prepare_ui_for_playback()
             pc.compile_pedal_and_play(config)
             return
 
         if notes_fresh and pedal_fresh:
-            # Both compiled and current: play immediately without recompiling.
             self._prepare_ui_for_playback()
             pc.start_playback(config)
             return
 
-        # Events are stale: navigate to Playback sub-tab and show the toast.
-        # Do NOT start playback.
         self.ui.tabs.setCurrentIndex(0)
         self.ui.playback_tab.navigate_to_playback_sub_tab()
         notes_dirty = not notes_fresh

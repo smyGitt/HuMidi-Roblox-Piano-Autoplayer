@@ -16,10 +16,8 @@ from ui.widgets import make_card, ElidedLabel
 from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.slider_spinbox import NoScrollComboBox
 
-# Log levels, in Levels-card display order.
 _LEVELS = ("INFO", "DEBUG", "WARN", "OK")
 
-# Filter-bar label -> level key (None means show everything).
 _FILTER_LEVELS = {
     "All": None,
     "Info": "INFO",
@@ -28,23 +26,16 @@ _FILTER_LEVELS = {
     "OK": "OK",
 }
 
-# Substring markers used to classify a message (matched lowercase, in order:
-# WARN beats OK beats DEBUG beats INFO).
 _WARN_MARKERS = (
     "error", "failed", "failure", "rejected", "aborted",
     "crashed", "cancelled", "not found",
 )
 _OK_MARKERS = ("successful", "complete", "accepted", "finished")
 
-# Oldest entries beyond this count are dropped from both the store and the
-# console view so a long debug session cannot grow memory without bound.
 _MAX_ENTRIES = 5000
 
-# Fixed width of the Filter/Levels/Session Snapshot column. Only the Console
-# card has layout stretch, so this column stays this width on any resize.
 _RIGHT_COLUMN_WIDTH = 240
 
-# Session Snapshot rows: (dict key, display label), in display order.
 _SNAPSHOT_ROWS = (
     ("file", "File"),
     ("source", "Source"),
@@ -58,10 +49,6 @@ _SNAPSHOT_ROWS = (
 
 _SNAPSHOT_EMPTY = "-"
 
-# Matches an absolute Windows filesystem path (drive-letter or UNC) and
-# captures its final path component, so redaction can collapse a full path
-# (which embeds the local username under C:\Users\<name>\...) down to just
-# the file or folder name.
 _PATH_PATTERN = re.compile(r'(?:[A-Za-z]:[\\/]|\\\\)[^\s"\']*[\\/]([^\\/:\s"\']+)')
 
 
@@ -91,10 +78,10 @@ class DebugTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._entries: list = []            # (level, formatted line) tuples
+        self._entries: list = []
         self._counts = {lvl: 0 for lvl in _LEVELS}
-        self._active_filter = None          # level key, None = All
-        self._redact_paths = True           # mirrors Settings > Privacy > "Redact file paths"
+        self._active_filter = None
+        self._redact_paths = True
         self._setup_ui()
 
     def _setup_ui(self):
@@ -102,7 +89,6 @@ class DebugTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -115,22 +101,15 @@ class DebugTab(QWidget):
         hl.addStretch()
         outer.addWidget(header)
 
-        # Body widget restores side margins
         body = QWidget()
         layout = QVBoxLayout(body)
         layout.setContentsMargins(16, 8, 16, 12)
         layout.setSpacing(0)
         outer.addWidget(body, 1)
 
-        # -- Split body: Console (left, fills all extra space) | fixed-width
-        # Filter + Levels + Snapshot column (right). Only the Console card
-        # grows when the window is resized; the right column stays a fixed
-        # width so its cards never stretch.
         body_row = QHBoxLayout()
         body_row.setSpacing(10)
 
-        # Console card (left) -- the only widget with stretch, so it alone
-        # absorbs any extra space from a window resize.
         console_card, console_body = make_card("Console")
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
@@ -139,9 +118,6 @@ class DebugTab(QWidget):
         console_body.addWidget(self.log_output)
         body_row.addWidget(console_card, 1)
 
-        # Right column: Filter + Levels tally card + Session Snapshot card
-        # (stacked, scrollable so extra cards never get clipped vertically).
-        # Fixed width + stretch=0 below keeps it from growing on resize.
         right_col_widget = QWidget()
         right_col = QVBoxLayout(right_col_widget)
         right_col.setContentsMargins(0, 0, 4, 0)
@@ -208,7 +184,6 @@ class DebugTab(QWidget):
         body_row.addWidget(right_scroll, 0)
         layout.addLayout(body_row, 1)
 
-        # -- Footer action bar -------------------------------------------------
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 8, 0, 0)
         footer.setSpacing(6)
@@ -227,7 +202,6 @@ class DebugTab(QWidget):
         footer.addStretch()
         layout.addLayout(footer)
 
-    # -- Logging API -----------------------------------------------------------
 
     def append_log(self, message: str) -> None:
         """Classify, timestamp, store, and (filter permitting) display a message.
@@ -269,7 +243,6 @@ class DebugTab(QWidget):
         """
         self._redact_paths = redact
 
-    # -- Session snapshot API ----------------------------------------------------
 
     def update_snapshot(self, fields: dict) -> None:
         """Update Session Snapshot rows from a partial dict.
@@ -287,11 +260,8 @@ class DebugTab(QWidget):
         """Reset every Session Snapshot row to the empty placeholder."""
         self.update_snapshot({key: None for key, _ in _SNAPSHOT_ROWS})
 
-    # -- Internal helpers --------------------------------------------------------
 
     def _append_to_view(self, entry: str) -> None:
-        # Insert as plain text via the cursor: QTextEdit.append() would try to
-        # interpret entries containing '<' (e.g. pynput Key reprs) as rich text.
         cursor = self.log_output.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         if not self.log_output.document().isEmpty():

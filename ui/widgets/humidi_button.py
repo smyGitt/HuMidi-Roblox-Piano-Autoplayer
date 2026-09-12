@@ -20,19 +20,15 @@ class HuMidiButton(QPushButton):
         super().__init__(text, parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        # Prevent keyboard focus so pynput-injected Space key events (used for
-        # the sustain pedal) cannot activate a focused transport button.
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._icon_name = icon_name
         self._icon_size = icon_size
-        # Color slot (overwritten by QSS qproperty-iconColor on stylesheet apply).
         self._icon_color = QColor("#dcdcf0")
         if tooltip:
             self.setToolTip(tooltip)
         if icon_name:
             self._render_icon()
 
-    # -- QSS-driven icon color -----------------------------------------------
 
     @Property(QColor)
     def iconColor(self) -> QColor:

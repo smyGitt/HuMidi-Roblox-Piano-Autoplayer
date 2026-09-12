@@ -19,8 +19,8 @@ class NavButton(QFrame):
 
     _ICON_SIZE = 22
     _ICON_X    = 12
-    _ICON_Y    = 13   # (48 - 22) // 2
-    _LABEL_X   = 44   # _ICON_X + _ICON_SIZE + 10 (gap)
+    _ICON_Y    = 13
+    _LABEL_X   = 44
     _LABEL_W   = 200
 
     def __init__(self, icon_name: str, label: str, parent=None):
@@ -28,7 +28,6 @@ class NavButton(QFrame):
         self._icon_name = icon_name
         self._pix_normal: QPixmap | None = None
         self._pix_active: QPixmap | None = None
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._icon_normal = QColor("#7878a0")
         self._icon_active = QColor("#dcdcf0")
 
@@ -53,7 +52,6 @@ class NavButton(QFrame):
         self._text_lbl.setProperty("highlighted", "false")
         self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def iconColorNormal(self) -> QColor:

@@ -27,7 +27,7 @@ class SavedSongsPanel(QWidget):
     MainWindow can wire them without reaching into the panel's internals.
     """
 
-    save_card_clicked = Signal(str, str, str)  # (filepath, save_name, song_name)
+    save_card_clicked = Signal(str, str, str)
 
     _SAVE_CARD_MAX = 15
 
@@ -86,7 +86,6 @@ class SavedSongsPanel(QWidget):
 
         outer.addWidget(saved_card, 1)
 
-        # Seed the empty-state placeholder before any external refresh.
         self.refresh_saved_songs(None)
 
     def refresh_saved_songs(self, save_dir) -> None:
@@ -114,7 +113,6 @@ class SavedSongsPanel(QWidget):
                     'song_name': metadata.get('source_midi_filename', 'Unknown MIDI'),
                     'save_name': metadata.get('custom_name') or os.path.splitext(filename)[0],
                     'created': created,
-                    # Legacy saves predate last_accessed; fall back to created.
                     'last_accessed': metadata.get('last_accessed') or created,
                 })
 

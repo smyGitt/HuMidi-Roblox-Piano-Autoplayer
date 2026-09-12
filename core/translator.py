@@ -6,7 +6,6 @@ from pynput.keyboard import Key
 from core.models import Note
 from core.core import KeyMapper, TempoMap
 
-# Maps Shift+number to the symbol character produced
 _SHIFT_NUM_TO_SYMBOL = {
     '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
     '6': '^', '7': '&', '8': '*', '9': '(', '0': ')'
@@ -21,7 +20,7 @@ def _build_pitch_to_char(key_mapper: KeyMapper) -> Dict[int, str]:
         key = data['key']
         mods = data['modifiers']
         if Key.ctrl in mods:
-            continue  # 88-key extended range; no standard sheet representation
+            continue
         if not mods:
             result[pitch] = key
         elif Key.shift in mods:
@@ -44,9 +43,6 @@ def _build_char_to_pitch(key_mapper: KeyMapper) -> Dict[str, int]:
 class VirtualPianoFormat:
     NAME = "Virtual Piano"
 
-    # ------------------------------------------------------------------
-    # Tokenizer
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _parse_chunk(chunk: str) -> List[Tuple[List[str], int]]:
@@ -70,7 +66,6 @@ class VirtualPianoFormat:
                 chars = list(chunk[i + 1:j])
                 i = j + 1
             elif chunk[i] == '-':
-                # Orphaned leading dash — skip
                 i += 1
                 continue
             else:
@@ -87,9 +82,6 @@ class VirtualPianoFormat:
 
         return tokens
 
-    # ------------------------------------------------------------------
-    # Import
-    # ------------------------------------------------------------------
 
     @classmethod
     def parse(cls, text: str, bpm: float, key_mapper: KeyMapper) -> List[Note]:
@@ -131,9 +123,6 @@ class VirtualPianoFormat:
 
         return notes
 
-    # ------------------------------------------------------------------
-    # Export
-    # ------------------------------------------------------------------
 
     @classmethod
     def serialize(cls, notes: List[Note], key_mapper: KeyMapper, tempo_map: TempoMap) -> str:
@@ -158,9 +147,8 @@ class VirtualPianoFormat:
         def duration_to_dashes(dur_secs: float) -> int:
             n16 = max(1, round(dur_secs / base_16th))
             exp = round(math.log2(n16))
-            return max(0, min(exp, 3))  # cap at half note (3 dashes)
+            return max(0, min(exp, 3))
 
-        # Group notes by quantized start time
         groups: Dict[float, Dict] = {}
         for note in sorted(notes, key=lambda n: n.start_time):
             char = pitch_to_char.get(note.pitch)
@@ -170,7 +158,6 @@ class VirtualPianoFormat:
             if q not in groups:
                 groups[q] = {'chars': [], 'duration': note.duration}
             else:
-                # Use max duration in the chord group
                 groups[q]['duration'] = max(groups[q]['duration'], note.duration)
             if char not in groups[q]['chars']:
                 groups[q]['chars'].append(char)
@@ -188,7 +175,6 @@ class VirtualPianoFormat:
             else:
                 tokens.append(f"[{''.join(chars)}]{dashes}")
 
-        # Wrap into lines of ~80 chars
         lines = []
         current_line: List[str] = []
         line_len = 0
@@ -212,9 +198,6 @@ class VirtualPianoFormat:
         return 60_000_000.0 / tempo_map.events[0][1]
 
 
-# ------------------------------------------------------------------
-# Registry
-# ------------------------------------------------------------------
 
 class FormatRegistry:
     _FORMATS = {

@@ -17,7 +17,7 @@ def parse_version(tag: str) -> tuple:
 
 
 class UpdateChecker(QThread):
-    update_available = Signal(str, str)  # (latest_tag, releases_page_url)
+    update_available = Signal(str, str)
     no_update        = Signal()
     check_failed     = Signal()
 
@@ -27,10 +27,6 @@ class UpdateChecker(QThread):
         self._force = force
 
     def run(self):
-        # Overrides run() with a single blocking network call and never calls
-        # exec(), so this thread has no event loop: quit() has no effect on
-        # it. Callers must join via a bounded wait() covering
-        # REQUEST_TIMEOUT_SECONDS instead (see MainWindow.closeEvent).
         if not self._force and not getattr(sys, "frozen", False):
             return
         try:

@@ -20,7 +20,6 @@ class FileStrip(QFrame):
         hbox.setContentsMargins(14, 8, 14, 8)
         hbox.setSpacing(10)
 
-        # Icon tile
         tile = QFrame()
         tile.setObjectName("file_strip_tile")
         tile.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -31,7 +30,6 @@ class FileStrip(QFrame):
         tile_layout.addWidget(self.tile_icon, alignment=Qt.AlignmentFlag.AlignCenter)
         hbox.addWidget(tile)
 
-        # File info column
         info_col = QWidget()
         info_col.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         info_layout = QVBoxLayout(info_col)
@@ -49,7 +47,6 @@ class FileStrip(QFrame):
         info_layout.addWidget(self._meta_lbl)
         hbox.addWidget(info_col, 1)
 
-        # Action buttons
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(6)

@@ -25,8 +25,6 @@ from core.models import Note, KeyEvent
 
 _CACHE_PATH = os.path.join(tempfile.gettempdir(), 'humidi_session.json')
 
-# Config keys that drive note humanization. Changing any of these makes the
-# note events (and therefore the pedal events) stale.
 NOTES_CONFIG_KEYS: frozenset = frozenset([
     'simulate_hands',
     'vary_timing', 'timing_variance',
@@ -39,8 +37,6 @@ NOTES_CONFIG_KEYS: frozenset = frozenset([
     'use_88_key_layout',
 ])
 
-# Config keys that drive pedal generation only. Changing these makes only the
-# pedal events stale; the note events can be reused.
 PEDAL_CONFIG_KEYS: frozenset = frozenset([
     'pedal_style',
     'use_ai_pedal',
@@ -129,7 +125,6 @@ def tempo_map_to_dict(tempo_map) -> dict:
     }
 
 
-# -- Private helpers ----------------------------------------------------------
 
 def _write_atomic(path: str, data: dict) -> None:
     target_dir = os.path.dirname(path) or '.'

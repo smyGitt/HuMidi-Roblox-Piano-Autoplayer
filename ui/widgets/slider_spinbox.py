@@ -54,15 +54,10 @@ def make_slider_spinbox(min_val, max_val, default_val,
     slider.setValue(int(default_val * factor))
     spinbox.setValue(default_val)
 
-    # Slider drives spinbox live, but only when the user is not actively typing
-    # in the spinbox (focus guard prevents rewriting text mid-edit).
     slider.valueChanged.connect(
         lambda v: spinbox.setValue(v / factor) if not spinbox.hasFocus() else None
     )
 
-    # Spinbox drives slider only once editing is committed (Enter or focus-out).
-    # After clamping through the slider, the spinbox is also updated so it shows
-    # the clamped value rather than the raw typed string.
     def _commit():
         slider.setValue(int(spinbox.value() * factor))
         spinbox.setValue(slider.value() / factor)

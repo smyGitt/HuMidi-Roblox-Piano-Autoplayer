@@ -54,12 +54,10 @@ class ApplyToast(QFrame):
         self._discard_btn.clicked.connect(self.discard_clicked)
         layout.addWidget(self._discard_btn)
 
-    # -- Message --------------------------------------------------------------
 
     def update_message(self, notes_dirty: bool, pedal_dirty_independent: bool) -> None:
         self._msg_label.setText(_MSG)
 
-    # -- Visibility -----------------------------------------------------------
 
     def is_toast_visible(self) -> bool:
         return self._visible
@@ -98,7 +96,6 @@ class ApplyToast(QFrame):
             self._finished_connected_to_hide = True
         self._slide_anim.start()
 
-    # -- Shake ----------------------------------------------------------------
 
     def shake(self) -> None:
         """Brief horizontal shake to draw attention when play is blocked."""

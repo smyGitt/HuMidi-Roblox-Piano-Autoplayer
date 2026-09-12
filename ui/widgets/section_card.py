@@ -12,8 +12,8 @@ class AnimatedDashedCard(QFrame):
     set_drag_active() to switch to the accent-colored drag-over state.
     """
 
-    _DASH_PATTERN = [6.0, 4.0]  # dash length, gap length in pen-width units
-    _PATTERN_CYCLE = 10.0       # sum of _DASH_PATTERN
+    _DASH_PATTERN = [6.0, 4.0]
+    _PATTERN_CYCLE = 10.0
     _BORDER_RADIUS = 5
     _PEN_WIDTH = 1.5
 
@@ -22,7 +22,6 @@ class AnimatedDashedCard(QFrame):
         self.setObjectName("section_card_dashed")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._dash_offset = 0.0
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._border_color = QColor("#32324a")
         self._drag_border  = QColor("#5b8dee")
         self._drag_bg      = QColor(91, 141, 238, 30)
@@ -31,7 +30,6 @@ class AnimatedDashedCard(QFrame):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def borderColor(self) -> QColor:

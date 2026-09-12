@@ -282,11 +282,6 @@ class LoadCoordinator(QObject):
             )
 
         _events = tempo_map.events
-        # events[0] is always a synthetic default entry (GlobalTickMap always
-        # prepends it at tick 0 with 500000 us). The real first set_tempo event
-        # lands at events[1] when the MIDI places it even one tick after tick 0,
-        # which gives a tiny positive time_sec that get_tempo_at(0.0) misses.
-        # Using events[1] directly (if it starts within 5 s) avoids that gap.
         if len(_events) > 1 and _events[1][0] <= 5.0:
             _initial_tempo_us = _events[1][1]
         else:
@@ -306,7 +301,6 @@ class LoadCoordinator(QObject):
             self.ui.play_button.setEnabled(True)
             self.ui.scrubber_slider.setEnabled(True)
             self.ui._set_save_enabled(True)
-            # Invalidate any prior compiled state and kick off phase-1 notes compilation.
             self.playback_controller.invalidate_notes_cache()
             config = self.ui.gather_playback_config()
             self.playback_controller.compile_notes(config, self.state.selected_tracks_info)

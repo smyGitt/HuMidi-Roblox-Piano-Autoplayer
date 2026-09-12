@@ -5,7 +5,6 @@ from pathlib import Path
 
 class ConfigManager:
     def __init__(self):
-        # Resolve path regardless of whether the script is run natively or compiled to .exe via PyInstaller
         if getattr(sys, 'frozen', False):
             self.root_dir = os.path.dirname(sys.executable)
         else:
