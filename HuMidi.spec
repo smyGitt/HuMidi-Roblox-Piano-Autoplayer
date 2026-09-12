@@ -1,4 +1,3 @@
-# -*- mode: python ; coding: utf-8 -*-
 import sys
 
 a = Analysis(
@@ -30,7 +29,6 @@ a = Analysis(
 pyz = PYZ(a.pure)
 
 if sys.platform == 'darwin':
-    # macOS: directory layout feeds BUNDLE to produce a proper .app
     exe = EXE(
         pyz,
         a.scripts,
@@ -61,7 +59,6 @@ if sys.platform == 'darwin':
         bundle_identifier='com.smygitt.humidi',
     )
 else:
-    # Windows / Linux: everything packed into a single executable
     exe = EXE(
         pyz,
         a.scripts,

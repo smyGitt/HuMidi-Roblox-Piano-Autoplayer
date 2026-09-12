@@ -28,14 +28,12 @@ class LoadSaveDialog(QDialog):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # ── Left: tree ────────────────────────────────────────────────
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setAlternatingRowColors(True)
         self.tree.itemSelectionChanged.connect(self._on_selection_changed)
         splitter.addWidget(self.tree)
 
-        # ── Right: details pane ───────────────────────────────────────
         self.details_widget = QWidget()
         self.details_layout = QVBoxLayout(self.details_widget)
         self.details_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -51,16 +49,15 @@ class LoadSaveDialog(QDialog):
 
         layout.addWidget(splitter)
 
-        # ── Buttons ───────────────────────────────────────────────────
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(6)
 
         self.rename_btn = QPushButton("Rename")
         self.delete_btn = QPushButton("Delete")
-        self.delete_btn.setObjectName("stop_button")   # reuse red styling
+        self.delete_btn.setObjectName("stop_button")
         self.cancel_btn = QPushButton("Cancel")
         self.load_btn = QPushButton("Load")
-        self.load_btn.setObjectName("save_button")     # reuse accent styling
+        self.load_btn.setObjectName("save_button")
 
         self.rename_btn.setEnabled(False)
         self.delete_btn.setEnabled(False)
@@ -207,13 +204,11 @@ class LoadSaveDialog(QDialog):
     def _display_metadata(self, metadata):
         self._clear_details()
 
-        # Title
         title = QLabel(metadata.get('source_midi_filename', 'Unknown MIDI'))
         title.setProperty("variant", "title")
         title.setWordWrap(True)
         self.details_layout.addWidget(title)
 
-        # Timestamp
         ts = metadata.get('creation_timestamp', 'Unknown')
         try:
             dt = datetime.fromisoformat(ts)
@@ -224,7 +219,6 @@ class LoadSaveDialog(QDialog):
         date_label.setProperty("variant", "muted")
         self.details_layout.addWidget(date_label)
 
-        # Separator
         sep = QFrame()
         sep.setObjectName("h_sep")
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -234,7 +228,6 @@ class LoadSaveDialog(QDialog):
 
         settings = metadata.get('playback_settings', {})
 
-        # Playback settings
         pb_label = QLabel("Playback Settings")
         pb_label.setProperty("variant", "section")
         self.details_layout.addWidget(pb_label)
@@ -257,7 +250,6 @@ class LoadSaveDialog(QDialog):
         self.details_layout.addLayout(pb_grid)
         self.details_layout.addSpacing(8)
 
-        # Humanization
         hum_label = QLabel("Humanization")
         hum_label.setProperty("variant", "section")
         self.details_layout.addWidget(hum_label)

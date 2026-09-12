@@ -18,7 +18,7 @@ class MidiParseWorker(QObject):
     Emits `parsed(tracks, tempo_map, pedal_count, midi_pedal_events)` on
     success or `failed(str)` on any exception, and always `finished()` last.
     """
-    parsed   = Signal(object, object, int, object)  # tracks, tempo_map, pedal_count, midi_pedal_events
+    parsed   = Signal(object, object, int, object)
     failed   = Signal(str)
     finished = Signal()
 

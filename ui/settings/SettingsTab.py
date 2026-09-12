@@ -13,9 +13,6 @@ from ui.theme import ThemeManager
 
 class SettingsTab(QWidget):
 
-    # Default minimum embedded MIDI CC 64 (sustain pedal) event count before
-    # LoadCoordinator._on_midi_parsed prompts the user to use the file's own
-    # pedal data instead of generating new pedal events.
     DEFAULT_PEDAL_PROMPT_THRESHOLD = 8
 
     def __init__(self, parent=None):
@@ -27,7 +24,6 @@ class SettingsTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -40,7 +36,6 @@ class SettingsTab(QWidget):
         hl.addStretch()
         outer.addWidget(header)
 
-        # --- Nav bar (sub_tab_bar / sub_tab_btn -- same style as PlaybackTab) ---
         nav_bar = QFrame()
         nav_bar.setObjectName("sub_tab_bar")
         nav_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -61,7 +56,6 @@ class SettingsTab(QWidget):
         nav_layout.addStretch()
         outer.addWidget(nav_bar)
 
-        # --- Content stack (fills remaining space, no card wrapper) ---
         self._stack = QStackedWidget()
         self._stack.addWidget(self._make_display_page())
         self._stack.addWidget(self._make_files_page())
@@ -72,7 +66,6 @@ class SettingsTab(QWidget):
 
         self._switch_tab(0)
 
-    # ── Page builders ───────────────────────────────────────────────────────────
 
     def _make_display_page(self) -> QWidget:
         page = QWidget()
@@ -345,7 +338,6 @@ class SettingsTab(QWidget):
         page_layout.addWidget(card, 1)
         return page
 
-    # ── Internal helpers ────────────────────────────────────────────────────────
 
     @staticmethod
     def _section_label(text: str) -> QLabel:
@@ -362,7 +354,6 @@ class SettingsTab(QWidget):
             btn.style().polish(btn)
             btn.update()
 
-    # ── Public API ──────────────────────────────────────────────────────────────
 
     def _populate_theme_combo(self) -> None:
         active = ThemeManager.get_active_name()

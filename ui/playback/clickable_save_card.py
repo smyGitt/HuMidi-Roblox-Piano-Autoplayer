@@ -32,7 +32,6 @@ class ClickableSaveCard(QFrame):
             time_row.setContentsMargins(0, 0, 0, 0)
             time_row.setSpacing(4)
 
-            # Clock icon color comes from QSS via PhIconLabel qproperty-iconColor.
             time_icon = PhIconLabel("clock", 10)
             time_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             time_row.addWidget(time_icon)

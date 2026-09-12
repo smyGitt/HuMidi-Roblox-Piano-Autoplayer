@@ -9,8 +9,8 @@ from ui.widgets.ph_icon import ph_icon
 
 _ICON_SIZE = 22
 _ICON_X    = 12
-_ICON_Y    = 13   # (48 - 22) // 2
-_LABEL_X   = 44   # _ICON_X + _ICON_SIZE + 10 (gap)
+_ICON_Y    = 13
+_LABEL_X   = 44
 _LABEL_W   = 200
 
 
@@ -25,7 +25,6 @@ class DiscordNavButton(QFrame):
         super().__init__(parent)
         self.setObjectName("nav_btn")
         self._url = url
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._color_dim = QColor("#7878a0")
         self._color_hi  = QColor("#dcdcf0")
         self._hovered = False
@@ -56,7 +55,6 @@ class DiscordNavButton(QFrame):
         pix = ph_icon("discord-logo", color.name(), _ICON_SIZE).pixmap(_ICON_SIZE * 2, _ICON_SIZE * 2)
         self._icon_lbl.setPixmap(pix)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def colorDim(self) -> QColor:

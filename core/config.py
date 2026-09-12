@@ -26,16 +26,16 @@ class HumanizationConfig(TypedDict, total=False):
     enable_tempo_sway: bool
     tempo_sway_intensity: float
     invert_tempo_sway: bool
-    use_velocity_accent: bool       # True = hold Alt while pressing any note that has recorded velocity, played as-is (no threshold)
+    use_velocity_accent: bool
 
 
 class PedalConfig(TypedDict, total=False):
     """Keys consumed by pedal_generator.generate_events."""
     pedal_style: str
     use_ai_pedal: bool
-    pedal_threshold_on: float   # raw sigmoid threshold for pedal-down edge; -1.0 = auto
-    pedal_threshold_off: float  # raw sigmoid threshold for pedal-up edge; -1.0 = auto
-    use_midi_pedal: bool        # True = use CC 64 events from the MIDI file directly
+    pedal_threshold_on: float
+    pedal_threshold_off: float
+    use_midi_pedal: bool
 
 
 class PlaybackOptions(TypedDict, total=False):

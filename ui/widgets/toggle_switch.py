@@ -30,7 +30,6 @@ class ToggleSwitch(QAbstractButton):
 
         self._pos: float = 0.0
 
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._track_off = QColor("#7878a0")
         self._track_on  = QColor("#5b8dee")
         self._knob      = QColor("#e8e8f0")
@@ -54,7 +53,6 @@ class ToggleSwitch(QAbstractButton):
         self._pos = value
         self.update()
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def trackOff(self) -> QColor:
@@ -110,10 +108,8 @@ class ToggleSwitch(QAbstractButton):
         self._dis_track = c
         self.update()
 
-    # -- State ----------------------------------------------------------------
 
     def setChecked(self, checked: bool) -> None:
-        # Snap pos before super() so the toggled handler skips the animation.
         self._pos = 1.0 if checked else 0.0
         super().setChecked(checked)
 

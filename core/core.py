@@ -157,8 +157,6 @@ class MidiParser:
 
         tracks = []
         note_id_counter = 0
-        # CC 64 = damper / sustain pedal. Count on/off transitions per channel.
-        # An on->off pair is one event; threshold matches the GM convention.
         pedal_state_by_channel: Dict[int, bool] = {}
         pedal_event_count = 0
         midi_pedal_events: List[Tuple[float, bool]] = []
@@ -217,7 +215,6 @@ class MidiParser:
                     )
             elif debug_log is not None:
                 debug_log(f"[MIDI] Track {i} ({track_name}): empty (no notes), skipped")
-        # Any pedal still held at EOF counts as one event.
         pedal_event_count += sum(1 for held in pedal_state_by_channel.values() if held)
         midi_pedal_events.sort(key=lambda x: x[0])
 

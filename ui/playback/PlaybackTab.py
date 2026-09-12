@@ -23,14 +23,13 @@ from ui.playback.apply_toast import ApplyToast
 class PlaybackTab(QWidget):
 
     edit_selection_requested = Signal()
-    save_card_clicked        = Signal(str, str, str)  # (filepath, save_name, song_name)
+    save_card_clicked        = Signal(str, str, str)
     apply_requested          = Signal()
     discard_requested        = Signal()
     tab_shown                = Signal()
     config_changed           = Signal()
     generate_pedal_requested = Signal()
 
-    # Re-exported from PerformanceCard for backward-compatible callers.
     PEDAL_MAPPING     = PerformanceCard.PEDAL_MAPPING
     PEDAL_MAPPING_INV = PerformanceCard.PEDAL_MAPPING_INV
 
@@ -47,22 +46,19 @@ class PlaybackTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Persistent file info strip
         self.file_strip = FileStrip()
         outer.addWidget(self.file_strip)
 
-        # Sub-tab bar (I-III)
         self._sub_tab_bar = SubTabBar()
         self._sub_tab_bar.tab_changed.connect(self._on_sub_tab_changed)
         outer.addWidget(self._sub_tab_bar)
 
-        # Stacked content pages
         self._stack = QStackedWidget()
         outer.addWidget(self._stack, 1)
 
-        self._stack.addWidget(self._scrollable(self._build_file_tab()))        # I
-        self._stack.addWidget(self._scrollable(self._build_playback_tab())) # II
-        self._stack.addWidget(self._scrollable(self._build_humanize_tab())) # III
+        self._stack.addWidget(self._scrollable(self._build_file_tab()))
+        self._stack.addWidget(self._scrollable(self._build_playback_tab()))
+        self._stack.addWidget(self._scrollable(self._build_humanize_tab()))
 
         self._toast = ApplyToast(self)
         self._toast.apply_clicked.connect(self._on_toast_apply)
@@ -98,7 +94,6 @@ class PlaybackTab(QWidget):
         super().resizeEvent(event)
         self._reposition_toast()
 
-    # -- Toast helpers --------------------------------------------------------
 
     def _reposition_toast(self) -> None:
         if self._toast.is_toast_visible():
@@ -158,7 +153,6 @@ class PlaybackTab(QWidget):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         return scroll
 
-    # -- Tab I: File ----------------------------------------------------------
 
     def _build_file_tab(self) -> QWidget:
         page = QWidget()
@@ -167,19 +161,16 @@ class PlaybackTab(QWidget):
         self._file_page_layout = layout
         layout.setSpacing(10)
 
-        # Row 1: LOADED card containing the LoadedRow widget.
         tracks_card, tracks_layout = make_card("LOADED")
         tracks_card.setMinimumHeight(100)
         self._loaded_row = LoadedRow()
         self._loaded_row.edit_selection_btn.clicked.connect(
             self.edit_selection_requested.emit
         )
-        # Proxy for backward-compatible attribute access on PlaybackTab.
         self.edit_selection_btn = self._loaded_row.edit_selection_btn
         tracks_layout.addWidget(self._loaded_row)
         layout.addWidget(tracks_card)
 
-        # Row 2: drop zone on the left, saved songs panel on the right.
         cols = QHBoxLayout()
         cols.setSpacing(14)
 
@@ -189,14 +180,12 @@ class PlaybackTab(QWidget):
         self._drop_card, drop_body = make_card("REPLACE", dashed_border=True)
         drop_body.addWidget(self.drop_zone)
 
-        # file_path_label kept for API compat -- stores full path in toolTip.
         self.file_path_label = QLabel("No file selected.")
         self.file_path_label.setObjectName("file_path_label")
         self.file_path_label.setVisible(False)
 
         self._saved_panel = SavedSongsPanel()
         self._saved_panel.save_card_clicked.connect(self.save_card_clicked.emit)
-        # Proxy attributes for MainWindow._bind_signals.
         self.all_saves_btn          = self._saved_panel.all_saves_btn
         self.refresh_saved_songs_btn = self._saved_panel.refresh_saved_songs_btn
 
@@ -205,7 +194,6 @@ class PlaybackTab(QWidget):
         layout.addLayout(cols, 1)
         return page
 
-    # -- Tab II: Playback (includes Mapping and Activity) ---------------------
 
     def _build_playback_tab(self) -> QWidget:
         page = QWidget()
@@ -214,11 +202,9 @@ class PlaybackTab(QWidget):
         self._playback_page_layout = layout
         layout.setSpacing(10)
 
-        # Row 1: two equal columns
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
-        # Left column: PERFORMANCE card stretched to fill column height.
         self._perf_card = PerformanceCard()
         self._perf_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -229,7 +215,6 @@ class PlaybackTab(QWidget):
         self.use_midi_pedal_check = self._perf_card.use_midi_pedal_check
         self.use_velocity_accent_check = self._perf_card.use_velocity_accent_check
 
-        # Right column: OPTIONS card.
         self._opts_card = OptionsCard()
         self._opts_card.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -242,7 +227,6 @@ class PlaybackTab(QWidget):
         row1.addWidget(self._perf_card, 1)
         row1.addWidget(self._opts_card, 1)
 
-        # Row 2: TEMPO card spanning full width.
         tempo_card, tempo_body = make_card("TEMPO")
         tempo_row = QHBoxLayout()
         tempo_row.setSpacing(8)
@@ -302,7 +286,6 @@ class PlaybackTab(QWidget):
         self.tempo_spinbox.valueChanged.connect(self._update_result_bpm)
         self.target_bpm_spinbox.editingFinished.connect(self._on_target_bpm_edited)
 
-        # Row 3: PEDAL AI THRESHOLDS card (full width; locked until first AI generation).
         self._pedal_ai_card = PedalAICard()
         self._pedal_ai_card.generate_requested.connect(self.generate_pedal_requested.emit)
         self.pedal_ai_reset_icon = self._pedal_ai_card.reset_icon
@@ -312,7 +295,6 @@ class PlaybackTab(QWidget):
         layout.addWidget(self._pedal_ai_card)
         return page
 
-    # -- BPM display ----------------------------------------------------------
 
     def update_bpm_display(self, original_bpm: float) -> None:
         self._original_bpm = original_bpm
@@ -333,7 +315,6 @@ class PlaybackTab(QWidget):
         multiplier = max(0.1, min(10.0, multiplier))
         self.tempo_slider.setValue(int(round(multiplier * 100.0)))
 
-    # -- Tab III: Humanize ----------------------------------------------------
 
     def _build_humanize_tab(self) -> QWidget:
         page = QWidget()
@@ -346,7 +327,6 @@ class PlaybackTab(QWidget):
         self.all_humanization_spinboxes = {}
         self.all_humanization_sliders   = {}
 
-        # Master row card
         self._humanize_master = HumanizeMasterRow()
         self.select_all_humanization_check = (
             self._humanize_master.select_all_humanization_check
@@ -360,11 +340,9 @@ class PlaybackTab(QWidget):
         )
         layout.addWidget(self._humanize_master)
 
-        # Stacked detail cards
         cols = QVBoxLayout()
         cols.setSpacing(10)
 
-        # Left: Timing & Feel
         self.timing_reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
         self.timing_reset_icon.setToolTip("Reset timing & feel to defaults")
         self.timing_reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -400,7 +378,6 @@ class PlaybackTab(QWidget):
         left_layout.addWidget(_invert_container)
         left_layout.addStretch()
 
-        # Right: Hands & Imperfection
         self.hands_reset_icon = PhIconLabel("arrow-counter-clockwise", size=16)
         self.hands_reset_icon.setToolTip("Reset hands & imperfection to defaults")
         self.hands_reset_icon.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -420,7 +397,6 @@ class PlaybackTab(QWidget):
         cols.addWidget(right_card)
         layout.addLayout(cols)
 
-        # Dummy vary_velocity entry for legacy save compatibility.
         self.all_humanization_checks['vary_velocity'] = ToggleSwitch()
 
         self.select_all_humanization_check.toggled.connect(self._toggle_all)
@@ -441,7 +417,6 @@ class PlaybackTab(QWidget):
         self.all_humanization_sliders[key]   = row.slider
         self.all_humanization_spinboxes[key] = row.spinbox
 
-    # -- Humanization helpers -------------------------------------------------
 
     def _toggle_all(self, checked: bool) -> None:
         for check in self.all_humanization_checks.values():
@@ -454,7 +429,6 @@ class PlaybackTab(QWidget):
         self.select_all_humanization_check.setChecked(all(c.isChecked() for c in checks))
         self.select_all_humanization_check.blockSignals(False)
 
-    # -- Public API -----------------------------------------------------------
 
     def set_midi_pedal_available(self, available: bool) -> None:
         """Show or hide the 'Use MIDI Pedal' toggle based on CC 64 event presence."""

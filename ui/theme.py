@@ -15,7 +15,6 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 
 
-# -- Colour helpers -----------------------------------------------------------
 
 def _hex_to_rgb(h: str) -> tuple[int, int, int]:
     h = h.lstrip("#")
@@ -32,28 +31,27 @@ def _mix(hex1: str, hex2: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-# -- Data model ---------------------------------------------------------------
 
 @dataclass
 class ThemeColors:
     name: str = "Dark"
-    bg_primary:    str = "#1c1c2e"   # window / dialog background
-    bg_secondary:  str = "#21213a"   # surfaces: groups, transport, headers
-    bg_input:      str = "#24243e"   # inputs: spinbox, combobox, lineedit
-    accent:        str = "#5b8dee"   # interactive: sliders, checkboxes, selection
-    text_primary:  str = "#dcdcf0"   # main text
-    text_secondary: str = "#7878a0"  # muted labels, group titles
-    border:        str = "#32324a"   # all borders
-    accent_play:   str = "#4ecb8d"   # play button
-    accent_stop:   str = "#e05c5c"   # stop / danger
-    pedal_color:   str = "#e8a020"   # sustain pedal indicator
-    accent_controls: str = "#5b8dee" # sliders and checkboxes
-    bg_button:     str = "#21213a"   # generic button background
-    accent_save:   str = "#5b8dee"   # save button accent
-    accent_loaded: str = "#c9a535"   # file loaded / warning indicator
-    knob_color:   str = "#dcdcdf"   # toggle switch knob
-    toggle_on:    str = "#5b8dee"   # toggle switch track color when checked
-    toggle_off:   str = "#7878a0"   # toggle switch track color when unchecked
+    bg_primary:    str = "#1c1c2e"
+    bg_secondary:  str = "#21213a"
+    bg_input:      str = "#24243e"
+    accent:        str = "#5b8dee"
+    text_primary:  str = "#dcdcf0"
+    text_secondary: str = "#7878a0"
+    border:        str = "#32324a"
+    accent_play:   str = "#4ecb8d"
+    accent_stop:   str = "#e05c5c"
+    pedal_color:   str = "#e8a020"
+    accent_controls: str = "#5b8dee"
+    bg_button:     str = "#21213a"
+    accent_save:   str = "#5b8dee"
+    accent_loaded: str = "#c9a535"
+    knob_color:   str = "#dcdcdf"
+    toggle_on:    str = "#5b8dee"
+    toggle_off:   str = "#7878a0"
     builtin: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
@@ -64,7 +62,6 @@ class ThemeColors:
     @classmethod
     def from_dict(cls, d: dict) -> "ThemeColors":
         d = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
-        # Derive new fields from existing ones for older saved themes.
         if "accent_controls" not in d:
             d["accent_controls"] = d.get("accent", "#5b8dee")
         if "bg_button" not in d:
@@ -83,7 +80,6 @@ class ThemeColors:
         return cls(**d)
 
 
-# -- Built-in presets ---------------------------------------------------------
 
 BUILTIN_THEMES: dict[str, ThemeColors] = {
     "Midnight": ThemeColors(
@@ -119,8 +115,6 @@ BUILTIN_THEMES: dict[str, ThemeColors] = {
 }
 
 
-# -- Stylesheet template ------------------------------------------------------
-# Uses %(key)s substitution -- CSS braces do not need escaping.
 
 _QSS = """\
 QMainWindow {
@@ -936,7 +930,6 @@ PhIconLabel[variant="icon_danger"] { qproperty-iconHoverColor: %(accent_stop)s; 
 
 def generate_stylesheet(c: ThemeColors) -> str:
     """Generate a complete QSS string from a ThemeColors instance."""
-    # Tinted button backgrounds
     play_bg       = _mix(c.bg_primary, c.accent_play, 0.15)
     play_hover    = _mix(c.bg_primary, c.accent_play, 0.28)
     play_border   = _mix(c.accent_play, c.bg_secondary, 0.40)
@@ -951,12 +944,10 @@ def generate_stylesheet(c: ThemeColors) -> str:
     stop_dis_text = _mix(c.accent_stop, c.bg_primary, 0.65)
     stop_dis_bdr  = _mix(stop_border, c.bg_primary, 0.65)
 
-    # Generic button (uses bg_button, separate from bg_secondary)
     btn_bg      = c.bg_button
     btn_hover   = _mix(c.bg_button, c.accent, 0.16)
     btn_pressed = _mix(c.bg_primary, "#000000", 0.06)
 
-    # Save button (accent_save-tinted background)
     save_btn_bg       = _mix(c.bg_primary, c.accent_save, 0.15)
     save_btn_hover    = _mix(c.bg_primary, c.accent_save, 0.28)
     save_btn_border   = _mix(c.accent_save, c.bg_secondary, 0.40)
@@ -964,12 +955,10 @@ def generate_stylesheet(c: ThemeColors) -> str:
     save_btn_dis_text = _mix(c.accent_save, c.bg_primary, 0.65)
     save_btn_dis_bdr  = _mix(save_btn_border, c.bg_primary, 0.65)
 
-    # Disabled generic
     dis_text   = _mix(c.text_primary, c.bg_primary, 0.65)
     dis_bg     = _mix(c.bg_secondary, c.bg_primary, 0.55)
     dis_border = _mix(c.border, c.bg_primary, 0.50)
 
-    # Controls (sliders, checkboxes) derived colors
     accent_controls_light = _mix(c.accent_controls, "#ffffff", 0.25)
     text_area_bg  = c.bg_input
     scroll_handle = _mix(c.border, c.accent, 0.45)
@@ -983,16 +972,12 @@ def generate_stylesheet(c: ThemeColors) -> str:
     nav_active_bg = _mix(c.bg_secondary, c.accent, 0.10)
     nav_hover_bg  = _mix(c.bg_secondary, c.accent, 0.05)
 
-    # New derived colors for paper/ink design language
     accent_tint = _mix(c.bg_secondary, c.accent, 0.12)
     ink_faint   = _mix(c.text_secondary, c.bg_primary, 0.45)
     rule_strong = _mix(c.border, c.text_secondary, 0.18)
 
-    # Drop-zone dashed border: always darker than bg_secondary so the affordance
-    # reads consistently across light and dark themes.
     dropzone_border = _mix(c.bg_secondary, "#000000", 0.35)
 
-    # Save card hover: faint accent wash so the hover echoes the left accent bar.
     save_card_hover = _mix(c.bg_secondary, c.accent, 0.10)
 
     d = dict(
@@ -1019,14 +1004,12 @@ def generate_stylesheet(c: ThemeColors) -> str:
         accent_tint=accent_tint, ink_faint=ink_faint, rule_strong=rule_strong,
         dropzone_border=dropzone_border,
         save_card_hover=save_card_hover,
-        # Custom-painted widget colors (consumed via qproperty-*)
         toggle_off=c.toggle_off, toggle_on=c.toggle_on, knob_color=c.knob_color,
         dis_track=dis_border, accent_loaded=c.accent_loaded, pedal_color=c.pedal_color,
     )
     return _QSS % d
 
 
-# -- Theme manager ------------------------------------------------------------
 
 class ThemeManager:
     """Loads/saves custom themes and the active theme name from disk."""
@@ -1034,7 +1017,6 @@ class ThemeManager:
     _themes_dir = Path.home() / ".humidi"
     _themes_file = Path.home() / ".humidi" / "themes.json"
 
-    # -- Disk I/O -------------------------------------------------------------
 
     @classmethod
     def _load_raw(cls) -> dict:
@@ -1062,7 +1044,6 @@ class ThemeManager:
         if existing:
             cls._save_raw(existing)
 
-    # -- Public API -----------------------------------------------------------
 
     @classmethod
     def all_themes(cls) -> dict[str, ThemeColors]:

@@ -126,7 +126,6 @@ class LicenseTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -139,19 +138,16 @@ class LicenseTab(QWidget):
         hl.addStretch()
         outer.addWidget(header)
 
-        # Body widget restores side margins
         body = QWidget()
         layout = QVBoxLayout(body)
         layout.setContentsMargins(16, 8, 16, 16)
         layout.setSpacing(0)
         outer.addWidget(body, 1)
 
-        # -- Nav + stacked content inside a single card ------------------------
         split = QHBoxLayout()
         split.setContentsMargins(0, 0, 0, 0)
         split.setSpacing(0)
 
-        # Left nav panel
         nav_panel = QWidget()
         nav_panel.setObjectName("settings_nav_panel")
         nav_panel.setFixedWidth(170)
@@ -169,12 +165,10 @@ class LicenseTab(QWidget):
             self._tab_btns.append(btn)
         nav_layout.addStretch()
 
-        # Vertical divider
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setObjectName("settings_nav_sep")
 
-        # Stacked pages -- one QTextEdit per license entry
         self._stack = QStackedWidget()
         for text in _LICENSE_TEXTS.values():
             page = QWidget()
@@ -198,7 +192,6 @@ class LicenseTab(QWidget):
 
         self._switch_tab(0)
 
-    # ── Internal ──────────────────────────────────────────────────────────────
 
     def _switch_tab(self, idx: int) -> None:
         self._stack.setCurrentIndex(idx)

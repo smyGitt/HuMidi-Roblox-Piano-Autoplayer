@@ -44,7 +44,6 @@ class PhIconLabel(EventInjectableMixin, QLabel):
         self.size = size
         self.normal_pixmap: QPixmap | None = None
         self.hover_pixmap:  QPixmap | None = None
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._icon_color = QColor("#7878a0")
         self._icon_hover_color = QColor("#dcdcf0")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
@@ -69,7 +68,6 @@ class PhIconLabel(EventInjectableMixin, QLabel):
         self.hover_pixmap = h
         self.setPixmap(self.normal_pixmap)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def iconColor(self) -> QColor:

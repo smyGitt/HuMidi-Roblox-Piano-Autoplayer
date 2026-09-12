@@ -8,14 +8,10 @@ from core.models import Note, MusicalSection, KeyEvent
 from core.core import get_time_groups
 from core.config import PedalConfig
 
-# Cached weights -- loaded once on first AI pedal call.
 _weights = None
 MIN_CONFIDENCE_GATE = 0.3
 
 
-# ---------------------------------------------------------------------------
-# Strategy Protocol
-# ---------------------------------------------------------------------------
 
 class PedalStrategy(Protocol):
     """Contract for all pedal generation strategies.
@@ -40,9 +36,6 @@ class PedalStrategy(Protocol):
     ) -> List[KeyEvent]: ...
 
 
-# ---------------------------------------------------------------------------
-# Low-level generators (private, no Protocol signature requirement)
-# ---------------------------------------------------------------------------
 
 def _get_model_path() -> str:
     base = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,14 +48,14 @@ def _load_weights() -> Optional[dict]:
         return None
     npz = np.load(path)
     return {
-        'lstm1_W': npz['lstm2_W'],    # (2, 1024, 140)
-        'lstm1_R': npz['lstm2_R'],    # (2, 1024, 256)
-        'lstm1_B': npz['lstm2_B'],    # (2, 2048)
-        'lstm2_W': npz['lstm1_W'],    # (2, 1024, 512)
-        'lstm2_R': npz['lstm1_R'],    # (2, 1024, 256)
-        'lstm2_B': npz['lstm1_B'],    # (2, 2048)
-        'linear_W': npz['linear_W'],  # (512, 1)
-        'linear_B': npz['linear_B'],  # (1,)
+        'lstm1_W': npz['lstm2_W'],
+        'lstm1_R': npz['lstm2_R'],
+        'lstm1_B': npz['lstm2_B'],
+        'lstm2_W': npz['lstm1_W'],
+        'lstm2_R': npz['lstm1_R'],
+        'lstm2_B': npz['lstm1_B'],
+        'linear_W': npz['linear_W'],
+        'linear_B': npz['linear_B'],
     }
 
 
@@ -73,7 +66,7 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 def _lstm_direction(x_seq: np.ndarray, W: np.ndarray, R: np.ndarray,
                     B: np.ndarray, H: int) -> np.ndarray:
     """Single-direction LSTM over a sequence. ONNX gate order: i, o, f, c."""
-    bias = B[:4*H] + B[4*H:]  # combine Wb and Rb
+    bias = B[:4*H] + B[4*H:]
     h = np.zeros(H, dtype=np.float32)
     c = np.zeros(H, dtype=np.float32)
     out = np.empty((len(x_seq), H), dtype=np.float32)
@@ -101,8 +94,8 @@ def _bilstm_chunk(seq: np.ndarray, weights: dict) -> np.ndarray:
     """Run 2-layer BiLSTM + linear head on a single chunk. seq: (T, 140) -> (T,)."""
     out1 = _bilstm_layer(seq,  weights['lstm1_W'], weights['lstm1_R'], weights['lstm1_B'], 256)
     out2 = _bilstm_layer(out1, weights['lstm2_W'], weights['lstm2_R'], weights['lstm2_B'], 256)
-    logits = out2 @ weights['linear_W'] + weights['linear_B']  # (T, 1)
-    return _sigmoid(logits[:, 0])  # (T,)
+    logits = out2 @ weights['linear_W'] + weights['linear_B']
+    return _sigmoid(logits[:, 0])
 
 
 def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
@@ -110,7 +103,7 @@ def _bilstm_forward(x: np.ndarray, weights: dict) -> np.ndarray:
     x: (1, T, 140) -> preds: (T,).
     Uses 1024-frame chunks with 512-frame stride. Each frame's prediction
     comes from the chunk where it is closest to the center."""
-    seq = x[0]  # (T, 140)
+    seq = x[0]
     T = seq.shape[0]
     CHUNK = 1024
     STRIDE = 512
@@ -413,9 +406,6 @@ def _generate_harmonic_pedal(bass_notes: List[Note]) -> List[KeyEvent]:
     return events
 
 
-# ---------------------------------------------------------------------------
-# Strategy implementations (match PedalStrategy Protocol)
-# ---------------------------------------------------------------------------
 
 def _rhythmic_strategy(
     config: PedalConfig,
@@ -537,22 +527,16 @@ def _hybrid_strategy(
     return _generate_adaptive_pedal_driver(bass_notes, notes, debug_log)
 
 
-# ---------------------------------------------------------------------------
-# Strategy registry
-# ---------------------------------------------------------------------------
 
 _STRATEGY_MAP: Dict[str, PedalStrategy] = {
     'rhythmic': _rhythmic_strategy,
     'harmonic': _harmonic_strategy,
-    'legato':   _harmonic_strategy,   # backward-compat alias for pre-v2.1 saves
+    'legato':   _harmonic_strategy,
     'ai':       _ai_strategy,
     'hybrid':   _hybrid_strategy,
 }
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 def generate_events(
     config: PedalConfig,

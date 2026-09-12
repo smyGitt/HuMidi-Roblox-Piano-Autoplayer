@@ -49,7 +49,6 @@ class PedalAICard(QWidget):
         self._stack = QStackedWidget()
         body.addWidget(self._stack)
 
-        # Page 0: pre-generate ------------------------------------------------
         pre_page = QWidget()
         pre_layout = QVBoxLayout(pre_page)
         pre_layout.setContentsMargins(0, 4, 0, 4)
@@ -72,7 +71,6 @@ class PedalAICard(QWidget):
         pre_layout.addStretch()
         self._stack.addWidget(pre_page)
 
-        # Page 1: post-generate (thresholds + stats) --------------------------
         post_page = QWidget()
         post_layout = QVBoxLayout(post_page)
         post_layout.setContentsMargins(0, 0, 0, 0)
@@ -81,7 +79,6 @@ class PedalAICard(QWidget):
         row = QHBoxLayout()
         row.setSpacing(16)
 
-        # Left: threshold controls + status
         left = QVBoxLayout()
         left.setSpacing(0)
 
@@ -113,7 +110,6 @@ class PedalAICard(QWidget):
 
         row.addLayout(left)
 
-        # Right: stats column
         right = QVBoxLayout()
         right.setSpacing(4)
 
@@ -138,7 +134,6 @@ class PedalAICard(QWidget):
 
         post_layout.addLayout(row)
 
-        # Diagnostic section -- hidden until quality issues are detected
         self._diag_widget = QWidget()
         self._diag_widget.setObjectName("pedal_diag")
         self._diag_widget.setVisible(False)
@@ -194,7 +189,6 @@ class PedalAICard(QWidget):
         vbox.addWidget(desc)
         return container
 
-    # Public API --------------------------------------------------------------
 
     @property
     def has_thresholds(self) -> bool:

@@ -22,7 +22,6 @@ class PianoWidget(QWidget):
         self.pedal_active = False
         self.show_pedal = True
 
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._white_key    = QColor(230, 230, 240)
         self._black_key    = QColor(28, 28, 46)
         self._white_border = QColor(50, 50, 70)
@@ -30,7 +29,6 @@ class PianoWidget(QWidget):
         self._active_key   = QColor(78, 203, 141)
         self._pedal_color  = QColor(232, 160, 32)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     @Property(QColor)
     def whiteKey(self) -> QColor:
@@ -86,7 +84,6 @@ class PianoWidget(QWidget):
         self._pedal_color = c
         self.update()
 
-    # -- State ----------------------------------------------------------------
 
     def set_active_pitches(self, pitches: list):
         self.active_pitches = set(pitches)
@@ -179,7 +176,7 @@ class TimelineWidget(QWidget):
         self.is_dragging = False
         self.pixels_per_second = 50
         self.tempo_map = None
-        self.pedal_intervals = []        # List of (start_sec, end_sec) tuples
+        self.pedal_intervals = []
         self.show_pedal = True
 
         self.cached_background = None
@@ -189,7 +186,6 @@ class TimelineWidget(QWidget):
         self._resize_debounce.setInterval(120)
         self._resize_debounce.timeout.connect(self._on_resize_settled)
 
-        # Color slots (overwritten by QSS qproperty-* on stylesheet apply).
         self._bg_color = QColor(24, 24, 40)
         self._left_hand_color = QColor(91, 141, 238, 210)
         self._right_hand_color = QColor(78, 203, 141, 210)
@@ -198,7 +194,6 @@ class TimelineWidget(QWidget):
         self._measure_line_color = QColor(255, 255, 255, 30)
         self._pedal_color = QColor(232, 160, 32, 180)
 
-    # -- QSS-driven color slots ----------------------------------------------
 
     def _invalidate(self) -> None:
         self._needs_rebuild = True
@@ -281,7 +276,6 @@ class TimelineWidget(QWidget):
         self._pedal_color = c
         self._invalidate()
 
-    # -- State ----------------------------------------------------------------
 
     def set_data(self, notes: List[Note], duration: float, tempo_map: TempoMap = None):
         self.notes = notes

@@ -31,12 +31,9 @@ from ui.widgets.toggle_switch import ToggleSwitch
 from ui.widgets.slider_spinbox import NoScrollComboBox, NoScrollDoubleSpinBox
 
 
-# ── Preview scale ─────────────────────────────────────────────────────────────
 
-# All fixed pixel dimensions inside the preview window are half the real-UI value.
 _PREV_SCALE: float = 1 / 2
 
-# Fully-expanded width of the swatch side panel in pixels.
 _SWATCH_WIDTH = 280
 
 
@@ -45,8 +42,6 @@ def _ps(n: int) -> int:
     return int(n * _PREV_SCALE)
 
 
-# ── Colour groups (order matters -- shown in the editor) ──────────────────────
-# Each entry is a (key, label) color field or a str group header.
 
 _COLOR_GROUPS: list[tuple[str, str] | str] = [
     "SURFACES",
@@ -73,10 +68,8 @@ _COLOR_GROUPS: list[tuple[str, str] | str] = [
     ("pedal_color",     "Pedal Color"),
 ]
 
-# Flat list of (key, label) pairs -- used by code that iterates fields only.
 _COLOR_FIELDS = [entry for entry in _COLOR_GROUPS if isinstance(entry, tuple)]
 
-# ── Widget-to-ThemeColors-field lookup tables (module-level; never change) ────
 
 _BY_NAME: dict[str, tuple[str, str]] = {
     "pedal_swatch":         ("pedal_color",    "Pedal Color"),
@@ -125,7 +118,6 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
     if obj_name in _BY_NAME:
         return _BY_NAME[obj_name]
 
-    # Nav text labels are always empty in the collapsed preview sidebar.
     if obj_name == "nav_label":
         return None
 
@@ -157,7 +149,6 @@ def _field_for_widget(widget: QWidget) -> tuple[str, str] | None:
     return _BY_CLASS.get(cls_name)
 
 
-# ── Unique-name helper ────────────────────────────────────────────────────────
 
 def _unique_copy_name(base_name: str, existing: set[str]) -> str:
     """Return '<base_name> Copy' (or '<base_name> Copy N') not in existing."""
@@ -169,7 +160,6 @@ def _unique_copy_name(base_name: str, existing: set[str]) -> str:
     return candidate
 
 
-# ── Color swatch widget ───────────────────────────────────────────────────────
 
 class _ColorSwatch(QWidget):
     """A coloured square button + hex text field, kept in sync."""
@@ -198,7 +188,6 @@ class _ColorSwatch(QWidget):
         layout.addWidget(self._swatch)
         layout.addWidget(self._hex)
 
-    # ── Public ────────────────────────────────────────────────────────
 
     def set_color(self, hex_color: str, emit: bool = False) -> None:
         self._color = hex_color.lower()
@@ -217,7 +206,6 @@ class _ColorSwatch(QWidget):
         self._swatch.setEnabled(editable)
         self._hex.setReadOnly(not editable)
 
-    # ── Internals ─────────────────────────────────────────────────────
 
     def _pick_color(self) -> None:
         if not self._editable:
@@ -248,12 +236,11 @@ class _ColorSwatch(QWidget):
         )
 
 
-# ── Inspect mode event filter ─────────────────────────────────────────────────
 
 class _InspectFilter(QObject):
     """App-level event filter: intercepts right-click-release inside the preview panel."""
 
-    widget_right_clicked = Signal(object, object)  # (QWidget, QPoint global)
+    widget_right_clicked = Signal(object, object)
 
     def __init__(self, root: QWidget, parent=None):
         super().__init__(parent)
@@ -284,7 +271,6 @@ class _InspectFilter(QObject):
         return True
 
 
-# ── Hover highlight overlay ───────────────────────────────────────────────────
 
 class _HoverOverlay(QWidget):
     """Transparent overlay drawn over the preview panel in inspect mode.
@@ -358,7 +344,6 @@ class _HoverOverlay(QWidget):
         painter.drawPath(path)
 
 
-# ── Theme dialog ──────────────────────────────────────────────────────────────
 
 class ThemeDialog(QDialog):
     """
@@ -401,14 +386,12 @@ class ThemeDialog(QDialog):
         self._sync_toolbar_btn_widths()
         self._populate_list()
 
-    # ── Layout ────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 12, 12, 12)
         outer.setSpacing(8)
 
-        # Top toolbar: theme selector + action buttons
         toolbar = QHBoxLayout()
         toolbar.setSpacing(4)
 
@@ -487,7 +470,6 @@ class ThemeDialog(QDialog):
         top_sep.setFrameShape(QFrame.Shape.HLine)
         outer.addWidget(top_sep)
 
-        # Body: animated swatch panel + preview panel
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
@@ -502,7 +484,6 @@ class ThemeDialog(QDialog):
 
         outer.addLayout(body, 1)
 
-        # Bottom bar
         bot_sep = QFrame()
         bot_sep.setObjectName("h_sep")
         bot_sep.setFrameShape(QFrame.Shape.HLine)
@@ -531,7 +512,6 @@ class ThemeDialog(QDialog):
 
         outer.addLayout(bottom)
 
-        # Animation: slide the swatch panel in/out
         self._swatch_anim = QPropertyAnimation(self._swatch_panel_widget, b"maximumWidth")
         self._swatch_anim.setDuration(220)
         self._swatch_anim.finished.connect(self._on_swatch_anim_finished)
@@ -571,8 +551,8 @@ class ThemeDialog(QDialog):
         swatch_grid.setContentsMargins(4, 6, 4, 6)
         swatch_grid.setHorizontalSpacing(8)
         swatch_grid.setVerticalSpacing(10)
-        swatch_grid.setColumnStretch(0, 0)  # label column, fixed
-        swatch_grid.setColumnStretch(1, 1)  # swatch widget spans col 1+2; hex field stretches
+        swatch_grid.setColumnStretch(0, 0)
+        swatch_grid.setColumnStretch(1, 1)
 
         self._swatches: dict[str, _ColorSwatch] = {}
         grid_row = 0
@@ -704,7 +684,7 @@ class ThemeDialog(QDialog):
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
         sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        sidebar.setFixedWidth(_ps(44))  # real sidebar is 44px collapsed
+        sidebar.setFixedWidth(_ps(44))
 
         v = QVBoxLayout(sidebar)
         v.setContentsMargins(0, 0, 0, 0)
@@ -767,7 +747,7 @@ class ThemeDialog(QDialog):
         app_name.setObjectName("sidebar_logo_text")
         title_h.addWidget(app_name)
         title_h.addStretch()
-        for sym in ("–", "□", "×"):  # en-dash, square, multiplication sign
+        for sym in ("–", "□", "×"):
             lbl = QLabel(sym)
             lbl.setProperty("variant", "muted")
             title_h.addWidget(lbl)
@@ -995,7 +975,6 @@ class ThemeDialog(QDialog):
         v.addLayout(action_row)
         return bar
 
-    # ── Panel animation ───────────────────────────────────────────────
 
     def _toggle_swatch_panel(self, expand: bool) -> None:
         """Slide the color-swatch panel in (expand=True) or out."""
@@ -1023,7 +1002,6 @@ class ThemeDialog(QDialog):
             self._expand_panel_btn.setVisible(True)
             self._collapse_panel_btn.setVisible(False)
 
-    # ── Population ────────────────────────────────────────────────────
 
     def _populate_list(self, select_name: str | None = None) -> None:
         self._combo.blockSignals(True)
@@ -1041,7 +1019,6 @@ class ThemeDialog(QDialog):
         self._combo.blockSignals(False)
         self._combo.setCurrentIndex(target_row)
 
-    # ── Slots ─────────────────────────────────────────────────────────
 
     def _on_row_changed(self, row: int) -> None:
         if row < 0:
@@ -1199,12 +1176,8 @@ class ThemeDialog(QDialog):
             self.theme_applied.emit(self._current_theme.name)
         self.accept()
 
-    # ── Helpers ───────────────────────────────────────────────────────
 
     def _refresh_io_icons(self, colors: ThemeColors) -> None:
-        # Toolbar PhIconLabels are recolored by the dialog stylesheet via
-        # qproperty-*. Only the inspect button (a plain QPushButton) needs an
-        # explicit icon render here.
         self._inspect_btn.setIcon(ph_icon("inspect-mode", colors.text_secondary))
 
     def _preview(self, theme: ThemeColors) -> None:
@@ -1228,22 +1201,20 @@ class ThemeDialog(QDialog):
             + f"\nQFrame#pedal_swatch {{ background-color: {theme.pedal_color}; border-radius: 4px; }}"
             + f"\nQFrame#border_swatch {{ background-color: {theme.border}; border-radius: 2px; }}"
         )
-        _ti = _ps(22)   # transport icon: half of 22px real size
+        _ti = _ps(22)
         self._prev_play_btn.setIcon(ph_icon("play",        theme.accent_play, _ti))
         self._prev_stop_btn.setIcon(ph_icon("stop",        theme.accent_stop, _ti))
         self._prev_save_btn.setIcon(ph_icon("floppy-disk", theme.accent_save, _ti))
         self._prev_reset_btn.setIcon(ph_icon("arrow-counter-clockwise", theme.text_secondary, 7))
         self._prev_reset_btn.setIconSize(QSize(7, 7))
         self._prev_file_tile_icon.setPixmap(ph_icon("music-note", theme.accent, 8).pixmap(16, 16))
-        _ni = 9  # nav/logo icon: 9px logical in collapsed-sidebar preview
+        _ni = 9
         self._prev_sidebar_logo.setPixmap(
             ph_icon("music-note", theme.text_primary, _ni).pixmap(_ni * 2, _ni * 2)
         )
         for icon_lbl, icon_name, is_active in self._prev_nav_icon_labels:
             color = theme.text_primary if is_active else theme.text_secondary
             icon_lbl.setPixmap(ph_icon(icon_name, color, _ni).pixmap(_ni * 2, _ni * 2))
-        # _prev_check (ToggleSwitch) is re-colored by the preview stylesheet via
-        # qproperty-*; no manual color push is needed here.
         if self._hover_overlay is not None:
             self._hover_overlay.set_accent(theme.accent)
 

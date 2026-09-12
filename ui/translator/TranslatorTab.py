@@ -12,9 +12,7 @@ from ui.widgets import make_card
 
 
 class TranslatorTab(QWidget):
-    # (text, format_name, bpm, humanize)
     play_sheet_requested = Signal(str, str, int, bool)
-    # (format_name)
     export_requested = Signal(str)
 
     def __init__(self, parent=None):
@@ -26,7 +24,6 @@ class TranslatorTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Full-width page header bar
         header = QFrame()
         header.setObjectName("page_header")
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -39,14 +36,12 @@ class TranslatorTab(QWidget):
         hl.addStretch()
         outer.addWidget(header)
 
-        # Body widget restores side margins
         body = QWidget()
         layout = QVBoxLayout(body)
         layout.setContentsMargins(16, 8, 16, 16)
         layout.setSpacing(0)
         outer.addWidget(body, 1)
 
-        # -- Toolbar: format dropdown (left) | Import / Export toggle (right) --
         toolbar = QFrame()
         tbl = QHBoxLayout(toolbar)
         tbl.setContentsMargins(0, 4, 0, 8)
@@ -75,13 +70,11 @@ class TranslatorTab(QWidget):
         tbl.addWidget(self._export_btn)
         layout.addWidget(toolbar)
 
-        # -- Workspace (stacked: import page / export page) --------------------
         self._workspace = QStackedWidget()
         self._workspace.addWidget(self._build_import_page())
         self._workspace.addWidget(self._build_export_page())
         layout.addWidget(self._workspace, 1)
 
-    # ── Import page ───────────────────────────────────────────────────────────
 
     def _build_import_page(self) -> QWidget:
         page = QWidget()
@@ -92,7 +85,6 @@ class TranslatorTab(QWidget):
         body = QHBoxLayout()
         body.setSpacing(10)
 
-        # Source card: sheet-text input
         src_card, src_body = make_card("Source")
         self.import_text = QTextEdit()
         self.import_text.setProperty("variant", "mono")
@@ -102,18 +94,15 @@ class TranslatorTab(QWidget):
         src_body.addWidget(self.import_text)
         body.addWidget(src_card, 1)
 
-        # Preview card (notation legend / key-range bar / stat tiles not yet implemented)
         prev_card, prev_body = make_card("Preview")
         prev_lbl = QLabel("Not yet implemented")
         prev_lbl.setProperty("variant", "muted")
         prev_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # TODO: parsed preview -- notation legend, key-range bar, stat tiles
         prev_body.addWidget(prev_lbl)
         body.addWidget(prev_card, 1)
 
         vl.addLayout(body, 1)
 
-        # Action bar
         ab = QHBoxLayout()
         ab.setContentsMargins(0, 4, 0, 0)
         ab.setSpacing(8)
@@ -141,7 +130,6 @@ class TranslatorTab(QWidget):
 
         return page
 
-    # ── Export page ───────────────────────────────────────────────────────────
 
     def _build_export_page(self) -> QWidget:
         page = QWidget()
@@ -152,16 +140,13 @@ class TranslatorTab(QWidget):
         body = QHBoxLayout()
         body.setSpacing(10)
 
-        # Source card (loaded MIDI track list for export mode -- not yet implemented)
         track_card, track_body = make_card("Source")
         track_lbl = QLabel("Not yet implemented")
         track_lbl.setProperty("variant", "muted")
         track_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # TODO: loaded MIDI track list for export mode
         track_body.addWidget(track_lbl)
         body.addWidget(track_card, 1)
 
-        # Output card: generated sheet text
         out_card, out_body = make_card("Output")
         self.export_status_label = QLabel(
             "Load a MIDI file on the Playback tab, then click Generate."
@@ -177,7 +162,6 @@ class TranslatorTab(QWidget):
 
         vl.addLayout(body, 1)
 
-        # Action bar
         ab = QHBoxLayout()
         ab.setContentsMargins(0, 4, 0, 0)
         ab.setSpacing(8)
@@ -192,12 +176,10 @@ class TranslatorTab(QWidget):
         self.copy_btn.setToolTip("Copy the generated sheet to the clipboard")
         self.copy_btn.clicked.connect(self._on_copy_clicked)
         ab.addWidget(self.copy_btn)
-        # TODO: Save Sheet to File button
         vl.addLayout(ab)
 
         return page
 
-    # ── Internal ──────────────────────────────────────────────────────────────
 
     def _set_mode(self, index: int) -> None:
         self._workspace.setCurrentIndex(index)
@@ -225,7 +207,6 @@ class TranslatorTab(QWidget):
         from PySide6.QtWidgets import QApplication
         QApplication.clipboard().setText(self.export_text.toPlainText())
 
-    # ── Public API ────────────────────────────────────────────────────────────
 
     def set_export_text(self, text: str):
         self.export_text.setPlainText(text)

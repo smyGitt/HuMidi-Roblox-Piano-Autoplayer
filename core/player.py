@@ -41,10 +41,6 @@ class Player(QObject):
         self.stop_event = threading.Event()
         self.pause_event = threading.Event()
 
-        # Cross-thread seek handoff. seek() is invoked from the GUI thread but
-        # all key/timing state is owned by the player thread's cursor loop.
-        # The request is parked here under a lock and applied inside the loop
-        # so no physical-keyboard or timing state is ever mutated concurrently.
         self._seek_lock = threading.Lock()
         self._pending_seek: Optional[float] = None
 
@@ -52,7 +48,6 @@ class Player(QObject):
         self.active_pitches: set = set()
         self.pedal_is_down = False
 
-        # Running key-net state for O(1) resume sync (maintained by _execute_chord_event)
         self._key_net: Dict[str, int] = {}
         self._key_last_press: Dict[str, KeyEvent] = {}
         self._pedal_net_down = False
@@ -153,7 +148,6 @@ class Player(QObject):
             self.status_updated.emit("Stopping playback...")
             self.stop_event.set()
             self.pause_event.clear()
-            # shutdown() is called by _execute_playback()'s finally block once the loop exits.
 
     def toggle_pause(self):
         """GUI-thread entry point. Flips pause_event immediately (a
@@ -241,20 +235,16 @@ class Player(QObject):
         self._pedal_net_down = False
 
         while not self.stop_event.is_set():
-            # Apply any GUI-thread seek request before doing anything else so
-            # the rest of the iteration sees consistent index/timing state.
             self._consume_pending_seek()
 
             if self.pause_event.is_set():
                 if not _was_paused:
-                    # First pause iteration: safe to release now; cursor loop owns all key presses
                     self.shutdown()
                     _was_paused = True
                 time.sleep(0.05)
                 continue
 
             if _was_paused:
-                # Just unpaused: re-press any notes that were mid-play at the pause point
                 self._sync_active_keys_at_resume()
                 _was_paused = False
 
@@ -304,7 +294,6 @@ class Player(QObject):
             else:
                 sleep_time = min(next_event.time - playback_time - 0.001, self.progress_update_interval)
                 time.sleep(max(0.0005, sleep_time))
-                # Refresh after sleep so the cursor emits current time, not pre-sleep time
                 now = time.perf_counter()
                 playback_time = (now - self.start_time) - self.total_paused_time
 
@@ -353,7 +342,6 @@ class Player(QObject):
             state = self.key_states.get(key_char)
             if not state: continue
 
-            # Only physically release when no other notes still need this key
             if net <= 0:
                 base_key = key_char
                 if key_char in self.mapper.SYMBOL_MAP: base_key = self.mapper.SYMBOL_MAP[key_char]
@@ -384,7 +372,6 @@ class Player(QObject):
             try:
                 with self.keyboard.pressed(*modifiers):
                     if was_physically_down:
-                        # Key already held by an overlapping note; re-strike for new attack
                         self.keyboard.release(base_key)
                         time.sleep(0.001)
                         self.keyboard.press(base_key)

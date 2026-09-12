@@ -5,8 +5,6 @@ from typing import List, Set, Dict, Optional
 from core.models import Note, MusicalSection
 from core.core import get_time_groups
 
-# Independent per-group noise injected into hand drift (std dev in seconds).
-# This gives Hand Drift a meaningful effect even when Vary Timing is off.
 _DRIFT_NOISE_SIGMA = 0.004
 
 
@@ -51,7 +49,6 @@ class Humanizer:
         for group in time_groups:
             is_resync = round(group[0].start_time, 2) in resync_points
 
-            # At resync points (simultaneous notes in both hands), decay accumulated drift.
             if enable_drift and is_resync:
                 decay = self.config.get('drift_decay_factor', 0.25)
                 if hand == 'left':
@@ -60,31 +57,25 @@ class Humanizer:
                     self.right_hand_drift *= decay
                 resync_count += 1
 
-            # Per-group timing offset: Gaussian noise clamped to ±3σ.
             timing_offset = 0.0
             if vary_timing:
                 timing_offset = random.gauss(0, timing_sigma)
                 timing_offset = max(-3 * timing_sigma, min(3 * timing_sigma, timing_offset))
                 max_timing_offset = max(max_timing_offset, abs(timing_offset))
 
-            # Chord roll: stagger simultaneous notes with random speed and direction.
             if enable_chord_roll and len(group) > 1:
-                ascending = random.random() > 0.2   # mostly low-to-high, occasionally reversed
-                stagger   = random.uniform(0.004, 0.010)  # 4–10 ms per step
+                ascending = random.random() > 0.2
+                stagger   = random.uniform(0.004, 0.010)
                 group.sort(key=lambda n: n.pitch, reverse=not ascending)
                 for i, note in enumerate(group):
                     note.start_time += i * stagger
                 chord_roll_count += 1
 
-            # Articulation: scale note duration only when explicitly enabled.
             articulation_scale = None
             if vary_articulation:
                 base = self.config.get('articulation', 0.95)
                 articulation_scale = base - random.random() * 0.1
 
-            # Apply timing offset and current drift to every note in the group.
-            # Drift is read *before* updating so this group uses the previously
-            # accumulated value; the new noise feeds into the next group.
             current_drift = self.left_hand_drift if hand == 'left' else self.right_hand_drift
             max_drift = max(max_drift, abs(current_drift))
             for note in group:
@@ -94,7 +85,6 @@ class Humanizer:
                 if articulation_scale is not None:
                     note.duration = max(0.03, note.duration * articulation_scale)
 
-            # Accumulate independent drift noise for the next group.
             if enable_drift:
                 drift_noise = random.gauss(0, _DRIFT_NOISE_SIGMA)
                 if hand == 'left':
@@ -102,7 +92,6 @@ class Humanizer:
                 else:
                     self.right_hand_drift += drift_noise
 
-        # Summary stats
         summary_parts = []
         if vary_timing:
             summary_parts.append(f"max_timing_offset={max_timing_offset*1000:.1f}ms (sigma={timing_sigma*1000:.1f}ms)")
@@ -134,8 +123,6 @@ class Humanizer:
             if section_duration < 1.0:
                 continue
 
-            # Fast sections sway less (they're already expressive); slow sections sway more.
-            # Invert reverses this relationship.
             if section.pace_label == 'fast':
                 pace_multiplier = 1.5 if invert_sway else 0.25
             elif section.pace_label == 'slow':
@@ -149,8 +136,6 @@ class Humanizer:
             for note in section.notes:
                 if note.id in note_map:
                     rel_pos = (note.start_time - section.start_time) / section_duration
-                    # sin(0..π) creates a bow: no shift at boundaries, max shift at midpoint.
-                    # Subtracting pulls the midpoint earlier, producing a subtle acceleration arc.
                     shift = np.sin(rel_pos * np.pi) * intensity
                     note_map[note.id].start_time -= shift
                     section_shifted += 1

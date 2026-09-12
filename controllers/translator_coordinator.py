@@ -71,7 +71,7 @@ class TranslatorCoordinator:
         self.ui.scrubber_slider.setEnabled(True)
         self.playback_coordinator.sync_play_button()
         if self.ui._nav_btns[1].isEnabled():
-            self.ui.tabs.setCurrentIndex(1)  # Switch to Visualizer
+            self.ui.tabs.setCurrentIndex(1)
 
     def _on_export_sheet(self, format_name: str) -> None:
         if not self.state.current_notes:

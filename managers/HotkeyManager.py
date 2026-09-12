@@ -24,10 +24,6 @@ class HotkeyManager(QObject):
 
     def __init__(self):
         super().__init__()
-        # _lock guards every field below that the pynput listener thread writes
-        # (current_mods, current_key, save_mods, save_key, _held_mods,
-        # listening_for_bind, listening_for_save_bind) and that the GUI thread
-        # reads (format_hotkey_string, format_save_hotkey_string).
         self._lock = threading.Lock()
         self.current_mods = frozenset()
         self.current_key  = Key.f6
@@ -75,9 +71,6 @@ class HotkeyManager(QObject):
             self._held_mods.discard(_normalize(key))
 
     def on_press(self, key):
-        # Runs on the pynput listener thread. All shared-state reads/writes are
-        # done under the lock, then signal emission (and format_* helpers,
-        # which lock independently) happens after release to avoid re-entrancy.
         canon = _normalize(key)
         emit_bound      = False
         emit_save_bound = False

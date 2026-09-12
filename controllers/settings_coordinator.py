@@ -40,8 +40,6 @@ class SettingsCoordinator(QObject):
         self.hotkey_manager = hotkey_manager
         self.playback_coordinator = playback_coordinator
         self.app_version = app_version
-        # Must exist before bind_signals(): load_config_to_ui fires settings
-        # toggle signals that call save_config, which reads this attribute.
         self._skipped_update_version = ''
         self._update_checker = None
         self._manual_checker = None
@@ -61,7 +59,6 @@ class SettingsCoordinator(QObject):
         self.ui.settings_tab.always_top_check.toggled.connect(self._toggle_always_on_top)
         self.ui.settings_tab.opacity_slider.valueChanged.connect(self._change_opacity)
 
-        # Settings-tab persistence: save immediately on change so closing without playing doesn't lose them
         self.ui.settings_tab.always_top_check.toggled.connect(self.save_config)
         self.ui.settings_tab.opacity_slider.valueChanged.connect(self.save_config)
         self.ui.settings_tab.timeline_vis_check.toggled.connect(self.save_config)
@@ -69,7 +66,6 @@ class SettingsCoordinator(QObject):
         self.ui.settings_tab.pedal_prompt_threshold_spinbox.valueChanged.connect(self.save_config)
         self.ui.settings_tab.redact_paths_check.toggled.connect(self.save_config)
 
-        # Privacy: mirror the redact-paths toggle onto the DebugTab immediately
         self.ui.settings_tab.redact_paths_check.toggled.connect(self.ui.debug_tab.set_redact_paths)
 
         self.hotkey_manager.bound_updated.connect(self._on_hotkey_bound)
@@ -85,13 +81,6 @@ class SettingsCoordinator(QObject):
             self._update_checker.start()
 
     def join_update_threads(self) -> None:
-        # Join every background update-check thread (bounded) so none outlives
-        # the window and later emits a signal into a destroyed MainWindow.
-        # UpdateChecker overrides run() with a single blocking network call and
-        # never starts an event loop, so quit() would be a no-op for it; the
-        # wait() bound must cover the request's own timeout (see
-        # UpdateManager.REQUEST_TIMEOUT_SECONDS) to actually join rather than
-        # merely give up after an arbitrary duration.
         update_join_ms = int(REQUEST_TIMEOUT_SECONDS * 1000) + 500
         if self._update_checker is not None:
             self._update_checker.wait(update_join_ms)
@@ -200,10 +189,6 @@ class SettingsCoordinator(QObject):
             "Could not reach GitHub.\nPlease check your internet connection.")
 
     def _on_update_available(self, latest_tag: str, releases_url: str, suppress_skipped: bool = False) -> None:
-        # The automatic launch check passes suppress_skipped=True so a version the
-        # user chose to skip does not re-prompt on every start. The manual "Check
-        # for updates" button passes False, so an explicit check always shows the
-        # dialog even for a previously skipped version.
         if suppress_skipped and latest_tag == self._skipped_update_version:
             return
 
