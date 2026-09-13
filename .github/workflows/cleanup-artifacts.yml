@@ -1,0 +1,56 @@
+name: Cleanup old artifacts
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Delete artifacts older than the newest per branch
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete old artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/${REPO}/actions/artifacts" --paginate --jq '.artifacts' > artifacts.json
+
+          python3 - <<'EOF'
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["REPO"]
+
+          with open("artifacts.json") as f:
+              artifacts = json.load(f)
+
+          by_branch = {}
+          for artifact in artifacts:
+              branch = artifact["workflow_run"]["head_branch"]
+              run_id = artifact["workflow_run"]["id"]
+              by_branch.setdefault(branch, {}).setdefault(run_id, []).append(artifact)
+
+          keep_ids = set()
+          for branch, runs in by_branch.items():
+              latest_run = max(runs.items(), key=lambda kv: max(a["created_at"] for a in kv[1]))
+              for artifact in latest_run[1]:
+                  keep_ids.add(artifact["id"])
+
+          to_delete = [a for a in artifacts if a["id"] not in keep_ids]
+          print(f"{len(artifacts)} artifacts total, keeping {len(keep_ids)} (newest per branch), deleting {len(to_delete)}")
+
+          for artifact in to_delete:
+              branch = artifact["workflow_run"]["head_branch"]
+              print(f"Deleting {artifact['id']}  {branch}  {artifact['name']}  {artifact['created_at']}")
+              subprocess.run(
+                  ["gh", "api", "-X", "DELETE", f"repos/{repo}/actions/artifacts/{artifact['id']}"],
+                  check=False,
+              )
+          EOF
