@@ -729,6 +729,13 @@ pub fn import_theme_file(
     serde_json::from_str(&contents).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn check_for_updates_now(
+    app: tauri::AppHandle,
+) -> Result<crate::managers::update_manager::UpdateCheckOutcome, String> {
+    crate::managers::update_manager::check_for_updates(&app).await
+}
+
 pub fn shutdown_playback_now(state: &AppState) {
     let handle = state.playback_handle.lock().ok().and_then(|mut g| g.take());
     if let Some(handle) = handle {

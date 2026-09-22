@@ -76,6 +76,7 @@ pub fn run() {
             commands::notes_to_sheet,
             commands::start_binding,
             commands::start_save_binding,
+            commands::check_for_updates_now,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

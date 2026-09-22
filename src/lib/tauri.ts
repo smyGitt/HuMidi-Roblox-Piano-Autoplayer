@@ -320,6 +320,15 @@ export async function startSaveBinding(): Promise<void> {
   return invoke("start_save_binding");
 }
 
+export type UpdateCheckOutcome =
+  | { status: "update_available"; tag: string; url: string }
+  | { status: "no_update" }
+  | { status: "indeterminate" };
+
+export async function checkForUpdatesNow(): Promise<UpdateCheckOutcome> {
+  return invoke("check_for_updates_now");
+}
+
 export type PlayerEventMap = {
   status_updated: string;
   progress_updated: number;

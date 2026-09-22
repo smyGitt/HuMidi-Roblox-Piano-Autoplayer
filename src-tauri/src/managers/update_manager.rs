@@ -16,7 +16,8 @@ pub fn parse_version(tag: &str) -> Vec<i64> {
     result
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
 pub enum UpdateCheckOutcome {
     UpdateAvailable { tag: String, url: String },
     NoUpdate,

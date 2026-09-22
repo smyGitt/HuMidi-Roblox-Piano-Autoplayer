@@ -10,6 +10,7 @@ import { useAppSettings } from "../../state/AppSettingsContext";
 import { usePlaybackConfig } from "../../state/PlaybackConfigContext";
 import { useLog } from "../../state/LogContext";
 import { DEFAULT_CONFIG } from "../playback/types";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   isTauri,
   onEvent,
@@ -21,6 +22,8 @@ import {
   getMidiDir,
   getThemesFile,
   setThemesDir,
+  checkForUpdatesNow,
+  type UpdateCheckOutcome,
 } from "../../lib/tauri";
 
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
@@ -247,6 +250,20 @@ function HotkeyPage() {
 function SystemPage() {
   const settings = useAppSettings();
   const { setConfig } = usePlaybackConfig();
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<UpdateCheckOutcome | null>(null);
+
+  async function handleCheckNow() {
+    if (!isTauri()) return;
+    setChecking(true);
+    try {
+      setCheckResult(await checkForUpdatesNow());
+    } catch {
+      setCheckResult({ status: "indeterminate" });
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <div className="settings-tab__display">
@@ -257,6 +274,18 @@ function SystemPage() {
             onChange={settings.setAutoCheckUpdates}
             label="Automatically check for updates"
           />
+        </div>
+        <div className="control-row">
+          <button className="modal__btn" disabled={checking} onClick={() => void handleCheckNow()}>
+            {checking ? "Checking..." : "Check Now"}
+          </button>
+          {checkResult?.status === "update_available" && (
+            <button className="modal__btn modal__btn--accent" onClick={() => void openUrl(checkResult.url)}>
+              Update available ({checkResult.tag}): Open
+            </button>
+          )}
+          {checkResult?.status === "no_update" && <span>Up to date.</span>}
+          {checkResult?.status === "indeterminate" && <span>Couldn't check for updates.</span>}
         </div>
       </Card>
       <Card title="MIDI Import">
