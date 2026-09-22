@@ -13,6 +13,7 @@ import { SettingsTab } from "./pages/settings/SettingsTab";
 import { TranslatorTab } from "./pages/translator/TranslatorTab";
 import { DebugTab } from "./pages/debug/DebugTab";
 import { LicenseTab } from "./pages/license/LicenseTab";
+import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
 import type { PageId } from "./pages/pageIds";
 import "./App.css";
 
@@ -28,7 +29,7 @@ const PAGE_TITLES: Record<PageId, string> = {
 function AppShell() {
   const [activePage, setActivePage] = useState<PageId>("playback");
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { opacity } = useAppSettings();
+  const { opacity, showUpdatePrompt, resolveUpdatePrompt } = useAppSettings();
   const engine = usePlaybackEngine();
 
   useEffect(() => {
@@ -86,6 +87,8 @@ function AppShell() {
         onSave={() => void engine.save()}
         onToggleCollapsed={() => setIsCollapsed((c) => !c)}
       />
+
+      {showUpdatePrompt && <UpdateCheckPrompt onChoice={resolveUpdatePrompt} />}
     </div>
   );
 }

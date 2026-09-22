@@ -43,7 +43,7 @@ describe("AppSettingsContext (preview mode, isTauri() = false)", () => {
     expect(result.current.showPiano).toBe(true);
     expect(result.current.showPianoPedal).toBe(true);
     expect(result.current.pedalPromptThreshold).toBe(8);
-    expect(result.current.autoCheckUpdates).toBe(true);
+    expect(result.current.autoCheckUpdates).toBe(false);
     expect(tauriMocks.loadAppConfig).not.toHaveBeenCalled();
   });
 
@@ -89,7 +89,7 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await waitFor(() => expect(tauriMocks.loadAppConfig).toHaveBeenCalled());
     expect(result.current.pedalPromptThreshold).toBe(8);
-    expect(result.current.autoCheckUpdates).toBe(true);
+    expect(result.current.autoCheckUpdates).toBe(false);
   });
 
   it("setPedalPromptThreshold persists under the exact Python key name", async () => {

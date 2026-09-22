@@ -20,6 +20,8 @@ interface AppSettingsContextValue extends AppSettings {
   setShowPianoPedal: (v: boolean) => void;
   setPedalPromptThreshold: (v: number) => void;
   setAutoCheckUpdates: (v: boolean) => void;
+  showUpdatePrompt: boolean;
+  resolveUpdatePrompt: (v: boolean) => void;
 }
 
 const DEFAULTS: AppSettings = {
@@ -29,7 +31,7 @@ const DEFAULTS: AppSettings = {
   showPiano: true,
   showPianoPedal: true,
   pedalPromptThreshold: 8,
-  autoCheckUpdates: true,
+  autoCheckUpdates: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -42,6 +44,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [showPianoPedal, setShowPianoPedalState] = useState(DEFAULTS.showPianoPedal);
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -57,7 +60,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         if (typeof cfg.pedal_prompt_threshold === "number") {
           setPedalPromptThresholdState(cfg.pedal_prompt_threshold);
         }
-        if (typeof cfg.auto_check_updates === "boolean") setAutoCheckUpdatesState(cfg.auto_check_updates);
+        if (typeof cfg.auto_check_updates === "boolean") {
+          setAutoCheckUpdatesState(cfg.auto_check_updates);
+        } else {
+          setShowUpdatePrompt(true);
+        }
       })
       .catch(() => {});
   }, []);
@@ -101,6 +108,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (isTauri()) void saveAppConfig({ auto_check_updates: v });
   }
 
+  function resolveUpdatePrompt(v: boolean) {
+    setShowUpdatePrompt(false);
+    setAutoCheckUpdates(v);
+  }
+
   const value = useMemo(
     () => ({
       alwaysOnTop,
@@ -117,8 +129,19 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setShowPianoPedal,
       setPedalPromptThreshold,
       setAutoCheckUpdates,
+      showUpdatePrompt,
+      resolveUpdatePrompt,
     }),
-    [alwaysOnTop, opacity, showTimeline, showPiano, showPianoPedal, pedalPromptThreshold, autoCheckUpdates],
+    [
+      alwaysOnTop,
+      opacity,
+      showTimeline,
+      showPiano,
+      showPianoPedal,
+      pedalPromptThreshold,
+      autoCheckUpdates,
+      showUpdatePrompt,
+    ],
   );
 
   return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>;

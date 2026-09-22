@@ -45,7 +45,7 @@ pub fn auto_check_enabled(config: &serde_json::Value) -> bool {
     config
         .get("auto_check_updates")
         .and_then(|v| v.as_bool())
-        .unwrap_or(true)
+        .unwrap_or(false)
 }
 
 pub async fn check_for_updates(app: &tauri::AppHandle) -> Result<UpdateCheckOutcome, String> {
@@ -193,13 +193,13 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_default_true_when_key_absent() {
-            assert!(auto_check_enabled(&json!({"other": 1})));
+        fn test_default_false_when_key_absent() {
+            assert!(!auto_check_enabled(&json!({"other": 1})));
         }
 
         #[test]
-        fn test_default_true_when_config_empty() {
-            assert!(auto_check_enabled(&json!({})));
+        fn test_default_false_when_config_empty() {
+            assert!(!auto_check_enabled(&json!({})));
         }
 
         #[test]

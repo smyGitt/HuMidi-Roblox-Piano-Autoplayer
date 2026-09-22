@@ -258,10 +258,6 @@ function SystemPage() {
             label="Automatically check for updates"
           />
         </div>
-        <span className="page-placeholder__hint">
-          The check itself is not built yet -- the backend's `check_for_updates` is still a stub pending real
-          release-endpoint infra. This toggle's value already persists.
-        </span>
       </Card>
       <Card title="MIDI Import">
         <div className="control-row">

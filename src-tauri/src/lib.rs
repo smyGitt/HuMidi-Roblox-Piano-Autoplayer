@@ -4,7 +4,7 @@ mod managers;
 mod state;
 
 use state::AppState;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +16,28 @@ pub fn run() {
         .manage(AppState::default())
         .setup(|app| {
             commands::spawn_hotkey_listener(app.handle().clone());
+
+            let auto_check = {
+                let state = app.state::<AppState>();
+                let config = state.app_config.lock().unwrap();
+                managers::update_manager::auto_check_enabled(&config)
+            };
+            if auto_check {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Ok(managers::update_manager::UpdateCheckOutcome::UpdateAvailable {
+                        tag,
+                        url,
+                    }) = managers::update_manager::check_for_updates(&app_handle).await
+                    {
+                        let _ = app_handle.emit(
+                            "update-available",
+                            serde_json::json!({ "tag": tag, "url": url }),
+                        );
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

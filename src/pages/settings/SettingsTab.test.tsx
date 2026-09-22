@@ -185,6 +185,6 @@ describe("SettingsTab > System page", () => {
     renderSettings();
     fireEvent.click(screen.getByText("System"));
     fireEvent.click(screen.getByText("Automatically check for updates"));
-    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ auto_check_updates: false }));
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ auto_check_updates: true }));
   });
 });
