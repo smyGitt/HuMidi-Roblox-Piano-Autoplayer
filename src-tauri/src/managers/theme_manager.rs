@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use super::config_manager::determine_root_dir;
+
 pub const FALLBACK_THEME_NAME: &str = "Midnight";
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -36,7 +38,7 @@ pub struct ThemeManager {
 
 impl ThemeManager {
     pub fn new() -> Self {
-        let themes_dir = dirs::home_dir().unwrap_or_default().join(".humidi");
+        let themes_dir = determine_root_dir();
         let themes_file = themes_dir.join("themes.json");
         ThemeManager { themes_dir, themes_file }
     }

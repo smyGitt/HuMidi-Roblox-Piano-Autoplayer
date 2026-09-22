@@ -4,7 +4,7 @@ fn empty_object() -> serde_json::Value {
     serde_json::Value::Object(serde_json::Map::new())
 }
 
-fn determine_root_dir() -> PathBuf {
+pub(crate) fn determine_root_dir() -> PathBuf {
     std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))

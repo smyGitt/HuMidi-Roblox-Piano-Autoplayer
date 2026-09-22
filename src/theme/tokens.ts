@@ -74,6 +74,51 @@ export const THEMES: Theme[] = [
 
 export const DEFAULT_THEME_NAME = "Midnight";
 
+export const COLOR_FIELD_GROUPS: { label: string; fields: { key: keyof ThemeTokens; label: string }[] }[] = [
+  {
+    label: "Surfaces",
+    fields: [
+      { key: "bg_primary", label: "Background" },
+      { key: "bg_surface", label: "Surface" },
+      { key: "bg_input", label: "Input Fields" },
+    ],
+  },
+  {
+    label: "Text & Borders",
+    fields: [
+      { key: "text_primary", label: "Text" },
+      { key: "text_muted", label: "Muted Text" },
+      { key: "border", label: "Borders" },
+    ],
+  },
+  {
+    label: "Accents",
+    fields: [
+      { key: "accent", label: "Accent" },
+      { key: "knob_color", label: "Knob" },
+    ],
+  },
+  {
+    label: "Status",
+    fields: [
+      { key: "accent_play", label: "Play Color" },
+      { key: "accent_stop", label: "Stop / Danger" },
+      { key: "accent_loaded", label: "File Loaded" },
+      { key: "pedal_color", label: "Pedal Color" },
+    ],
+  },
+];
+
+export function uniqueCopyName(baseName: string, existing: Set<string>): string {
+  let candidate = `${baseName} Copy`;
+  let n = 2;
+  while (existing.has(candidate)) {
+    candidate = `${baseName} Copy ${n}`;
+    n += 1;
+  }
+  return candidate;
+}
+
 export function applyThemeToRoot(theme: Theme, root: HTMLElement = document.documentElement) {
   for (const [key, value] of Object.entries(theme.tokens)) {
     root.style.setProperty(`--${key}`, value);

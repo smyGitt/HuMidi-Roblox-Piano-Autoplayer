@@ -41,6 +41,8 @@ pub fn run() {
             commands::get_custom_themes,
             commands::save_custom_theme,
             commands::delete_custom_theme,
+            commands::export_theme_file,
+            commands::import_theme_file,
             commands::save_playback,
             commands::load_save_file,
             commands::list_saves,

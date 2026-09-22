@@ -254,6 +254,14 @@ export async function deleteCustomTheme(name: string): Promise<void> {
   return invoke("delete_custom_theme", { name });
 }
 
+export async function exportThemeFile(path: string, theme: CustomThemeColors): Promise<void> {
+  return invoke("export_theme_file", { path, theme });
+}
+
+export async function importThemeFile(path: string): Promise<CustomThemeColors> {
+  return invoke("import_theme_file", { path });
+}
+
 export async function savePlayback(
   config: PlaybackConfig,
   midiFile: string,

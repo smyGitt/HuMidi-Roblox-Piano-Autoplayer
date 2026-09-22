@@ -84,6 +84,8 @@ describe("ThemeProvider (Tauri mode, isTauri() = true)", () => {
     );
     const { result } = renderHook(() => useTheme(), { wrapper });
     await waitFor(() => expect(result.current.themeName).toBe("Sunset"));
+    expect(result.current.theme.tokens.accent).toBe("#f80");
+    expect(result.current.theme.tokens.bg_primary).toBe("#000");
   });
 
   it("setThemeName persists the choice via set_active_theme_name", async () => {

@@ -712,6 +712,23 @@ pub fn delete_custom_theme(state: State<AppState>, name: String) -> Result<(), S
     Ok(())
 }
 
+#[tauri::command]
+pub fn export_theme_file(
+    path: String,
+    theme: crate::managers::theme_manager::ThemeColors,
+) -> Result<(), String> {
+    let serialized = serde_json::to_string_pretty(&theme).map_err(|e| e.to_string())?;
+    std::fs::write(&path, serialized).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_theme_file(
+    path: String,
+) -> Result<crate::managers::theme_manager::ThemeColors, String> {
+    let contents = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&contents).map_err(|e| e.to_string())
+}
+
 pub fn shutdown_playback_now(state: &AppState) {
     let handle = state.playback_handle.lock().ok().and_then(|mut g| g.take());
     if let Some(handle) = handle {

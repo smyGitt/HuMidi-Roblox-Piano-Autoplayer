@@ -4,6 +4,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { Card } from "../../components/Card";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { SliderSpinbox } from "../../components/SliderSpinbox";
+import { ThemeDialog } from "../../dialogs/ThemeDialog";
 import { useTheme } from "../../theme/ThemeProvider";
 import { useAppSettings } from "../../state/AppSettingsContext";
 import { usePlaybackConfig } from "../../state/PlaybackConfigContext";
@@ -28,6 +29,7 @@ type SettingsNav = (typeof NAV_ITEMS)[number];
 function DisplayPage() {
   const settings = useAppSettings();
   const { themeName, setThemeName, themeNames } = useTheme();
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
 
   return (
     <div className="settings-tab__display">
@@ -62,7 +64,7 @@ function DisplayPage() {
       <Card
         title="Appearance"
         footer={
-          <button className="settings-tab__customize-btn" disabled title="Theme editor not built yet">
+          <button className="settings-tab__customize-btn" onClick={() => setThemeDialogOpen(true)}>
             Customize...
           </button>
         }
@@ -80,6 +82,8 @@ function DisplayPage() {
           </select>
         </div>
       </Card>
+
+      {themeDialogOpen && <ThemeDialog onClose={() => setThemeDialogOpen(false)} />}
     </div>
   );
 }
