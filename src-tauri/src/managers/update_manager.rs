@@ -48,8 +48,17 @@ pub fn auto_check_enabled(config: &serde_json::Value) -> bool {
         .unwrap_or(true)
 }
 
-pub fn check_for_updates(_app: &tauri::AppHandle) {
-    todo!("blocked on real tauri-plugin-updater release endpoints + signing key -- see docs/managers/update_manager.md")
+pub async fn check_for_updates(app: &tauri::AppHandle) -> Result<UpdateCheckOutcome, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => Ok(UpdateCheckOutcome::UpdateAvailable {
+            tag: update.version.clone(),
+            url: RELEASES_PAGE.to_string(),
+        }),
+        Ok(None) => Ok(UpdateCheckOutcome::NoUpdate),
+        Err(_) => Ok(UpdateCheckOutcome::Indeterminate),
+    }
 }
 
 #[cfg(test)]
