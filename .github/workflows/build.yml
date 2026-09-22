@@ -18,8 +18,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release delete "build-${{ github.ref_name }}" --yes --cleanup-tag --repo "${{ github.repository }}" || true
 
-  build:
+  create-release:
     needs: delete-previous-release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.id }}
+    steps:
+      - name: Create prerelease
+        id: create
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: build-${{ github.ref_name }}
+          name: 'Build (${{ github.ref_name }})'
+          body: 'testing out a new GUI, feel free to test it please!!!!!!'
+          draft: false
+          prerelease: true
+
+  build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +92,5 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: build-${{ github.ref_name }}
-          releaseName: 'Build (${{ github.ref_name }})'
-          releaseBody: 'testing out a new GUI, feel free to test it please!!!!!!'
-          releaseDraft: false
-          prerelease: true
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
