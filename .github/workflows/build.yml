@@ -3,6 +3,9 @@ name: Build
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -10,16 +13,12 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            name: windows
             args: ''
           - platform: ubuntu-22.04
-            name: linux
             args: ''
           - platform: macos-latest
-            name: macos-arm64
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
-            name: macos-x86_64
             args: '--target x86_64-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
@@ -56,12 +55,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        run: npm run tauri build -- ${{ matrix.args }}
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Build and attach to prerelease
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: humidi-tauri-${{ matrix.name }}
-          path: src-tauri/target/**/release/bundle/**
-          if-no-files-found: error
+          tagName: build-${{ github.run_number }}
+          releaseName: 'Build ${{ github.run_number }}'
+          releaseBody: 'Automated build, not a versioned release.'
+          releaseDraft: false
+          prerelease: true
+          args: ${{ matrix.args }}
