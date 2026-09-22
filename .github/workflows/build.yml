@@ -10,7 +10,16 @@ permissions:
   contents: write
 
 jobs:
+  delete-previous-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete previous prerelease for this branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "build-${{ github.ref_name }}" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+
   build:
+    needs: delete-previous-release
     strategy:
       fail-fast: false
       matrix:
@@ -63,9 +72,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: build-${{ github.run_number }}
-          releaseName: 'Build ${{ github.run_number }}'
-          releaseBody: 'Automated build, not a versioned release.'
+          tagName: build-${{ github.ref_name }}
+          releaseName: 'Build (${{ github.ref_name }})'
+          releaseBody: 'testing out a new GUI, feel free to test it please!!!!!!'
           releaseDraft: false
           prerelease: true
           args: ${{ matrix.args }}
