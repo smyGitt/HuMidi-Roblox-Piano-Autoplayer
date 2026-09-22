@@ -16,8 +16,9 @@ dist-ssr
 /src-tauri/target
 /src-tauri/gen/schemas
 
-# Per-file documentation tree: never committed to any repo
-/docs
+# Markdown docs: kept on disk locally only, never tracked in this repo
+*.md
+!README.md
 
 # Editor directories and files
 .vscode/*
