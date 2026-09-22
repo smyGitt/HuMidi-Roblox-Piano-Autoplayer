@@ -12,6 +12,7 @@ for (const path in modules) {
 
 export type IconName =
   | "arrow-counter-clockwise"
+  | "arrow-square-out"
   | "arrows-clockwise"
   | "bug"
   | "certificate"

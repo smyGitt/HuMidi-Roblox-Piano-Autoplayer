@@ -22,7 +22,7 @@ export function UpdateCheckPrompt({ onChoice }: UpdateCheckPromptProps) {
         </>
       }
     >
-      <p className="update-check-prompt__text">
+      <p className="message-modal__text">
         Enable automatically checking for update when you start the application?
         <br />
         NOTE: You can change this setting whenever you want in the settings.

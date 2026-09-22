@@ -14,7 +14,7 @@ import { TranslatorTab } from "./pages/translator/TranslatorTab";
 import { DebugTab } from "./pages/debug/DebugTab";
 import { LicenseTab } from "./pages/license/LicenseTab";
 import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
-import { UpdateAvailableToast } from "./components/UpdateAvailableToast";
+import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
 import type { PageId } from "./pages/pageIds";
 import "./App.css";
 
@@ -93,9 +93,10 @@ function AppShell() {
 
       {showUpdatePrompt && <UpdateCheckPrompt onChoice={resolveUpdatePrompt} />}
       {updateAvailable && (
-        <UpdateAvailableToast
-          tag={updateAvailable.tag}
-          url={updateAvailable.url}
+        <UpdateAvailableModal
+          currentVersion={updateAvailable.currentVersion}
+          latestVersion={updateAvailable.tag}
+          releasesUrl={updateAvailable.url}
           onDismiss={dismissUpdateAvailable}
         />
       )}

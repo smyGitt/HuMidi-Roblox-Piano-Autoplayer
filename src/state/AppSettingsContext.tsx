@@ -22,7 +22,7 @@ interface AppSettingsContextValue extends AppSettings {
   setAutoCheckUpdates: (v: boolean) => void;
   showUpdatePrompt: boolean;
   resolveUpdatePrompt: (v: boolean) => void;
-  updateAvailable: { tag: string; url: string } | null;
+  updateAvailable: { tag: string; url: string; currentVersion: string } | null;
   dismissUpdateAvailable: () => void;
 }
 
@@ -47,7 +47,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string } | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string; currentVersion: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isTauri()) return;

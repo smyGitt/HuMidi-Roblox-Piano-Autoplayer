@@ -329,6 +329,10 @@ export async function checkForUpdatesNow(): Promise<UpdateCheckOutcome> {
   return invoke("check_for_updates_now");
 }
 
+export async function downloadAndInstallUpdate(): Promise<void> {
+  return invoke("download_and_install_update");
+}
+
 export type PlayerEventMap = {
   status_updated: string;
   progress_updated: number;
@@ -343,7 +347,7 @@ export type PlayerEventMap = {
   hotkey_bound_save_updated: string;
   hotkey_toggle_requested: null;
   hotkey_save_requested: null;
-  "update-available": { tag: string; url: string };
+  "update-available": { tag: string; url: string; currentVersion: string };
 };
 
 export function onEvent<K extends keyof PlayerEventMap>(

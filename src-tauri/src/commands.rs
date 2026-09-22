@@ -736,6 +736,11 @@ pub async fn check_for_updates_now(
     crate::managers::update_manager::check_for_updates(&app).await
 }
 
+#[tauri::command]
+pub async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
+    crate::managers::update_manager::download_and_install_update(&app).await
+}
+
 pub fn shutdown_playback_now(state: &AppState) {
     let handle = state.playback_handle.lock().ok().and_then(|mut g| g.take());
     if let Some(handle) = handle {

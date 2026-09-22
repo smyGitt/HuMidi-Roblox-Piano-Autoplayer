@@ -24,6 +24,7 @@ pub fn run() {
             };
             if auto_check {
                 let app_handle = app.handle().clone();
+                let current_version = app.package_info().version.to_string();
                 tauri::async_runtime::spawn(async move {
                     if let Ok(managers::update_manager::UpdateCheckOutcome::UpdateAvailable {
                         tag,
@@ -32,7 +33,11 @@ pub fn run() {
                     {
                         let _ = app_handle.emit(
                             "update-available",
-                            serde_json::json!({ "tag": tag, "url": url }),
+                            serde_json::json!({
+                                "tag": tag,
+                                "url": url,
+                                "currentVersion": current_version,
+                            }),
                         );
                     }
                 });
@@ -77,6 +82,7 @@ pub fn run() {
             commands::start_binding,
             commands::start_save_binding,
             commands::check_for_updates_now,
+            commands::download_and_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
