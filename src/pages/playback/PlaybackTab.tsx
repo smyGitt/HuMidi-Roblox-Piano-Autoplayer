@@ -63,6 +63,10 @@ export function PlaybackTab() {
     if (loadDialogOpen) void refreshSaves();
   }, [loadDialogOpen, refreshSaves]);
 
+  useEffect(() => {
+    if (engine.tracks.length > 0) setTrackSelectionOpen(true);
+  }, [engine.tracks]);
+
   async function handleRenameSave(filepath: string, newName: string) {
     try {
       await renameSave(filepath, newName);
@@ -157,7 +161,11 @@ export function PlaybackTab() {
               editEnabled={engine.tracks.length > 0}
             />
             <div className="playback-tab__two-col">
-              <MidiDropZone onFileChosen={chooseFile} onLoadSaved={() => setLoadDialogOpen(true)} />
+              <MidiDropZone
+              onFileChosen={chooseFile}
+              onLoadSaved={() => setLoadDialogOpen(true)}
+              onBrowse={() => void engine.openFileBrowser()}
+            />
               <SavedSongsPanel
                 saves={saves.map((s) => ({
                   filepath: s.path,

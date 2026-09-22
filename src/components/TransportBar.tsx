@@ -11,6 +11,7 @@ interface TransportBarProps {
   currentTime: number;
   totalTime: number;
   isCollapsed: boolean;
+  playEnabled: boolean;
   saveEnabled: boolean;
   onScrub: (value: number) => void;
   onSeekCommit: (value: number) => void;
@@ -25,6 +26,7 @@ export function TransportBar({
   currentTime,
   totalTime,
   isCollapsed,
+  playEnabled,
   saveEnabled,
   onScrub,
   onSeekCommit,
@@ -52,7 +54,12 @@ export function TransportBar({
       )}
 
       <div className="transport-bar__btn-row">
-        <button className="transport-bar__btn" onClick={onPlayPause} title={isPlaying ? "Pause" : "Play"}>
+        <button
+          className="transport-bar__btn"
+          onClick={onPlayPause}
+          disabled={!playEnabled}
+          title={isPlaying ? "Pause" : "Play"}
+        >
           <Icon name={isPlaying ? "pause" : "play"} size={20} />
         </button>
         <button className="transport-bar__btn" onClick={onStop} title="Stop">

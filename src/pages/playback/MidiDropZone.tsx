@@ -1,10 +1,12 @@
 import { useState, type DragEvent } from "react";
 import { Card } from "../../components/Card";
 import { Icon } from "../../components/Icon";
+import { isTauri } from "../../lib/tauri";
 
 interface MidiDropZoneProps {
   onFileChosen: (name: string) => void;
   onLoadSaved: () => void;
+  onBrowse: () => void;
 }
 
 function isMidiFile(name: string) {
@@ -12,7 +14,7 @@ function isMidiFile(name: string) {
   return lower.endsWith(".mid") || lower.endsWith(".midi");
 }
 
-export function MidiDropZone({ onFileChosen, onLoadSaved }: MidiDropZoneProps) {
+export function MidiDropZone({ onFileChosen, onLoadSaved, onBrowse }: MidiDropZoneProps) {
   const [dragActive, setDragActive] = useState(false);
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
@@ -40,6 +42,10 @@ export function MidiDropZone({ onFileChosen, onLoadSaved }: MidiDropZoneProps) {
           <button
             className="midi-drop-zone__btn"
             onClick={() => {
+              if (isTauri()) {
+                onBrowse();
+                return;
+              }
               const input = document.createElement("input");
               input.type = "file";
               input.accept = ".mid,.midi";

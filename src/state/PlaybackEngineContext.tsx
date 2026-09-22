@@ -17,6 +17,7 @@ import {
   savePlayback as invokeSavePlayback,
   resumeFromSave as invokeResumeFromSave,
   getSaveDir,
+  getMidiDir,
   type TrackSummary,
   type SelectedTrackInfo,
   type BackendNote,
@@ -220,7 +221,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog("File dialog unavailable outside the desktop app");
       return;
     }
-    const selected = await openDialog({ multiple: false, filters: [{ name: "MIDI", extensions: ["mid", "midi"] }] });
+    const midiDir = await getMidiDir().catch(() => "");
+    const selected = await openDialog({
+      multiple: false,
+      filters: [{ name: "MIDI", extensions: ["mid", "midi"] }],
+      defaultPath: midiDir || undefined,
+    });
     if (typeof selected === "string") {
       await loadFile(selected, selected.split(/[\\/]/).pop() ?? selected);
     }

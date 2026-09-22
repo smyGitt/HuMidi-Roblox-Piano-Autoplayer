@@ -7,10 +7,10 @@ interface UpdateCheckPromptProps {
 export function UpdateCheckPrompt({ onChoice }: UpdateCheckPromptProps) {
   return (
     <Modal
-      title="Check for updates on startup?"
+      title="Check for update on startup"
       onClose={() => {}}
       width={420}
-      height={160}
+      height={220}
       footer={
         <>
           <button className="modal__btn" onClick={() => onChoice(false)}>
@@ -22,7 +22,11 @@ export function UpdateCheckPrompt({ onChoice }: UpdateCheckPromptProps) {
         </>
       }
     >
-      <p>Check for updates on startup?</p>
+      <p className="update-check-prompt__text">
+        Enable automatically checking for update when you start the application?
+        <br />
+        NOTE: You can change this setting whenever you want in the settings.
+      </p>
     </Modal>
   );
 }

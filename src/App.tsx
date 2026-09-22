@@ -76,6 +76,7 @@ function AppShell() {
         currentTime={engine.currentTime}
         totalTime={engine.totalDuration}
         isCollapsed={isCollapsed}
+        playEnabled={engine.hasCompiledNotes}
         saveEnabled={engine.hasCompiledNotes}
         onScrub={(v) => engine.seek(engine.totalDuration > 0 ? (v / 10000) * engine.totalDuration : 0)}
         onSeekCommit={() => {}}

@@ -1,5 +1,5 @@
 :root {
-  font-family: "Segoe UI", sans-serif;
+  font-family: Arial, sans-serif;
   font-size: 9pt;
   color-scheme: dark;
 }
@@ -1583,4 +1583,9 @@ button:disabled {
   gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+
+.update-check-prompt__text {
+  margin: 0;
+  line-height: 1.5;
 }
