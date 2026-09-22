@@ -1589,3 +1589,40 @@ button:disabled {
   margin: 0;
   line-height: 1.5;
 }
+
+.update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg_surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.update-toast__msg {
+  white-space: nowrap;
+}
+
+.update-toast__btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg_input);
+  color: var(--text_primary);
+}
+
+.update-toast__btn:hover {
+  background: var(--btn_hover);
+}
+
+.update-toast__btn--accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}

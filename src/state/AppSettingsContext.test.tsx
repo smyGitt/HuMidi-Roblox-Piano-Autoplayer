@@ -7,6 +7,7 @@ const tauriMocks = vi.hoisted(() => ({
   isTauri: vi.fn(() => false),
   loadAppConfig: vi.fn<() => Promise<Record<string, unknown>>>(() => Promise.resolve({})),
   saveAppConfig: vi.fn(() => Promise.resolve()),
+  onEvent: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 vi.mock("../lib/tauri", async () => {

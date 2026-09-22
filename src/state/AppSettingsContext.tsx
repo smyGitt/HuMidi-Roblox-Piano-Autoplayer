@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { isTauri, loadAppConfig, saveAppConfig } from "../lib/tauri";
+import { isTauri, loadAppConfig, saveAppConfig, onEvent } from "../lib/tauri";
 
 interface AppSettings {
   alwaysOnTop: boolean;
@@ -22,6 +22,8 @@ interface AppSettingsContextValue extends AppSettings {
   setAutoCheckUpdates: (v: boolean) => void;
   showUpdatePrompt: boolean;
   resolveUpdatePrompt: (v: boolean) => void;
+  updateAvailable: { tag: string; url: string } | null;
+  dismissUpdateAvailable: () => void;
 }
 
 const DEFAULTS: AppSettings = {
@@ -45,6 +47,16 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string } | null>(null);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | null = null;
+    onEvent("update-available", (payload) => setUpdateAvailable(payload)).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -113,6 +125,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setAutoCheckUpdates(v);
   }
 
+  function dismissUpdateAvailable() {
+    setUpdateAvailable(null);
+  }
+
   const value = useMemo(
     () => ({
       alwaysOnTop,
@@ -131,6 +147,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setAutoCheckUpdates,
       showUpdatePrompt,
       resolveUpdatePrompt,
+      updateAvailable,
+      dismissUpdateAvailable,
     }),
     [
       alwaysOnTop,
@@ -141,6 +159,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       pedalPromptThreshold,
       autoCheckUpdates,
       showUpdatePrompt,
+      updateAvailable,
     ],
   );
 

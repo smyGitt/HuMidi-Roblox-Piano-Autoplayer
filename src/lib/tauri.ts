@@ -343,6 +343,7 @@ export type PlayerEventMap = {
   hotkey_bound_save_updated: string;
   hotkey_toggle_requested: null;
   hotkey_save_requested: null;
+  "update-available": { tag: string; url: string };
 };
 
 export function onEvent<K extends keyof PlayerEventMap>(
