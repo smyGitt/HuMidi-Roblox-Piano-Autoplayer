@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { Modal } from "./Modal";
-import { Icon, type IconName } from "./Icon";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 export interface MessageModalButton {
   label: string;
   onClick: () => void;
   variant?: "default" | "accent";
-  leadingIcon?: IconName;
-  trailingIcon?: IconName;
+  leadingIcon?: PhosphorIcon;
+  trailingIcon?: PhosphorIcon;
   iconSize?: number;
   disabled?: boolean;
 }
@@ -37,9 +37,9 @@ export function MessageModal({ title, body, buttons, onClose, width = 420, heigh
               onClick={b.onClick}
               disabled={b.disabled}
             >
-              {b.leadingIcon && <Icon name={b.leadingIcon} size={b.iconSize} />}
+              {b.leadingIcon && <b.leadingIcon size={b.iconSize ?? 20} weight="duotone" />}
               {b.label}
-              {b.trailingIcon && <Icon name={b.trailingIcon} size={b.iconSize} />}
+              {b.trailingIcon && <b.trailingIcon size={b.iconSize ?? 20} weight="duotone" />}
             </button>
           ))}
         </>

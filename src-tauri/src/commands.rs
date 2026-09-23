@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::path::Path;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -22,24 +22,53 @@ use crate::managers::hotkey_manager::{rdev_key_to_raw, HotkeyEvent};
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
 use tauri::{path::BaseDirectory, Emitter, Manager, State};
 
-fn ensure_pedal_model_loaded(state: &State<AppState>, app: &tauri::AppHandle) -> Result<(), String> {
-    let mut guard = state.pedal_model.lock().map_err(|e| e.to_string())?;
-    if guard.is_none() {
-        let resource_path = app
-            .path()
-            .resolve("resources/pedal_bilstm.safetensors", BaseDirectory::Resource)
-            .map_err(|e| e.to_string())?;
-        let model = PedalModel::load(resource_path).map_err(|e| e.to_string())?;
-        *guard = Some(model);
+async fn run_blocking<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    match tauri::async_runtime::spawn_blocking(work).await {
+        Ok(result) => result,
+        Err(e) => Err(format!("Background task failed: {e}")),
     }
-    Ok(())
+}
+
+fn pedal_resource_path<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .resolve("resources/pedal_bilstm.safetensors", BaseDirectory::Resource)
+        .map_err(|e| e.to_string())
+}
+
+fn load_pedal_model(
+    state: &AppState,
+    resolve_path: impl FnOnce() -> Result<std::path::PathBuf, String>,
+) -> Result<Arc<PedalModel>, String> {
+    let cached = state.pedal_model.lock().map_err(|e| e.to_string())?.clone();
+    if let Some(model) = cached {
+        return Ok(model);
+    }
+    let loaded = Arc::new(PedalModel::load(resolve_path()?).map_err(|e| e.to_string())?);
+    let mut guard = state.pedal_model.lock().map_err(|e| e.to_string())?;
+    Ok(Arc::clone(guard.get_or_insert(loaded)))
+}
+
+fn pedal_model_for(
+    state: &AppState,
+    config: &PlaybackConfig,
+    resolve_path: impl FnOnce() -> Result<std::path::PathBuf, String>,
+) -> Result<Option<Arc<PedalModel>>, String> {
+    if matches!(config.pedal_style.as_str(), "ai" | "hybrid") {
+        load_pedal_model(state, resolve_path).map(Some)
+    } else {
+        Ok(None)
+    }
 }
 
 #[tauri::command]
 pub fn run_pedal_smoketest(state: State<AppState>, app: tauri::AppHandle) -> Result<Vec<f32>, String> {
-    ensure_pedal_model_loaded(&state, &app)?;
-    let guard = state.pedal_model.lock().map_err(|e| e.to_string())?;
-    let model = guard.as_ref().unwrap();
+    let model = load_pedal_model(&state, || pedal_resource_path(&app))?;
 
     let t_len = 50usize;
     let seq = vec![0.0f32; t_len * FEATURES];
@@ -93,19 +122,23 @@ pub fn parse_midi_structure_logic(
 }
 
 #[tauri::command]
-pub fn parse_midi_structure(
-    state: State<AppState>,
+pub async fn parse_midi_structure<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     filepath: String,
 ) -> Result<ParsedMidiStructure, String> {
-    let (tracks, tempo_map, pedal_count, midi_pedal_events, result) =
-        parse_midi_structure_logic(&filepath).map_err(|e| e.to_string())?;
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let (tracks, tempo_map, pedal_count, midi_pedal_events, result) =
+            parse_midi_structure_logic(&filepath).map_err(|e| e.to_string())?;
 
-    *state.parsed_tracks.lock().map_err(|e| e.to_string())? = Some(tracks);
-    *state.parsed_tempo_map.lock().map_err(|e| e.to_string())? = Some(tempo_map);
-    *state.loaded_pedal_count.lock().map_err(|e| e.to_string())? = pedal_count;
-    *state.midi_pedal_events.lock().map_err(|e| e.to_string())? = midi_pedal_events;
+        *state.parsed_tracks.lock().map_err(|e| e.to_string())? = Some(tracks);
+        *state.parsed_tempo_map.lock().map_err(|e| e.to_string())? = Some(tempo_map);
+        *state.loaded_pedal_count.lock().map_err(|e| e.to_string())? = pedal_count;
+        *state.midi_pedal_events.lock().map_err(|e| e.to_string())? = midi_pedal_events;
 
-    Ok(result)
+        Ok(result)
+    })
+    .await
 }
 
 pub fn extract_pedal_intervals(events: &[KeyEvent]) -> Vec<(f64, f64)> {
@@ -280,13 +313,17 @@ pub fn compile_notes_logic(
 }
 
 #[tauri::command]
-pub fn compile_notes(
-    state: State<AppState>,
+pub async fn compile_notes<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     config: PlaybackConfig,
     selected_tracks_info: Vec<(i32, String)>,
 ) -> Result<TimelineData, String> {
-    let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
-    compile_notes_logic(&config, &selected_tracks_info, &mut session).map_err(|e| e.to_string())
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
+        compile_notes_logic(&config, &selected_tracks_info, &mut session).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 pub fn compile_notes_from_notes_logic(
@@ -351,14 +388,18 @@ pub fn compile_notes_from_sheet_logic(
 }
 
 #[tauri::command]
-pub fn compile_notes_from_sheet(
-    state: State<AppState>,
+pub async fn compile_notes_from_sheet<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     config: PlaybackConfig,
     sheet_text: String,
     bpm: f64,
 ) -> Result<TimelineData, String> {
-    let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
-    compile_notes_from_sheet_logic(&config, &sheet_text, bpm, &mut session)
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
+        compile_notes_from_sheet_logic(&config, &sheet_text, bpm, &mut session)
+    })
+    .await
 }
 
 pub fn compile_pedal_logic(
@@ -419,29 +460,36 @@ pub fn compile_pedal_logic(
     })
 }
 
-#[tauri::command]
-pub fn compile_pedal(
-    state: State<AppState>,
-    app: tauri::AppHandle,
-    config: PlaybackConfig,
+fn compile_pedal_blocking<R: tauri::Runtime>(
+    state: &AppState,
+    app: &tauri::AppHandle<R>,
+    config: &PlaybackConfig,
 ) -> Result<PedalData, String> {
-    if matches!(config.pedal_style.as_str(), "ai" | "hybrid") {
-        ensure_pedal_model_loaded(&state, &app)?;
-    }
-    let model_guard = state.pedal_model.lock().map_err(|e| e.to_string())?;
+    let model = pedal_model_for(state, config, || pedal_resource_path(app))?;
     let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
-    compile_pedal_logic(&config, model_guard.as_ref(), &mut session)
+    compile_pedal_logic(config, model.as_deref(), &mut session)
 }
 
 #[tauri::command]
-pub fn compile_pedal_and_play(
-    state: State<AppState>,
-    app: tauri::AppHandle,
+pub async fn compile_pedal<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     config: PlaybackConfig,
 ) -> Result<PedalData, String> {
-    let data = compile_pedal(state.clone(), app.clone(), config.clone())?;
-    start_playback(state, app, config)?;
-    Ok(data)
+    run_blocking(move || compile_pedal_blocking(&app.state::<AppState>(), &app, &config)).await
+}
+
+#[tauri::command]
+pub async fn compile_pedal_and_play<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    config: PlaybackConfig,
+) -> Result<PedalData, String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let data = compile_pedal_blocking(&state, &app, &config)?;
+        start_playback_blocking(&state, &app, config)?;
+        Ok(data)
+    })
+    .await
 }
 
 fn event_to_channel_payload(event: &PlayerEvent) -> (&'static str, serde_json::Value) {
@@ -517,10 +565,9 @@ pub fn run_playback_loop(
     }
 }
 
-#[tauri::command]
-pub fn start_playback(
-    state: State<AppState>,
-    app: tauri::AppHandle,
+fn start_playback_blocking<R: tauri::Runtime>(
+    state: &AppState,
+    app: &tauri::AppHandle<R>,
     config: PlaybackConfig,
 ) -> Result<(), String> {
     let (merged_events, total_dur) = {
@@ -574,6 +621,14 @@ pub fn start_playback(
 
     let _ = app_for_cleanup.emit("playback_started", ());
     Ok(())
+}
+
+#[tauri::command]
+pub async fn start_playback<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    config: PlaybackConfig,
+) -> Result<(), String> {
+    run_blocking(move || start_playback_blocking(&app.state::<AppState>(), &app, config)).await
 }
 
 #[tauri::command]
@@ -855,10 +910,7 @@ pub fn save_playback(
     selected_tracks_info: Vec<(i32, String)>,
     original_filename: String,
 ) -> Result<String, String> {
-    if matches!(config.pedal_style.as_str(), "ai" | "hybrid") {
-        ensure_pedal_model_loaded(&state, &app)?;
-    }
-    let model_guard = state.pedal_model.lock().map_err(|e| e.to_string())?;
+    let model = pedal_model_for(&state, &config, || pedal_resource_path(&app))?;
     let tracks = state
         .parsed_tracks
         .lock()
@@ -874,7 +926,7 @@ pub fn save_playback(
 
     save_playback_logic(
         &config,
-        model_guard.as_ref(),
+        model.as_deref(),
         &tracks,
         &selected_tracks_info,
         &save_dir,
@@ -1094,10 +1146,17 @@ pub fn resume_from_save_logic(
 }
 
 #[tauri::command]
-pub fn resume_from_save(state: State<AppState>, filepath: String) -> Result<ResumedSession, String> {
-    let data = load_save_file_logic(Path::new(&filepath))?;
-    let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
-    resume_from_save_logic(&data, &mut session)
+pub async fn resume_from_save<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    filepath: String,
+) -> Result<ResumedSession, String> {
+    run_blocking(move || {
+        let data = load_save_file_logic(Path::new(&filepath))?;
+        let state = app.state::<AppState>();
+        let mut session = state.playback_session.lock().map_err(|e| e.to_string())?;
+        resume_from_save_logic(&data, &mut session)
+    })
+    .await
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -3839,6 +3898,277 @@ mod tests {
             let (notes, _, _) =
                 prepare_notes_from_bytes(&bytes, &cfg, &[(0, "Unassigned".to_string())]).unwrap();
             assert_eq!(notes[0].hand, "left");
+        }
+    }
+
+    struct NoopWake;
+
+    impl std::task::Wake for NoopWake {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    type BoxedFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
+
+    fn poll_once<T>(fut: &mut BoxedFuture<T>) -> std::task::Poll<T> {
+        let waker = std::task::Waker::from(Arc::new(NoopWake));
+        let mut cx = std::task::Context::from_waker(&waker);
+        std::future::Future::poll(fut.as_mut(), &mut cx)
+    }
+
+    fn hermetic_state(dir: &Path) -> AppState {
+        use crate::managers::config_manager::ConfigManager;
+        use crate::managers::hotkey_manager::HotkeyManager;
+        use crate::managers::theme_manager::ThemeManager;
+        use std::sync::Mutex;
+
+        AppState {
+            pedal_model: Mutex::new(None),
+            parsed_tracks: Mutex::new(None),
+            parsed_tempo_map: Mutex::new(None),
+            loaded_pedal_count: Mutex::new(0),
+            midi_pedal_events: Mutex::new(Vec::new()),
+            playback_session: Mutex::new(PlaybackSession::default()),
+            playback_handle: Mutex::new(None),
+            hotkey_manager: Mutex::new(HotkeyManager::new()),
+            config_manager: Mutex::new(ConfigManager {
+                save_dir: dir.join("saves"),
+                midi_dir: std::path::PathBuf::new(),
+                config_dir: dir.to_path_buf(),
+                config_path: dir.join("config.json"),
+            }),
+            app_config: Mutex::new(serde_json::json!({})),
+            theme_manager: Mutex::new(ThemeManager::new()),
+        }
+    }
+
+    mod test_run_blocking {
+        use super::*;
+
+        #[test]
+        fn test_returns_the_ok_value() {
+            let result = tauri::async_runtime::block_on(run_blocking(|| Ok(41 + 1)));
+            assert_eq!(result, Ok(42));
+        }
+
+        #[test]
+        fn test_returns_the_err_string_unchanged() {
+            let result: Result<(), String> =
+                tauri::async_runtime::block_on(run_blocking(|| Err("boom".to_string())));
+            assert_eq!(result, Err("boom".to_string()));
+        }
+
+        #[test]
+        fn test_closure_runs_on_a_different_thread_than_the_caller() {
+            let caller = std::thread::current().id();
+            let worker = tauri::async_runtime::block_on(run_blocking(|| {
+                Ok(std::thread::current().id())
+            }))
+            .unwrap();
+            assert_ne!(caller, worker);
+        }
+
+        #[test]
+        fn test_polling_does_not_run_the_closure_inline() {
+            let (release_tx, release_rx) = mpsc::channel::<()>();
+            let (started_tx, started_rx) = mpsc::channel::<()>();
+            let mut fut: BoxedFuture<Result<u8, String>> = Box::pin(run_blocking(move || {
+                started_tx.send(()).unwrap();
+                let _ = release_rx.recv_timeout(Duration::from_secs(5));
+                Ok(7)
+            }));
+
+            assert!(poll_once(&mut fut).is_pending());
+            started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(poll_once(&mut fut).is_pending());
+
+            release_tx.send(()).unwrap();
+            assert_eq!(tauri::async_runtime::block_on(fut), Ok(7));
+        }
+
+        #[test]
+        fn test_a_panicking_closure_becomes_an_err_instead_of_unwinding_into_the_caller() {
+            let result: Result<(), String> = tauri::async_runtime::block_on(run_blocking(
+                || -> Result<(), String> { panic!("worker exploded") },
+            ));
+            let message = result.unwrap_err();
+            assert!(message.starts_with("Background task failed"), "{message}");
+        }
+
+        #[test]
+        fn test_the_pool_keeps_working_after_a_panicking_closure() {
+            let _: Result<(), String> = tauri::async_runtime::block_on(run_blocking(
+                || -> Result<(), String> { panic!("worker exploded") },
+            ));
+            let result = tauri::async_runtime::block_on(run_blocking(|| Ok("still alive")));
+            assert_eq!(result, Ok("still alive"));
+        }
+
+        #[test]
+        fn test_many_closures_run_concurrently_rather_than_one_after_another() {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+
+            let running = Arc::new(AtomicUsize::new(0));
+            let peak = Arc::new(AtomicUsize::new(0));
+            let futures: Vec<_> = (0..4)
+                .map(|i| {
+                    let running = Arc::clone(&running);
+                    let peak = Arc::clone(&peak);
+                    run_blocking(move || {
+                        let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                        peak.fetch_max(now, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(300));
+                        running.fetch_sub(1, Ordering::SeqCst);
+                        Ok(i)
+                    })
+                })
+                .collect();
+            let results = tauri::async_runtime::block_on(async move {
+                let handles: Vec<_> = futures
+                    .into_iter()
+                    .map(tauri::async_runtime::spawn)
+                    .collect();
+                let mut out = Vec::new();
+                for h in handles {
+                    out.push(h.await.unwrap().unwrap());
+                }
+                out
+            });
+            assert_eq!(results, vec![0, 1, 2, 3]);
+            assert!(peak.load(Ordering::SeqCst) >= 2);
+        }
+    }
+
+    mod test_pedal_model_sharing {
+        use super::*;
+
+        fn model_path() -> std::path::PathBuf {
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("resources")
+                .join("pedal_bilstm.safetensors")
+        }
+
+        fn real_model() -> Arc<PedalModel> {
+            Arc::new(PedalModel::load(model_path()).unwrap())
+        }
+
+        fn config_with_style(style: &str) -> PlaybackConfig {
+            let mut config = PlaybackConfig::default();
+            config.pedal_style = style.to_string();
+            config
+        }
+
+        fn forbidden_resolver() -> Result<std::path::PathBuf, String> {
+            panic!("the resource path must not be resolved here")
+        }
+
+        fn state_in(dir: &tempfile::TempDir) -> AppState {
+            hermetic_state(dir.path())
+        }
+
+        #[test]
+        fn test_styles_that_do_not_use_the_model_never_resolve_a_path_or_load_it() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            for style in ["none", "harmonic", "legato"] {
+                let model =
+                    pedal_model_for(&state, &config_with_style(style), forbidden_resolver).unwrap();
+                assert!(model.is_none(), "{style}");
+            }
+            assert!(state.pedal_model.lock().unwrap().is_none());
+        }
+
+        #[test]
+        fn test_ai_and_hybrid_styles_return_the_cached_model_without_reloading() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            let stored = real_model();
+            *state.pedal_model.lock().unwrap() = Some(Arc::clone(&stored));
+            for style in ["ai", "hybrid"] {
+                let got = pedal_model_for(&state, &config_with_style(style), forbidden_resolver)
+                    .unwrap()
+                    .unwrap();
+                assert!(Arc::ptr_eq(&got, &stored), "{style}");
+            }
+        }
+
+        #[test]
+        fn test_the_first_call_loads_the_model_once_and_every_later_call_shares_it() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            let first = pedal_model_for(&state, &config_with_style("ai"), || Ok(model_path()))
+                .unwrap()
+                .unwrap();
+            let second = pedal_model_for(&state, &config_with_style("hybrid"), forbidden_resolver)
+                .unwrap()
+                .unwrap();
+            assert!(Arc::ptr_eq(&first, &second));
+            let stored = state.pedal_model.lock().unwrap().clone().unwrap();
+            assert!(Arc::ptr_eq(&first, &stored));
+        }
+
+        #[test]
+        fn test_the_mutex_is_free_while_a_caller_keeps_using_the_returned_model() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            *state.pedal_model.lock().unwrap() = Some(real_model());
+            let in_use = pedal_model_for(&state, &config_with_style("ai"), forbidden_resolver)
+                .unwrap()
+                .unwrap();
+            assert!(
+                state.pedal_model.try_lock().is_ok(),
+                "a caller using the model must not keep the AppState mutex locked"
+            );
+            drop(in_use);
+        }
+
+        #[test]
+        fn test_the_model_stays_usable_from_another_thread_while_the_mutex_is_held_elsewhere() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            *state.pedal_model.lock().unwrap() = Some(real_model());
+            let in_use = pedal_model_for(&state, &config_with_style("ai"), forbidden_resolver)
+                .unwrap()
+                .unwrap();
+
+            std::thread::scope(|scope| {
+                let (locked_tx, locked_rx) = mpsc::channel();
+                let (release_tx, release_rx) = mpsc::channel::<()>();
+                let state_ref = &state;
+                let holder = scope.spawn(move || {
+                    let _guard = state_ref.pedal_model.lock().unwrap();
+                    locked_tx.send(()).unwrap();
+                    let _ = release_rx.recv_timeout(Duration::from_secs(5));
+                });
+                locked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+
+                let preds = in_use.forward(&vec![0.0f32; 10 * FEATURES], 10).unwrap();
+                assert_eq!(preds.len(), 10);
+
+                release_tx.send(()).unwrap();
+                holder.join().unwrap();
+            });
+        }
+
+        #[test]
+        fn test_a_failing_path_resolver_is_an_error_and_leaves_the_cache_empty() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            let result = pedal_model_for(&state, &config_with_style("ai"), || {
+                Err("no such resource".to_string())
+            });
+            assert_eq!(result.err(), Some("no such resource".to_string()));
+            assert!(state.pedal_model.lock().unwrap().is_none());
+        }
+
+        #[test]
+        fn test_an_unreadable_model_file_is_an_error_and_leaves_the_cache_empty() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            let junk = dir.path().join("junk.safetensors");
+            std::fs::write(&junk, b"not a safetensors file").unwrap();
+            let result = pedal_model_for(&state, &config_with_style("hybrid"), || Ok(junk));
+            assert!(result.is_err());
+            assert!(state.pedal_model.lock().unwrap().is_none());
         }
     }
 }

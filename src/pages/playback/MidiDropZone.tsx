@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from "react";
 import { Card } from "../../components/Card";
-import { Icon } from "../../components/Icon";
+import { FolderOpenIcon } from "@phosphor-icons/react";
 import { isTauri } from "../../lib/tauri";
 
 interface MidiDropZoneProps {
@@ -35,7 +35,7 @@ export function MidiDropZone({ onFileChosen, onLoadSaved, onBrowse }: MidiDropZo
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
       >
-        <Icon name="folder-open" size={48} />
+        <FolderOpenIcon size={48} weight="duotone" />
         <span className="midi-drop-zone__hint">Drop a .mid file</span>
         <span className="midi-drop-zone__sub">or use the buttons below</span>
         <div className="midi-drop-zone__buttons">

@@ -42,6 +42,7 @@ interface PlaybackEngineValue {
   measureBoundaries: MeasureBoundary[];
   hasCompiledNotes: boolean;
   hasCompiledPedal: boolean;
+  isGeneratingPedal: boolean;
   pedalIntervals: [number, number][];
   aiThresholds: [number, number] | null;
   defaultAiThresholds: [number, number] | null;
@@ -103,6 +104,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [measureBoundaries, setMeasureBoundaries] = useState<MeasureBoundary[]>([]);
   const [hasCompiledNotes, setHasCompiledNotes] = useState(false);
   const [hasCompiledPedal, setHasCompiledPedal] = useState(false);
+  const [isGeneratingPedal, setIsGeneratingPedal] = useState(false);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
   const [defaultAiThresholds, setDefaultAiThresholds] = useState<[number, number] | null>(null);
@@ -119,6 +121,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   configRef.current = config;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
+  const isGeneratingPedalRef = useRef(false);
   const playRef = useRef(play);
   playRef.current = play;
   const togglePauseRef = useRef(togglePause);
@@ -292,6 +295,9 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog("Pedal compiled successful (preview mode)");
       return;
     }
+    if (isGeneratingPedalRef.current) return;
+    isGeneratingPedalRef.current = true;
+    setIsGeneratingPedal(true);
     try {
       const data = await invokeCompilePedal(configRef.current, midiFilePath);
       setPedalIntervals(data.pedal_intervals);
@@ -305,10 +311,14 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog("Pedal compiled successful");
     } catch (e) {
       appendLog(`Failed to compile pedal: ${String(e)}`);
+    } finally {
+      isGeneratingPedalRef.current = false;
+      setIsGeneratingPedal(false);
     }
   }
 
   async function play() {
+    if (isGeneratingPedalRef.current) return;
     setIsPaused(false);
     if (!isTauri()) {
       setIsPlaying((p) => !p);
@@ -443,6 +453,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     measureBoundaries,
     hasCompiledNotes,
     hasCompiledPedal,
+    isGeneratingPedal,
     pedalIntervals,
     aiThresholds,
     defaultAiThresholds,

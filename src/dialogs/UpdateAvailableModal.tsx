@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { ArrowSquareOutIcon, GithubLogoIcon } from "@phosphor-icons/react";
 import { MessageModal } from "../components/MessageModal";
 import { downloadAndInstallUpdate } from "../lib/tauri";
 
@@ -59,15 +60,15 @@ export function UpdateAvailableModal({
         },
         {
           label: "To GitHub Releases",
-          leadingIcon: "github-logo",
-          trailingIcon: "arrow-square-out",
+          leadingIcon: GithubLogoIcon,
+          trailingIcon: ArrowSquareOutIcon,
           iconSize: 32,
           disabled: updating,
           onClick: () => void openUrl(releasesUrl),
         },
         {
           label: "To SourceForge",
-          trailingIcon: "arrow-square-out",
+          trailingIcon: ArrowSquareOutIcon,
           iconSize: 32,
           disabled: updating,
           onClick: () => void openUrl(SOURCEFORGE_URL),

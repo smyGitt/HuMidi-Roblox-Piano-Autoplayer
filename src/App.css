@@ -140,24 +140,47 @@ button:disabled {
 }
 
 .status-indicator {
-  height: 32px;
-  min-height: 32px;
+  height: 40px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 12px;
+  padding: 0 6px;
   white-space: nowrap;
   color: var(--text_muted);
 }
 
-.status-indicator__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+.status-indicator__spinner {
+  position: relative;
+  width: 32px;
+  height: 32px;
   flex: none;
+  color: var(--accent_stop);
+  transition: color 350ms ease;
+  will-change: transform;
 }
 
-.status-indicator__hourglass {
+.status-indicator[data-status="loaded"] .status-indicator__spinner,
+.status-indicator[data-status="loading"] .status-indicator__spinner {
+  color: var(--accent_loaded);
+}
+
+.status-indicator[data-status="ready"] .status-indicator__spinner {
+  color: var(--accent_play);
+}
+
+.status-indicator__glyph {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.status-indicator__glyph[data-active="true"] {
+  opacity: 1;
+}
+
+.hourglass-indicator {
   width: 10px;
   text-align: center;
   color: var(--accent);

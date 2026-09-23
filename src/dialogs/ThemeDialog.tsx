@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Modal } from "../components/Modal";
-import { Icon } from "../components/Icon";
+import { FileArrowDownIcon, FileArrowUpIcon, NotePencilIcon, PlusSquareIcon, TrashIcon } from "@phosphor-icons/react";
 import { useTheme } from "../theme/ThemeProvider";
 import {
   THEMES,
@@ -239,7 +239,7 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
             ))}
           </select>
           <button className="theme-dialog__icon-btn" title="New (duplicate current)" onClick={() => void handleNew()}>
-            <Icon name="new-theme" size={18} />
+            <PlusSquareIcon size={18} weight="duotone" />
           </button>
           <button
             className="theme-dialog__icon-btn"
@@ -247,7 +247,7 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
             disabled={isBuiltin}
             onClick={() => void handleRename()}
           >
-            <Icon name="rename-theme" size={18} />
+            <NotePencilIcon size={18} weight="duotone" />
           </button>
           <button
             className="theme-dialog__icon-btn"
@@ -255,13 +255,13 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
             disabled={isBuiltin}
             onClick={() => void handleDelete()}
           >
-            <Icon name="delete-theme" size={18} />
+            <TrashIcon size={18} weight="duotone" />
           </button>
           <button className="theme-dialog__icon-btn" title="Export" onClick={() => void handleExport()}>
-            <Icon name="export-theme" size={18} />
+            <FileArrowDownIcon size={18} weight="duotone" />
           </button>
           <button className="theme-dialog__icon-btn" title="Import" onClick={() => void handleImport()}>
-            <Icon name="import-theme" size={18} />
+            <FileArrowUpIcon size={18} weight="duotone" />
           </button>
         </div>
 

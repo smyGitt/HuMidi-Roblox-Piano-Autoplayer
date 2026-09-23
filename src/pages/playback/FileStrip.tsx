@@ -1,4 +1,4 @@
-import { Icon } from "../../components/Icon";
+import { MusicNoteIcon } from "@phosphor-icons/react";
 
 interface FileStripProps {
   name: string;
@@ -11,7 +11,7 @@ export function FileStrip({ name, meta, onReplace, onReveal }: FileStripProps) {
   return (
     <div className="file-strip">
       <div className="file-strip__tile">
-        <Icon name="music-note" size={20} />
+        <MusicNoteIcon size={20} weight="duotone" />
       </div>
       <div className="file-strip__info">
         <span className="file-strip__name">{name || "No file loaded"}</span>

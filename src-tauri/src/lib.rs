@@ -1,7 +1,7 @@
-mod commands;
+pub mod commands;
 pub mod core;
-mod managers;
-mod state;
+pub mod managers;
+pub mod state;
 
 use state::AppState;
 use tauri::{Emitter, Manager};

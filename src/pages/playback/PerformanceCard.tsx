@@ -1,5 +1,5 @@
 import { Card } from "../../components/Card";
-import { Icon } from "../../components/Icon";
+import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { PEDAL_MAPPING, type PlaybackConfig } from "./types";
 
@@ -21,7 +21,7 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
       title="PERFORMANCE"
       titleButtons={
         <button className="icon-btn icon-btn--danger" onClick={onReset} title="Reset">
-          <Icon name="arrow-counter-clockwise" size={16} />
+          <ArrowCounterClockwiseIcon size={16} weight="duotone" />
         </button>
       }
       className="performance-card"

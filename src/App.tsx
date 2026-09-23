@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { AppSettingsProvider, useAppSettings } from "./state/AppSettingsContext";
-import { PlaybackConfigProvider } from "./state/PlaybackConfigContext";
+import { PlaybackConfigProvider, usePlaybackConfig } from "./state/PlaybackConfigContext";
 import { LogProvider } from "./state/LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine } from "./state/PlaybackEngineContext";
 import { Sidebar } from "./components/Sidebar";
@@ -33,6 +33,7 @@ function AppShell() {
   const { opacity, showUpdatePrompt, resolveUpdatePrompt, updateAvailable, dismissUpdateAvailable } =
     useAppSettings();
   const engine = usePlaybackEngine();
+  const { config } = usePlaybackConfig();
 
   useEffect(() => {
     function handleKeydown(e: KeyboardEvent) {
@@ -45,8 +46,16 @@ function AppShell() {
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
 
-  const status = !engine.fileName ? "unloaded" : engine.hasCompiledPedal ? "ready" : "loaded";
-  const statusLabel = engine.fileName || "No file loaded";
+  const status = !engine.fileName
+    ? "unloaded"
+    : config.pedal_style === "none"
+      ? "ready"
+      : engine.isGeneratingPedal
+        ? "loading"
+        : engine.hasCompiledPedal
+          ? "ready"
+          : "loaded";
+  const statusLabel = { unloaded: "NO MIDI", loaded: "NO PEDAL", loading: "GEN PEDAL", ready: "READY" }[status];
 
   return (
     <div className={`app-window${isCollapsed ? " app-window--collapsed" : ""}`} style={{ opacity: opacity / 100 }}>

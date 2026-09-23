@@ -49,6 +49,16 @@ function wrapper({ children }: { children: ReactNode }) {
   );
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function renderEngine() {
   return renderHook(
     () => ({ engine: usePlaybackEngine(), log: useLog(), playbackConfig: usePlaybackConfig() }),
@@ -338,6 +348,137 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     await act(async () => result.current.engine.play());
     expect(tauriMocks.compilePedal).not.toHaveBeenCalled();
     expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+  });
+
+  describe("pedal generation state", () => {
+    const pedalResult = { pedal_intervals: [[0, 1]], ai_thresholds: null };
+
+    it("isGeneratingPedal is true only while compile_pedal is in flight", async () => {
+      const compile = deferred<typeof pedalResult>();
+      tauriMocks.compilePedal.mockReturnValue(compile.promise);
+      const { result } = renderEngine();
+      expect(result.current.engine.isGeneratingPedal).toBe(false);
+
+      let running!: Promise<void>;
+      act(() => {
+        running = result.current.engine.generatePedal();
+      });
+      await waitFor(() => expect(result.current.engine.isGeneratingPedal).toBe(true));
+      expect(result.current.engine.hasCompiledPedal).toBe(false);
+
+      await act(async () => {
+        compile.resolve(pedalResult);
+        await running;
+      });
+      expect(result.current.engine.isGeneratingPedal).toBe(false);
+      expect(result.current.engine.hasCompiledPedal).toBe(true);
+    });
+
+    it("isGeneratingPedal returns to false when compile_pedal rejects", async () => {
+      const compile = deferred<unknown>();
+      tauriMocks.compilePedal.mockReturnValue(compile.promise);
+      const { result } = renderEngine();
+
+      let running!: Promise<void>;
+      act(() => {
+        running = result.current.engine.generatePedal();
+      });
+      await waitFor(() => expect(result.current.engine.isGeneratingPedal).toBe(true));
+
+      await act(async () => {
+        compile.reject(new Error("boom"));
+        await running;
+      });
+      expect(result.current.engine.isGeneratingPedal).toBe(false);
+      expect(result.current.engine.hasCompiledPedal).toBe(false);
+      expect(result.current.log.entries.some((e) => e.level === "WARN" && e.line.includes("Failed to compile pedal"))).toBe(
+        true,
+      );
+    });
+
+    it("a second generatePedal call while one is running is ignored and does not end the first one's spinner early", async () => {
+      const compile = deferred<typeof pedalResult>();
+      tauriMocks.compilePedal.mockReturnValue(compile.promise);
+      const { result } = renderEngine();
+
+      let first!: Promise<void>;
+      act(() => {
+        first = result.current.engine.generatePedal();
+      });
+      await waitFor(() => expect(result.current.engine.isGeneratingPedal).toBe(true));
+
+      await act(async () => result.current.engine.generatePedal());
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+      expect(result.current.engine.isGeneratingPedal).toBe(true);
+
+      await act(async () => {
+        compile.resolve(pedalResult);
+        await first;
+      });
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+      expect(result.current.engine.isGeneratingPedal).toBe(false);
+    });
+
+    it("generatePedal can run again after a finished run, including after a failed one", async () => {
+      tauriMocks.compilePedal.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce(pedalResult);
+      const { result } = renderEngine();
+
+      await act(async () => result.current.engine.generatePedal());
+      expect(result.current.engine.hasCompiledPedal).toBe(false);
+      expect(result.current.engine.isGeneratingPedal).toBe(false);
+
+      await act(async () => result.current.engine.generatePedal());
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(2);
+      expect(result.current.engine.hasCompiledPedal).toBe(true);
+    });
+
+    it("play() does nothing while a pedal generation is running, then works once it has finished", async () => {
+      const compile = deferred<typeof pedalResult>();
+      tauriMocks.compilePedal.mockReturnValue(compile.promise);
+      tauriMocks.startPlayback.mockResolvedValue(undefined);
+      const { result } = renderEngine();
+
+      let running!: Promise<void>;
+      act(() => {
+        running = result.current.engine.generatePedal();
+      });
+      await waitFor(() => expect(result.current.engine.isGeneratingPedal).toBe(true));
+
+      await act(async () => result.current.engine.play());
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+      expect(tauriMocks.startPlayback).not.toHaveBeenCalled();
+
+      await act(async () => {
+        compile.resolve(pedalResult);
+        await running;
+      });
+      await act(async () => result.current.engine.play());
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+      expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+    });
+
+    it("hotkey_toggle_requested during a running generation neither starts playback nor a second compile", async () => {
+      const compile = deferred<typeof pedalResult>();
+      tauriMocks.compilePedal.mockReturnValue(compile.promise);
+      tauriMocks.startPlayback.mockResolvedValue(undefined);
+      const { result } = renderEngine();
+      await waitFor(() => expect(eventHandlers.has("hotkey_toggle_requested")).toBe(true));
+
+      let running!: Promise<void>;
+      act(() => {
+        running = result.current.engine.generatePedal();
+      });
+      await waitFor(() => expect(result.current.engine.isGeneratingPedal).toBe(true));
+
+      await act(async () => eventHandlers.get("hotkey_toggle_requested")!(null));
+      expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+      expect(tauriMocks.startPlayback).not.toHaveBeenCalled();
+
+      await act(async () => {
+        compile.resolve(pedalResult);
+        await running;
+      });
+    });
   });
 
   it("togglePause calls the real command and optimistically flips isPaused", async () => {

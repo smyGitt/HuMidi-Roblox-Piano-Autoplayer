@@ -1,4 +1,4 @@
-import { Icon } from "./Icon";
+import { FloppyDiskIcon, PauseIcon, PlayIcon, ResizeIcon, StopIcon } from "@phosphor-icons/react";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -60,10 +60,10 @@ export function TransportBar({
           disabled={!playEnabled}
           title={isPlaying ? "Pause" : "Play"}
         >
-          <Icon name={isPlaying ? "pause" : "play"} size={20} />
+          {isPlaying ? <PauseIcon size={20} weight="duotone" /> : <PlayIcon size={20} weight="duotone" />}
         </button>
         <button className="transport-bar__btn" onClick={onStop} title="Stop">
-          <Icon name="stop" size={20} />
+          <StopIcon size={20} weight="duotone" />
         </button>
 
         {isCollapsed && (
@@ -80,14 +80,14 @@ export function TransportBar({
           disabled={!saveEnabled}
           title="Save playback"
         >
-          <Icon name="floppy-disk" size={20} />
+          <FloppyDiskIcon size={20} weight="duotone" />
         </button>
         <button
           className="transport-bar__btn"
           onClick={onToggleCollapsed}
           title={isCollapsed ? "Expand" : "Collapse"}
         >
-          <Icon name={isCollapsed ? "resize-expand" : "resize-collapse"} size={20} />
+          <ResizeIcon size={20} weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
         </button>
       </div>
     </div>

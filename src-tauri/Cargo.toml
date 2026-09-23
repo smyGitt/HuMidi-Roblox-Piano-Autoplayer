@@ -36,6 +36,7 @@ rdev = "0.5"
 [dev-dependencies]
 approx = "0.5"
 tempfile = "3"
+tauri = { version = "2", features = ["test"] }
 
 [profile.release]
 opt-level = 3

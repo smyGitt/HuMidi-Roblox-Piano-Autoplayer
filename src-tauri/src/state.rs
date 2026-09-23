@@ -5,7 +5,7 @@ use crate::managers::config_manager::ConfigManager;
 use crate::managers::hotkey_manager::HotkeyManager;
 use crate::managers::theme_manager::ThemeManager;
 use std::sync::mpsc::Sender;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 #[derive(Default)]
@@ -35,7 +35,7 @@ pub struct PlaybackHandle {
 }
 
 pub struct AppState {
-    pub pedal_model: Mutex<Option<PedalModel>>,
+    pub pedal_model: Mutex<Option<Arc<PedalModel>>>,
     pub parsed_tracks: Mutex<Option<Vec<MidiTrack>>>,
     pub parsed_tempo_map: Mutex<Option<TempoMap>>,
     pub loaded_pedal_count: Mutex<u32>,

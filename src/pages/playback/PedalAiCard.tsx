@@ -1,5 +1,5 @@
 import { Card } from "../../components/Card";
-import { Icon } from "../../components/Icon";
+import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 
 export interface PedalAiStats {
   avgDur: number;
@@ -92,7 +92,7 @@ export function PedalAiCard({
       titleButtons={
         hasThresholds && (
           <button className="icon-btn icon-btn--danger" onClick={onReset} title="Reset">
-            <Icon name="arrow-counter-clockwise" size={16} />
+            <ArrowCounterClockwiseIcon size={16} weight="duotone" />
           </button>
         )
       }

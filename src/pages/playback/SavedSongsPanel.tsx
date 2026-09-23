@@ -1,5 +1,5 @@
 import { Card } from "../../components/Card";
-import { Icon } from "../../components/Icon";
+import { ArrowsClockwiseIcon, ClockIcon, ListMagnifyingGlassIcon } from "@phosphor-icons/react";
 
 export interface SavedSong {
   filepath: string;
@@ -22,10 +22,10 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
       titleButtons={
         <div className="saved-songs__title-btns">
           <button className="icon-btn" onClick={onRefresh} title="Refresh">
-            <Icon name="arrows-clockwise" size={16} />
+            <ArrowsClockwiseIcon size={16} weight="duotone" />
           </button>
           <button className="icon-btn" onClick={onOpenAll} title="All saves">
-            <Icon name="list-magnifying-glass" size={16} />
+            <ListMagnifyingGlassIcon size={16} weight="duotone" />
           </button>
         </div>
       }
@@ -40,7 +40,7 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
               <span className="part-card__meta">{s.songName}</span>
               {s.timeStr && (
                 <span className="save-card__time">
-                  <Icon name="clock" size={10} />
+                  <ClockIcon size={10} weight="duotone" />
                   {s.timeStr}
                 </span>
               )}
