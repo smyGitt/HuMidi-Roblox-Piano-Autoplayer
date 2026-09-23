@@ -132,7 +132,7 @@ export function StatusIndicator({ status, label }: StatusIndicatorProps) {
     [],
   );
 
-  const glyph = status === "loaded" ? "circle" : status === "ready" ? "check" : "dashed";
+  const glyph = status === "loaded" || status === "unloaded" ? "circle" : status === "ready" ? "check" : "dashed";
 
   return (
     <div className="status-indicator" data-status={status} title={label}>

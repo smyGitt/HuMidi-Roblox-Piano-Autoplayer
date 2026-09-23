@@ -120,6 +120,11 @@ button:disabled {
   overflow: hidden;
 }
 
+.sidebar__nav-btn > svg,
+.sidebar__link-btn > svg {
+  flex: none;
+}
+
 .sidebar__nav-label {
   flex: none;
 }
