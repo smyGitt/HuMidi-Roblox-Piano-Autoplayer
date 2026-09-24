@@ -9,8 +9,7 @@
   --space-4: 12px;
   --space-5: 16px;
   --space-6: 24px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --radius: 10px;
 }
 
 * {
@@ -247,7 +246,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -268,7 +267,7 @@ button:disabled {
 .card {
   background: var(--bg_surface);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius);
   padding: 6px 14px 7px;
   display: flex;
   flex-direction: column;
@@ -313,7 +312,7 @@ button:disabled {
   justify-content: center;
   color: var(--text_muted);
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .icon-btn:hover {
@@ -341,7 +340,7 @@ button:disabled {
 .toggle-switch__track {
   width: 28px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--text_muted);
   position: relative;
   transition: background 180ms ease;
@@ -388,7 +387,7 @@ button:disabled {
   width: 80px;
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   padding: 2px 6px;
 }
@@ -444,9 +443,26 @@ button:disabled {
 }
 
 .playback-tab__header .sub-tab-bar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: max-content;
+  align-items: end;
   border-bottom: none;
   margin-bottom: 0;
   padding: 0 24px;
+}
+
+.playback-tab__header .sub-tab-bar__btn {
+  position: relative;
+  text-align: center;
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.playback-tab__header .sub-tab-bar__btn--active {
+  background: var(--bg_primary);
+  margin-bottom: -1px;
 }
 
 .playback-tab__page {
@@ -482,7 +498,7 @@ button:disabled {
 .file-strip__tile {
   width: 34px;
   height: 34px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg_input);
   display: flex;
   align-items: center;
@@ -513,7 +529,7 @@ button:disabled {
 .file-strip__btn {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -554,7 +570,7 @@ button:disabled {
 .loaded-row__edit-btn {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   white-space: nowrap;
 }
 
@@ -566,7 +582,7 @@ button:disabled {
 .save-card {
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius);
   padding: 5px 8px;
   display: flex;
   flex-direction: column;
@@ -633,7 +649,7 @@ button:disabled {
 .midi-drop-zone__btn {
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -673,7 +689,7 @@ button:disabled {
 .control-row__number {
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   padding: 4px 8px;
 }
@@ -723,7 +739,7 @@ button:disabled {
   padding: 8px 16px;
   border: 1px solid var(--accent);
   color: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .pedal-ai-card__generate-btn:hover:not(:disabled) {
@@ -757,7 +773,7 @@ button:disabled {
 .pedal-ai-card__thresholds input {
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   padding: 4px 8px;
   width: 90px;
@@ -776,7 +792,7 @@ button:disabled {
   flex-direction: column;
   gap: 4px;
   background: var(--bg_primary);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 8px 10px;
   color: var(--pedal_color);
   font-size: 0.85em;
@@ -790,7 +806,7 @@ button:disabled {
   text-align: left;
   color: var(--accent);
   padding: 4px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius);
 }
 
 .pedal-ai-card__diag-row:hover {
@@ -874,7 +890,7 @@ button:disabled {
 .apply-toast__btn {
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -907,7 +923,7 @@ button:disabled {
   margin-left: auto;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -927,7 +943,7 @@ button:disabled {
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg_input);
 }
 
@@ -976,7 +992,7 @@ button:disabled {
   width: 100%;
   flex-shrink: 0;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg_input);
   padding: 6px 8px;
   box-sizing: border-box;
@@ -993,7 +1009,7 @@ button:disabled {
   height: 100%;
   background: var(--knob_color);
   border: 1px solid var(--border);
-  border-radius: 0 0 3px 3px;
+  border-radius: 0 0 var(--radius) var(--radius);
   box-sizing: border-box;
 }
 
@@ -1008,7 +1024,7 @@ button:disabled {
   background: var(--bg_primary);
   border: 1px solid var(--border);
   border-top: none;
-  border-radius: 0 0 2px 2px;
+  border-radius: 0 0 var(--radius) var(--radius);
   z-index: 1;
 }
 
@@ -1019,7 +1035,7 @@ button:disabled {
 .piano-keyboard__pedal-strip {
   width: 100%;
   background: var(--bg_surface);
-  border-radius: 2px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -1063,7 +1079,7 @@ button:disabled {
 .settings-tab__customize-btn {
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_muted);
 }
 
@@ -1098,7 +1114,7 @@ button:disabled {
   flex-direction: column;
   background: var(--bg_surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   max-width: 92vw;
   max-height: 88vh;
@@ -1121,7 +1137,7 @@ button:disabled {
   font-size: 1.2em;
   line-height: 1;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .modal__close-btn:hover {
@@ -1149,7 +1165,7 @@ button:disabled {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -1195,7 +1211,7 @@ button:disabled {
 .track-selection__table select {
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   padding: 3px 6px;
 }
@@ -1226,7 +1242,7 @@ button:disabled {
   width: 100%;
   text-align: left;
   padding: 6px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
 }
 
@@ -1316,7 +1332,7 @@ button:disabled {
   min-height: 200px;
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   font-family: "Courier New", monospace;
   font-size: 9pt;
@@ -1341,7 +1357,7 @@ button:disabled {
   width: 70px;
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_primary);
   padding: 4px 8px;
 }
@@ -1350,7 +1366,7 @@ button:disabled {
   padding: 6px 16px;
   border: 1px solid var(--accent);
   color: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .translator-tab__play-btn:hover:not(:disabled) {
@@ -1398,7 +1414,7 @@ button:disabled {
   height: 100%;
   overflow-y: auto;
   background: var(--bg_input);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 8px;
   font-family: "Courier New", monospace;
   font-size: 0.85em;
@@ -1454,7 +1470,7 @@ button:disabled {
   display: flex;
   height: 100%;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--bg_surface);
   overflow: hidden;
 }
@@ -1525,7 +1541,7 @@ button:disabled {
   width: 30px;
   height: 30px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--text_muted);
 }
 
@@ -1568,7 +1584,7 @@ button:disabled {
   gap: 8px;
   background: var(--bg_input);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 6px 8px;
 }
 
@@ -1577,7 +1593,7 @@ button:disabled {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: 5px;
+  border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
   cursor: pointer;

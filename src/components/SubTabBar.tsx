@@ -1,5 +1,4 @@
 const LABELS = ["File", "Playback", "Humanize"];
-const ORDINALS = ["I", "II", "III"];
 
 interface SubTabBarProps {
   active: number;
@@ -15,7 +14,7 @@ export function SubTabBar({ active, onChange }: SubTabBarProps) {
           className={`sub-tab-bar__btn${active === i ? " sub-tab-bar__btn--active" : ""}`}
           onClick={() => onChange(i)}
         >
-          {ORDINALS[i]}. {label}
+          {label}
         </button>
       ))}
     </div>
