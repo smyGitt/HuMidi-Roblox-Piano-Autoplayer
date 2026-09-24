@@ -126,5 +126,4 @@ export function applyThemeToRoot(theme: Theme, root: HTMLElement = document.docu
   root.style.setProperty("--btn_hover", `color-mix(in srgb, var(--accent) 16%, var(--bg_surface))`);
   root.style.setProperty("--accent_tint", `color-mix(in srgb, var(--accent) 12%, transparent)`);
   root.style.setProperty("--save_card_hover", `color-mix(in srgb, var(--accent) 10%, var(--bg_surface))`);
-  root.style.setProperty("--dropzone_border", `color-mix(in srgb, black 35%, var(--border))`);
 }
