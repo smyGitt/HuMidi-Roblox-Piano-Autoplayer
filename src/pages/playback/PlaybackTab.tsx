@@ -17,7 +17,7 @@ import { useLog } from "../../state/LogContext";
 import { isTauri, getSaveDir, listSaves, renameSave, deleteSave, type SaveSummary } from "../../lib/tauri";
 import { Checkbox } from "../../components/Field";
 
-const TABS = ["File", "Playback", "Humanize"] as const;
+const TABS = ["Info", "Playback", "Humanize"] as const;
 
 function toSaveEntry(s: SaveSummary): SaveEntry {
   return {

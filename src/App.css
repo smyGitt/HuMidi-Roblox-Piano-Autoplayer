@@ -610,6 +610,10 @@ button:disabled {
   margin-right: calc(var(--space-5) + var(--border-width));
 }
 
+.playback-tab__file-page {
+  height: 100%;
+}
+
 .playback-tab__file-page,
 .playback-tab__playback-page,
 .playback-tab__humanize-page {
@@ -674,25 +678,37 @@ button:disabled {
 
 /* --- Part / save cards --- */
 
+.loaded-row-card {
+  flex: 1;
+  min-height: 0;
+}
+
 .loaded-row-card .card__body {
-  flex-direction: row;
+  flex: 1;
+  min-height: 0;
   align-items: stretch;
-  min-height: var(--space-11);
 }
 
 .loaded-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: var(--space-1);
   width: 100%;
 }
 
+.loaded-row > .btn {
+  align-self: flex-start;
+}
+
 .loaded-row__cards {
   display: flex;
+  flex-direction: column;
   gap: var(--space-1);
-  overflow-x: auto;
+  overflow-y: auto;
   flex: 1;
-  align-items: center;
+  min-height: 0;
 }
 
 .loaded-row__placeholder,
@@ -713,6 +729,13 @@ button:disabled {
   gap: var(--space-1);
   min-width: var(--space-18);
   flex: none;
+}
+
+.part-card {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .save-card {

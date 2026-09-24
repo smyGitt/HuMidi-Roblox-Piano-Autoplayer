@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { usePlaybackConfig } from "./PlaybackConfigContext";
 import { useLog } from "./LogContext";
 import {
@@ -165,22 +164,6 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       unlisten.forEach((p) => p.then((fn) => fn()));
     };
   }, [appendLog]);
-
-  useEffect(() => {
-    if (!isTauri()) return;
-    let unlisten: (() => void) | null = null;
-    getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type !== "drop") return;
-        const path = event.payload.paths.find((p) => /\.midi?$/i.test(p));
-        if (path) void loadFile(path, path.split(/[\\/]/).pop() ?? path);
-      })
-      .then((fn) => {
-        unlisten = fn;
-      });
-    return () => unlisten?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const loadFile = useCallback(async (path: string, name: string) => {
     const version = ++songVersionRef.current;

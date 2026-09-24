@@ -34,11 +34,6 @@ vi.mock("../lib/tauri", async () => {
 const dialogOpen = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: dialogOpen }));
 
-const onDragDropEvent = vi.hoisted(() => vi.fn(() => Promise.resolve(() => {})));
-vi.mock("@tauri-apps/api/webview", () => ({
-  getCurrentWebview: () => ({ onDragDropEvent }),
-}));
-
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <PlaybackConfigProvider>
