@@ -10,6 +10,7 @@
   --border-width: 1px;
   --stroke-width: 1;
   --radius: 10px;
+  --rotate-expandable: 90deg;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -500,8 +501,16 @@ button:disabled {
   margin-bottom: calc(var(--border-width) * -1);
 }
 
+.playback-tab__body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
 .playback-tab__page {
   flex: 1;
+  min-width: 0;
   overflow: auto;
   padding: var(--space-3);
 }
@@ -699,11 +708,81 @@ button:disabled {
   gap: var(--space-1);
 }
 
+.saved-songs-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-raised);
+  width: calc(var(--space-5) + var(--border-width));
+  display: flex;
+  background: var(--bg_surface);
+  border-left: var(--border-width) solid var(--border);
+  overflow: hidden;
+  transition: width var(--duration) var(--easing);
+}
+
+.saved-songs-sidebar:hover {
+  width: var(--space-33);
+}
+
+.saved-songs-sidebar__handle {
+  flex: none;
+  width: var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text_muted);
+}
+
+.saved-songs-sidebar__handle svg {
+  width: var(--space-2);
+  height: var(--space-2);
+  transform: rotate(var(--rotate-expandable));
+}
+
+.saved-songs__title-btns svg {
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.save-card__time svg {
+  width: var(--space-1);
+  height: var(--space-1);
+}
+
+.saved-songs-sidebar:hover .saved-songs-sidebar__handle {
+  color: var(--text_primary);
+}
+
+.saved-songs-sidebar__content {
+  flex: none;
+  width: calc(var(--space-33) - var(--space-5) - var(--border-width));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.saved-songs-sidebar__head {
+  flex: none;
+  height: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-1);
+}
+
+.saved-songs-sidebar .card__title {
+  white-space: nowrap;
+}
+
 .saved-songs__list {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  max-height: var(--space-33);
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--space-1) var(--space-1);
   overflow-y: auto;
 }
 
