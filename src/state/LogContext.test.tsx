@@ -75,21 +75,21 @@ describe("useLog", () => {
     it("collapses an absolute Windows path down to its final component when enabled (default on)", () => {
       const { result } = renderHook(() => useLog(), { wrapper });
       expect(result.current.redactPaths).toBe(true);
-      act(() => result.current.appendLog("Loaded C:\\Users\\kevin\\Documents\\song.mid"));
+      act(() => result.current.appendLog("Loaded C:\\Users\\me\\Documents\\song.mid"));
       expect(result.current.entries[0].line).toContain("song.mid");
       expect(result.current.entries[0].line).not.toContain("Users");
     });
 
     it("collapses a bare directory path to its final component too", () => {
       const { result } = renderHook(() => useLog(), { wrapper });
-      act(() => result.current.appendLog("Save dir: C:\\Users\\kevin\\HuMidiSaves"));
+      act(() => result.current.appendLog("Save dir: C:\\Users\\me\\HuMidiSaves"));
       expect(result.current.entries[0].line).toContain("HuMidiSaves");
       expect(result.current.entries[0].line).not.toContain("Users");
     });
 
     it("collapses a forward-slash Windows path too (regression: was backslash-only before)", () => {
       const { result } = renderHook(() => useLog(), { wrapper });
-      act(() => result.current.appendLog("Loaded C:/Users/kevin/Documents/song.mid"));
+      act(() => result.current.appendLog("Loaded C:/Users/me/Documents/song.mid"));
       expect(result.current.entries[0].line).toContain("song.mid");
       expect(result.current.entries[0].line).not.toContain("Users");
     });
@@ -97,13 +97,13 @@ describe("useLog", () => {
     it("leaves paths untouched once redaction is turned off", () => {
       const { result } = renderHook(() => useLog(), { wrapper });
       act(() => result.current.setRedactPaths(false));
-      act(() => result.current.appendLog("Loaded C:\\Users\\kevin\\Documents\\song.mid"));
-      expect(result.current.entries[0].line).toContain("C:\\Users\\kevin\\Documents\\song.mid");
+      act(() => result.current.appendLog("Loaded C:\\Users\\me\\Documents\\song.mid"));
+      expect(result.current.entries[0].line).toContain("C:\\Users\\me\\Documents\\song.mid");
     });
 
     it("does not retroactively redact entries logged before the toggle changed", () => {
       const { result } = renderHook(() => useLog(), { wrapper });
-      act(() => result.current.appendLog("Loaded C:\\Users\\kevin\\Documents\\song.mid"));
+      act(() => result.current.appendLog("Loaded C:\\Users\\me\\Documents\\song.mid"));
       const firstLine = result.current.entries[0].line;
       expect(firstLine).toContain("song.mid");
       expect(firstLine).not.toContain("Users");
