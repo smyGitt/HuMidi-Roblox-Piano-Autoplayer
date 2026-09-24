@@ -552,6 +552,7 @@ button:disabled {
 .playback-tab__header .btn--tab {
   position: relative;
   text-align: center;
+  border: var(--border-width) solid var(--border);
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
 }
