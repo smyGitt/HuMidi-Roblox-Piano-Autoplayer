@@ -678,18 +678,18 @@ button:disabled {
 
 /* --- Part / save cards --- */
 
-.loaded-row-card {
+.loaded-parts-card {
   flex: 1;
   min-height: 0;
 }
 
-.loaded-row-card .card__body {
+.loaded-parts-card .card__body {
   flex: 1;
   min-height: 0;
   align-items: stretch;
 }
 
-.loaded-row {
+.loaded-parts {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -698,11 +698,11 @@ button:disabled {
   width: 100%;
 }
 
-.loaded-row > .btn {
+.loaded-parts > .btn {
   align-self: flex-start;
 }
 
-.loaded-row__cards {
+.loaded-parts__cards {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -711,9 +711,9 @@ button:disabled {
   min-height: 0;
 }
 
-.loaded-row__placeholder,
+.loaded-parts__placeholder,
 .saved-songs__placeholder,
-.loaded-row__pedal:empty {
+.loaded-parts__pedal:empty {
   color: var(--text_muted);
   font-size: var(--font-size);
 }

@@ -26,7 +26,7 @@ import {
   type MeasureBoundary,
 } from "../lib/tauri";
 import type { HandRole } from "../dialogs/TrackSelectionDialog";
-import type { TrackPart } from "../pages/playback/LoadedRow";
+import type { TrackPart } from "../pages/playback/LoadedParts";
 import type { PedalAiStats } from "../pages/playback/PedalAiCard";
 
 interface PlaybackEngineValue {
