@@ -6,6 +6,8 @@ import { LogProvider } from "./state/LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine } from "./state/PlaybackEngineContext";
 import { Sidebar } from "./components/Sidebar";
 import { TransportBar } from "./components/TransportBar";
+import { FileHeader } from "./components/FileHeader";
+import { TrackSelectionDialog, type HandRole } from "./dialogs/TrackSelectionDialog";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PlaybackTab } from "./pages/playback/PlaybackTab";
 import { VisualizerTab } from "./pages/visualizer/VisualizerTab";
@@ -30,6 +32,7 @@ const PAGE_TITLES: Record<PageId, string> = {
 function AppShell() {
   const [activePage, setActivePage] = useState<PageId>("playback");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
   const { opacity, showUpdatePrompt, resolveUpdatePrompt, updateAvailable, dismissUpdateAvailable } =
     useAppSettings();
   const engine = usePlaybackEngine();
@@ -45,6 +48,15 @@ function AppShell() {
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
+
+  useEffect(() => {
+    if (engine.tracks.length > 0) setTrackSelectionOpen(true);
+  }, [engine.tracks]);
+
+  async function confirmTrackSelection(selection: { index: number; role: HandRole }[]) {
+    await engine.confirmTrackSelection(selection);
+    setTrackSelectionOpen(false);
+  }
 
   const status = !engine.fileName
     ? "unloaded"
@@ -63,21 +75,24 @@ function AppShell() {
         <div className="app-body">
           <Sidebar activePage={activePage} onNavigate={setActivePage} status={status} statusLabel={statusLabel} />
           <div className="app-page-area">
-            {activePage === "playback" ? (
-              <PlaybackTab />
-            ) : activePage === "visualizer" ? (
-              <VisualizerTab />
-            ) : activePage === "settings" ? (
-              <SettingsTab />
-            ) : activePage === "translator" ? (
-              <TranslatorTab />
-            ) : activePage === "debug" ? (
-              <DebugTab />
-            ) : activePage === "license" ? (
-              <LicenseTab />
-            ) : (
-              <PlaceholderPage title={PAGE_TITLES[activePage]} />
-            )}
+            <FileHeader />
+            <div className="app-page-content">
+              {activePage === "playback" ? (
+                <PlaybackTab onEditTrackSelection={() => setTrackSelectionOpen(true)} />
+              ) : activePage === "visualizer" ? (
+                <VisualizerTab />
+              ) : activePage === "settings" ? (
+                <SettingsTab />
+              ) : activePage === "translator" ? (
+                <TranslatorTab />
+              ) : activePage === "debug" ? (
+                <DebugTab />
+              ) : activePage === "license" ? (
+                <LicenseTab />
+              ) : (
+                <PlaceholderPage title={PAGE_TITLES[activePage]} />
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -88,7 +103,6 @@ function AppShell() {
         totalTime={engine.totalDuration}
         isCollapsed={isCollapsed}
         playEnabled={engine.hasCompiledNotes}
-        saveEnabled={engine.hasCompiledNotes}
         onScrub={(v) => engine.seek(engine.totalDuration > 0 ? (v / 10000) * engine.totalDuration : 0)}
         onSeekCommit={() => {}}
         onPlayPause={() => {
@@ -96,9 +110,22 @@ function AppShell() {
           else void engine.play();
         }}
         onStop={() => void engine.stop()}
-        onSave={() => void engine.save()}
         onToggleCollapsed={() => setIsCollapsed((c) => !c)}
       />
+
+      {trackSelectionOpen && (
+        <TrackSelectionDialog
+          tracks={engine.tracks.map((t) => ({
+            index: t.index,
+            name: t.name,
+            instrument: t.instrument_name,
+            noteCount: t.note_count,
+            channel: t.is_drum ? 9 : 0,
+          }))}
+          onCancel={() => setTrackSelectionOpen(false)}
+          onConfirm={confirmTrackSelection}
+        />
+      )}
 
       {showUpdatePrompt && <UpdateCheckPrompt onChoice={resolveUpdatePrompt} />}
       {updateAvailable && (

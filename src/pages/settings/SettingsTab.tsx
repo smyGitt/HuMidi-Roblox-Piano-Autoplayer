@@ -346,7 +346,6 @@ export function SettingsTab() {
   return (
     <div className="settings-tab">
       <TabPage
-        title="Settings"
         tabs={NAV_ITEMS}
         active={NAV_ITEMS.indexOf(nav)}
         onChange={(i) => setNav(NAV_ITEMS[i])}

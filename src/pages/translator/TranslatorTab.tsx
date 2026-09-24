@@ -67,7 +67,6 @@ export function TranslatorTab() {
   return (
     <div className="translator-tab">
       <TabPage
-        title="Translator"
         tabs={MODES}
         active={mode === "import" ? 0 : 1}
         onChange={(i) => setMode(i === 0 ? "import" : "export")}

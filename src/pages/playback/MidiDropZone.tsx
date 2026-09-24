@@ -2,6 +2,7 @@ import { useState, type DragEvent } from "react";
 import { Card } from "../../components/Card";
 import { FolderOpenIcon } from "@phosphor-icons/react";
 import { isTauri } from "../../lib/tauri";
+import { pickMidiFile } from "../../lib/pickMidiFile";
 import { Button } from "../../components/Button";
 
 interface MidiDropZoneProps {
@@ -40,26 +41,10 @@ export function MidiDropZone({ onFileChosen, onLoadSaved, onBrowse }: MidiDropZo
         <span className="midi-drop-zone__hint">Drop a .mid file</span>
         <span className="midi-drop-zone__sub">or use the buttons below</span>
         <div className="midi-drop-zone__buttons">
-          <Button
-            className="midi-drop-zone__btn"
-            onClick={() => {
-              if (isTauri()) {
-                onBrowse();
-                return;
-              }
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = ".mid,.midi";
-              input.onchange = () => {
-                const file = input.files?.[0];
-                if (file) onFileChosen(file.name);
-              };
-              input.click();
-            }}
-          >
+          <Button onClick={() => (isTauri() ? onBrowse() : pickMidiFile(onFileChosen))}>
             Browse...
           </Button>
-          <Button className="midi-drop-zone__btn" onClick={onLoadSaved}>
+          <Button onClick={onLoadSaved}>
             Load Save
           </Button>
         </div>

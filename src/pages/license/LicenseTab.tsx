@@ -112,7 +112,7 @@ export function LicenseTab() {
 
   return (
     <div className="license-tab">
-      <TabPage title="About" tabs={NAV_ITEMS} active={active} onChange={setActive}>
+      <TabPage tabs={NAV_ITEMS} active={active} onChange={setActive}>
         <div className="license-tab__text">{LICENSE_TEXTS[NAV_ITEMS[active]]}</div>
       </TabPage>
     </div>

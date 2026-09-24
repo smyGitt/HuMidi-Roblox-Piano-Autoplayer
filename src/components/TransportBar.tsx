@@ -1,4 +1,4 @@
-import { FloppyDiskIcon, PauseIcon, PlayIcon, ResizeIcon, StopIcon } from "@phosphor-icons/react";
+import { PauseIcon, PlayIcon, ResizeIcon, StopIcon } from "@phosphor-icons/react";
 import { Button } from "./Button";
 import { RangeInput } from "./Field";
 
@@ -14,12 +14,10 @@ interface TransportBarProps {
   totalTime: number;
   isCollapsed: boolean;
   playEnabled: boolean;
-  saveEnabled: boolean;
   onScrub: (value: number) => void;
   onSeekCommit: (value: number) => void;
   onPlayPause: () => void;
   onStop: () => void;
-  onSave: () => void;
   onToggleCollapsed: () => void;
 }
 
@@ -29,12 +27,10 @@ export function TransportBar({
   totalTime,
   isCollapsed,
   playEnabled,
-  saveEnabled,
   onScrub,
   onSeekCommit,
   onPlayPause,
   onStop,
-  onSave,
   onToggleCollapsed,
 }: TransportBarProps) {
   return (
@@ -75,14 +71,6 @@ export function TransportBar({
 
         <div className="transport-bar__stretch" />
 
-        <Button
-          variant="icon" size="md"
-          onClick={onSave}
-          disabled={!saveEnabled}
-          title="Save playback"
-        >
-          <FloppyDiskIcon weight="duotone" />
-        </Button>
         <Button
           variant="icon" size="md"
           onClick={onToggleCollapsed}

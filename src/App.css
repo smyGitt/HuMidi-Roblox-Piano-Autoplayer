@@ -140,11 +140,7 @@ button:disabled {
 
 .btn--icon {
   padding: var(--space-1);
-  border-color: transparent;
-}
-
-.btn--icon.btn--outlined {
-  border-color: var(--border);
+  border: none;
 }
 
 .btn--subtle {
@@ -352,7 +348,16 @@ button:disabled {
 
 .app-page-area {
   flex: 1;
+  min-width: 0;
   margin-left: calc(var(--sidebar-width) + var(--border-width));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-page-content {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: var(--space-3);
 }
@@ -511,11 +516,11 @@ button:disabled {
 
 /* --- Tab page --- */
 
-.app-page-area:has(> .tab-page),
-.app-page-area:has(> .playback-tab),
-.app-page-area:has(> .settings-tab),
-.app-page-area:has(> .translator-tab),
-.app-page-area:has(> .license-tab) {
+.app-page-content:has(> .tab-page),
+.app-page-content:has(> .playback-tab),
+.app-page-content:has(> .settings-tab),
+.app-page-content:has(> .translator-tab),
+.app-page-content:has(> .license-tab) {
   padding: 0;
   overflow: hidden;
 }
@@ -608,14 +613,21 @@ button:disabled {
 
 /* --- File strip --- */
 
-.file-strip {
+.file-header {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
+  background: var(--bg_surface);
 }
 
-.file-strip__tile {
+.file-header__tile svg {
+  width: var(--space-3);
+  height: var(--space-3);
+}
+
+.file-header__tile {
   width: var(--space-4);
   height: var(--space-4);
   border-radius: var(--radius);
@@ -627,21 +639,21 @@ button:disabled {
   flex: none;
 }
 
-.file-strip__info {
+.file-header__info {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
 }
 
-.file-strip__name {
+.file-header__name {
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.file-strip__meta {
+.file-header__meta {
   font-size: var(--font-size);
   color: var(--text_muted);
 }

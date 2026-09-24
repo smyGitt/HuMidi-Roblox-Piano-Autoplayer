@@ -237,11 +237,11 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
               </option>
             ))}
           </Select>
-          <Button variant="icon" subtle outlined title="New (duplicate current)" onClick={() => void handleNew()}>
+          <Button variant="icon" subtle title="New (duplicate current)" onClick={() => void handleNew()}>
             <PlusSquareIcon weight="duotone" />
           </Button>
           <Button
-            variant="icon" subtle outlined
+            variant="icon" subtle
             title="Rename"
             disabled={isBuiltin}
             onClick={() => void handleRename()}
@@ -249,17 +249,17 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
             <NotePencilIcon weight="duotone" />
           </Button>
           <Button
-            variant="icon" subtle outlined
+            variant="icon" subtle
             title="Delete"
             disabled={isBuiltin}
             onClick={() => void handleDelete()}
           >
             <TrashIcon weight="duotone" />
           </Button>
-          <Button variant="icon" subtle outlined title="Export" onClick={() => void handleExport()}>
+          <Button variant="icon" subtle title="Export" onClick={() => void handleExport()}>
             <FileArrowDownIcon weight="duotone" />
           </Button>
-          <Button variant="icon" subtle outlined title="Import" onClick={() => void handleImport()}>
+          <Button variant="icon" subtle title="Import" onClick={() => void handleImport()}>
             <FileArrowUpIcon weight="duotone" />
           </Button>
         </div>

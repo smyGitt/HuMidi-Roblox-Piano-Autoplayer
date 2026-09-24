@@ -9,11 +9,10 @@ interface ButtonStyleProps {
   active?: boolean;
   danger?: boolean;
   subtle?: boolean;
-  outlined?: boolean;
 }
 
 export function buttonClassName(
-  { variant = "default", size, active, danger, subtle, outlined }: ButtonStyleProps,
+  { variant = "default", size, active, danger, subtle }: ButtonStyleProps,
   className?: string,
 ) {
   const resolvedSize = size ?? (variant === "icon" ? "sm" : undefined);
@@ -24,7 +23,6 @@ export function buttonClassName(
     active && "btn--active",
     danger && "btn--danger",
     subtle && "btn--subtle",
-    outlined && "btn--outlined",
     className,
   ]
     .filter(Boolean)
@@ -33,11 +31,11 @@ export function buttonClassName(
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & ButtonStyleProps;
 
-export function Button({ variant, size, active, danger, subtle, outlined, className, type = "button", ...rest }: ButtonProps) {
+export function Button({ variant, size, active, danger, subtle, className, type = "button", ...rest }: ButtonProps) {
   return (
     <button
       type={type}
-      className={buttonClassName({ variant, size, active, danger, subtle, outlined }, className)}
+      className={buttonClassName({ variant, size, active, danger, subtle }, className)}
       {...rest}
     />
   );
@@ -45,8 +43,8 @@ export function Button({ variant, size, active, danger, subtle, outlined, classN
 
 type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & ButtonStyleProps;
 
-export function Link({ variant, size, active, danger, subtle, outlined, className, ...rest }: LinkProps) {
+export function Link({ variant, size, active, danger, subtle, className, ...rest }: LinkProps) {
   return (
-    <a className={buttonClassName({ variant, size, active, danger, subtle, outlined }, className)} {...rest} />
+    <a className={buttonClassName({ variant, size, active, danger, subtle }, className)} {...rest} />
   );
 }
