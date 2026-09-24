@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Modal } from "../components/Modal";
 import { Button } from "../components/Button";
+import { Label } from "../components/Label";
 
 export interface SaveEntry {
   filepath: string;
@@ -15,14 +16,15 @@ export interface SaveEntry {
 
 interface LoadSaveDialogProps {
   saves: SaveEntry[];
+  initialSelected?: string | null;
   onCancel: () => void;
   onLoad: (save: SaveEntry) => void;
   onRename: (filepath: string, newName: string) => void;
   onDelete: (filepath: string) => void;
 }
 
-export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: LoadSaveDialogProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+export function LoadSaveDialog({ saves, initialSelected = null, onCancel, onLoad, onRename, onDelete }: LoadSaveDialogProps) {
+  const [selected, setSelected] = useState<string | null>(initialSelected);
 
   const groups = useMemo(() => {
     const map = new Map<string, SaveEntry[]>();
@@ -74,7 +76,7 @@ export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: 
           {groups.length === 0 && <span className="load-save-dialog__empty">No saves found.</span>}
           {groups.map(([midiName, entries]) => (
             <div key={midiName} className="load-save-dialog__group">
-              <div className="load-save-dialog__group-label">{midiName}</div>
+              <Label className="load-save-dialog__group-label">{midiName}</Label>
               {entries.map((s) => (
                 <Button
                   key={s.filepath}
@@ -82,7 +84,7 @@ export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: 
                   active={selected === s.filepath}
                   onClick={() => setSelected(s.filepath)}
                 >
-                  {s.saveName}
+                  <Label>{s.saveName}</Label>
                 </Button>
               ))}
             </div>

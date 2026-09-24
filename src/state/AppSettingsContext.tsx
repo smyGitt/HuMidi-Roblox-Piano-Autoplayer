@@ -11,6 +11,7 @@ interface AppSettings {
   pedalPromptThreshold: number;
   autoCheckUpdates: boolean;
   showStatusText: boolean;
+  maxVisibleSaves: number;
 }
 
 interface AppSettingsContextValue extends AppSettings {
@@ -22,10 +23,19 @@ interface AppSettingsContextValue extends AppSettings {
   setPedalPromptThreshold: (v: number) => void;
   setAutoCheckUpdates: (v: boolean) => void;
   setShowStatusText: (v: boolean) => void;
+  setMaxVisibleSaves: (v: number) => void;
   showUpdatePrompt: boolean;
   resolveUpdatePrompt: (v: boolean) => void;
   updateAvailable: { tag: string; url: string; currentVersion: string } | null;
   dismissUpdateAvailable: () => void;
+}
+
+export const MIN_VISIBLE_SAVES = 1;
+export const MAX_VISIBLE_SAVES = 100;
+const DEFAULT_MAX_VISIBLE_SAVES = 20;
+
+function clampVisibleSaves(v: number): number {
+  return Math.min(MAX_VISIBLE_SAVES, Math.max(MIN_VISIBLE_SAVES, Math.round(v)));
 }
 
 const DEFAULTS: AppSettings = {
@@ -37,6 +47,7 @@ const DEFAULTS: AppSettings = {
   pedalPromptThreshold: 8,
   autoCheckUpdates: false,
   showStatusText: false,
+  maxVisibleSaves: DEFAULT_MAX_VISIBLE_SAVES,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -50,6 +61,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
   const [showStatusText, setShowStatusTextState] = useState(DEFAULTS.showStatusText);
+  const [maxVisibleSaves, setMaxVisibleSavesState] = useState(DEFAULTS.maxVisibleSaves);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string; currentVersion: string } | null>(
     null,
@@ -79,6 +91,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           setPedalPromptThresholdState(cfg.pedal_prompt_threshold);
         }
         if (typeof cfg.show_status_text === "boolean") setShowStatusTextState(cfg.show_status_text);
+        if (typeof cfg.max_visible_saves === "number") setMaxVisibleSavesState(clampVisibleSaves(cfg.max_visible_saves));
         if (typeof cfg.auto_check_updates === "boolean") {
           setAutoCheckUpdatesState(cfg.auto_check_updates);
         } else {
@@ -132,6 +145,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (isTauri()) void saveAppConfig({ show_status_text: v });
   }
 
+  function setMaxVisibleSaves(v: number) {
+    const clamped = clampVisibleSaves(v);
+    setMaxVisibleSavesState(clamped);
+    if (isTauri()) void saveAppConfig({ max_visible_saves: clamped });
+  }
+
   function resolveUpdatePrompt(v: boolean) {
     setShowUpdatePrompt(false);
     setAutoCheckUpdates(v);
@@ -151,6 +170,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       pedalPromptThreshold,
       autoCheckUpdates,
       showStatusText,
+      maxVisibleSaves,
       setAlwaysOnTop,
       setOpacity,
       setShowTimeline,
@@ -159,6 +179,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setPedalPromptThreshold,
       setAutoCheckUpdates,
       setShowStatusText,
+      setMaxVisibleSaves,
       showUpdatePrompt,
       resolveUpdatePrompt,
       updateAvailable,
@@ -173,6 +194,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       pedalPromptThreshold,
       autoCheckUpdates,
       showStatusText,
+      maxVisibleSaves,
       showUpdatePrompt,
       updateAvailable,
     ],

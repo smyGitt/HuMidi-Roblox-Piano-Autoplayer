@@ -1315,6 +1315,12 @@ button:disabled {
   padding: var(--space-1) var(--space-1) var(--space-1);
 }
 
+.load-save-dialog__group .btn--item {
+  width: calc(100% - var(--space-3));
+  min-width: 0;
+  margin-left: var(--space-3);
+}
+
 .load-save-dialog__empty,
 .load-save-dialog__placeholder {
   color: var(--text_muted);

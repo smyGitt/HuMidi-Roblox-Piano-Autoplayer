@@ -46,6 +46,7 @@ describe("AppSettingsContext (preview mode, isTauri() = false)", () => {
     expect(result.current.pedalPromptThreshold).toBe(8);
     expect(result.current.autoCheckUpdates).toBe(false);
     expect(result.current.showStatusText).toBe(false);
+    expect(result.current.maxVisibleSaves).toBe(20);
     expect(tauriMocks.loadAppConfig).not.toHaveBeenCalled();
   });
 
@@ -76,11 +77,13 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
         pedal_prompt_threshold: 42,
         auto_check_updates: false,
         show_status_text: true,
+        max_visible_saves: 7,
       }),
     );
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await waitFor(() => expect(result.current.pedalPromptThreshold).toBe(42));
     expect(result.current.showStatusText).toBe(true);
+    expect(result.current.maxVisibleSaves).toBe(7);
     expect(result.current.alwaysOnTop).toBe(true);
     expect(result.current.opacity).toBe(70);
     expect(result.current.showTimeline).toBe(false);
@@ -100,6 +103,27 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await act(async () => result.current.setPedalPromptThreshold(15));
     expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ pedal_prompt_threshold: 15 });
+  });
+
+  it("setMaxVisibleSaves persists under max_visible_saves and clamps to 1..100", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await act(async () => result.current.setMaxVisibleSaves(35));
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: 35 });
+    expect(result.current.maxVisibleSaves).toBe(35);
+
+    await act(async () => result.current.setMaxVisibleSaves(0));
+    expect(result.current.maxVisibleSaves).toBe(1);
+    expect(tauriMocks.saveAppConfig).toHaveBeenLastCalledWith({ max_visible_saves: 1 });
+
+    await act(async () => result.current.setMaxVisibleSaves(5000));
+    expect(result.current.maxVisibleSaves).toBe(100);
+    expect(tauriMocks.saveAppConfig).toHaveBeenLastCalledWith({ max_visible_saves: 100 });
+  });
+
+  it("a persisted max_visible_saves outside 1..100 is clamped on load", async () => {
+    tauriMocks.loadAppConfig.mockReturnValue(Promise.resolve({ max_visible_saves: 9999 }));
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(result.current.maxVisibleSaves).toBe(100));
   });
 
   it("setShowStatusText persists under show_status_text", async () => {

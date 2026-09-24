@@ -153,6 +153,23 @@ describe("SettingsTab > Files page", () => {
   });
 });
 
+describe("SettingsTab > Display page", () => {
+  it("Max visible saves shows the default 20 and persists a change under max_visible_saves", async () => {
+    renderSettings();
+    const row = screen.getByText("Max visible saves").closest(".control-row") as HTMLElement;
+    const spinbox = row.querySelector(".slider-spinbox__spinbox") as HTMLInputElement;
+    expect(spinbox.value).toBe("20");
+    fireEvent.change(spinbox, { target: { value: "35" } });
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: 35 }));
+  });
+
+  it("Max visible saves is inside a Saved Songs card", () => {
+    renderSettings();
+    const card = screen.getByText("Max visible saves").closest(".card") as HTMLElement;
+    expect(card.querySelector(".card__title")?.textContent).toBe("Saved Songs");
+  });
+});
+
 describe("SettingsTab > System page", () => {
   it("Reset All Settings restores DEFAULT_CONFIG but preserves the current pedal AI thresholds", async () => {
     renderSettings();

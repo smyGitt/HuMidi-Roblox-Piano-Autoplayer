@@ -6,7 +6,7 @@ import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { SliderSpinbox } from "../../components/SliderSpinbox";
 import { ThemeDialog } from "../../dialogs/ThemeDialog";
 import { useTheme } from "../../theme/ThemeProvider";
-import { useAppSettings } from "../../state/AppSettingsContext";
+import { MAX_VISIBLE_SAVES, MIN_VISIBLE_SAVES, useAppSettings } from "../../state/AppSettingsContext";
 import { usePlaybackConfig } from "../../state/PlaybackConfigContext";
 import { useLog } from "../../state/LogContext";
 import { DEFAULT_CONFIG } from "../playback/types";
@@ -68,6 +68,20 @@ function DisplayPage() {
             checked={settings.showPianoPedal}
             onChange={settings.setShowPianoPedal}
             label="Show Piano Pedal"
+          />
+        </div>
+      </Card>
+
+      <Card title="Saved Songs">
+        <div className="control-row">
+          <div className="control-row__label">
+            <Label>Max visible saves</Label>
+          </div>
+          <SliderSpinbox
+            min={MIN_VISIBLE_SAVES}
+            max={MAX_VISIBLE_SAVES}
+            value={settings.maxVisibleSaves}
+            onChange={settings.setMaxVisibleSaves}
           />
         </div>
       </Card>

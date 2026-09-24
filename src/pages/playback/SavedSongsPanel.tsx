@@ -1,4 +1,4 @@
-import { ArrowsClockwiseIcon, ListMagnifyingGlassIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, LayoutIcon } from "@phosphor-icons/react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Label } from "../../components/Label";
@@ -28,7 +28,7 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
             <ArrowsClockwiseIcon weight="duotone" />
           </Button>
           <Button variant="icon" subtle onClick={onOpenAll} title="All saves">
-            <ListMagnifyingGlassIcon weight="duotone" />
+            <LayoutIcon weight="duotone" />
           </Button>
         </>
       }
