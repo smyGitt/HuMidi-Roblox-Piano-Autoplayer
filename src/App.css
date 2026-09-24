@@ -512,7 +512,11 @@ button:disabled {
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: var(--space-3);
+  padding: var(--space-2);
+}
+
+.playback-tab__page--with-sidebar {
+  padding-right: calc(var(--space-5) + var(--border-width) + var(--space-2));
 }
 
 .playback-tab__file-page,
