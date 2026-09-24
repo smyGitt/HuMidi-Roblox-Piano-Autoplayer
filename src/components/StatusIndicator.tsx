@@ -137,9 +137,9 @@ export function StatusIndicator({ status, label }: StatusIndicatorProps) {
   return (
     <div className="status-indicator" data-status={status} title={label}>
       <span className="status-indicator__spinner" ref={spinnerRef}>
-        <CircleDashedIcon className="status-indicator__glyph" data-active={glyph === "dashed"} size={32} weight="duotone" />
-        <CircleIcon className="status-indicator__glyph" data-active={glyph === "circle"} size={32} weight="duotone" />
-        <CheckCircleIcon className="status-indicator__glyph" data-active={glyph === "check"} size={32} weight="duotone" />
+        <CircleDashedIcon className="status-indicator__glyph" data-active={glyph === "dashed"} size={40} weight="duotone" />
+        <CircleIcon className="status-indicator__glyph" data-active={glyph === "circle"} size={40} weight="duotone" />
+        <CheckCircleIcon className="status-indicator__glyph" data-active={glyph === "check"} size={40} weight="duotone" />
       </span>
       {label && <span className="status-indicator__label">{label}</span>}
     </div>

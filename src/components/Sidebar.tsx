@@ -54,7 +54,7 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
       onMouseLeave={handleLeave}
     >
       <div className="sidebar__logo">
-        <img src={logo} alt="" width={22} height={22} />
+        <img src={logo} alt="" width={24} height={24} />
         <span className="sidebar__wordmark">
           Hu<i>Midi</i>
         </span>
@@ -68,7 +68,7 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
             disabled={id === "visualizer" && visualizerDisabled}
             onClick={() => onNavigate(id)}
           >
-            <NavIcon size={20} weight="duotone" />
+            <NavIcon size={24} weight="duotone" />
             <span className="sidebar__nav-label">{label}</span>
           </button>
         ))}
@@ -79,7 +79,7 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
       <StatusIndicator status={status} label={statusLabel} />
 
       <a className="sidebar__link-btn" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
-        <DiscordLogoIcon size={20} weight="duotone" />
+        <DiscordLogoIcon size={24} weight="duotone" />
         <span className="sidebar__nav-label">Discord</span>
       </a>
       <a
@@ -89,7 +89,7 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
         rel="noreferrer"
         title="GitHub"
       >
-        <GithubLogoIcon size={20} weight="duotone" />
+        <GithubLogoIcon size={24} weight="duotone" />
         <span className="sidebar__nav-label">GitHub</span>
       </a>
     </aside>
