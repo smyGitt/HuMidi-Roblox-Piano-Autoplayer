@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { CheckCircleIcon, CircleDashedIcon, CircleIcon } from "@phosphor-icons/react";
+import { Label } from "./Label";
 
 export type PlaybackStatus = "unloaded" | "loading" | "loaded" | "ready";
 
@@ -160,7 +161,7 @@ export function StatusIndicator({ status, label, showLabel = true }: StatusIndic
         <CircleIcon className="status-indicator__glyph" data-active={glyph === "circle"} size={40} weight="duotone" />
         <CheckCircleIcon className="status-indicator__glyph" data-active={glyph === "check"} size={40} weight="duotone" />
       </span>
-      {label && showLabel && <span className="status-indicator__label">{label}</span>}
+      {label && showLabel && <Label className="status-indicator__label">{label}</Label>}
     </div>
   );
 }

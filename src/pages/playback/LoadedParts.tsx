@@ -1,6 +1,7 @@
 import { ListIcon, NotePencilIcon } from "@phosphor-icons/react";
 import { PartCard } from "./PartCard";
 import { Button } from "../../components/Button";
+import { Label } from "../../components/Label";
 
 export interface TrackPart {
   name: string;
@@ -22,7 +23,7 @@ export function LoadedParts({ parts, pedalCount, onEditSelection, editEnabled }:
       </div>
       <div className="side-panel__content">
         <div className="side-panel__head">
-          <span className="card__title">LOADED PARTS</span>
+          <Label className="card__title">LOADED PARTS</Label>
           <Button variant="icon" subtle disabled={!editEnabled} onClick={onEditSelection} title="Edit Selection">
             <NotePencilIcon weight="duotone" />
           </Button>
@@ -33,7 +34,7 @@ export function LoadedParts({ parts, pedalCount, onEditSelection, editEnabled }:
           </div>
           <div className="loaded-parts__cards">
             {parts.length === 0 ? (
-              <span className="loaded-parts__placeholder">No file loaded.</span>
+              <Label className="loaded-parts__placeholder">No file loaded.</Label>
             ) : (
               parts.map((p, i) => <PartCard key={i} title={p.name} meta={p.meta} />)
             )}

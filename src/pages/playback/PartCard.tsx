@@ -1,3 +1,4 @@
+import { Label } from "../../components/Label";
 interface PartCardProps {
   title: string;
   meta: string;
@@ -13,9 +14,9 @@ export function PartCard({ title, meta, onClick, clickable, timeStr }: PartCardP
       onClick={onClick}
       role={clickable ? "button" : undefined}
     >
-      <span className="part-card__title">{title}</span>
-      <span className="part-card__meta">{meta}</span>
-      {timeStr && <span className="part-card__meta part-card__time">{timeStr}</span>}
+      <Label className="part-card__title">{title}</Label>
+      <Label className="part-card__meta">{meta}</Label>
+      {timeStr && <Label className="part-card__meta part-card__time">{timeStr}</Label>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { SliderSpinbox } from "../../components/SliderSpinbox";
+import { Label } from "../../components/Label";
 
 interface HumRowProps {
   name: string;
@@ -31,7 +32,7 @@ export function HumRow({
       <div className="hum-row__top">
         <div className="hum-row__check">
           <ToggleSwitch checked={checked} onChange={onCheckedChange} label={name} />
-          {desc && <span className="hum-row__desc">{desc}</span>}
+          {desc && <Label className="hum-row__desc">{desc}</Label>}
         </div>
       </div>
       <SliderSpinbox

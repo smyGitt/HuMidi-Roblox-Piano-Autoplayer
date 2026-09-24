@@ -28,6 +28,7 @@ import {
 import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
 import { Select, TextInput } from "../../components/Field";
+import { Label } from "../../components/Label";
 
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
 type SettingsNav = (typeof NAV_ITEMS)[number];
@@ -45,7 +46,7 @@ function DisplayPage() {
         </div>
         <div className="control-row">
           <div className="control-row__label">
-            <span>Opacity</span>
+            <Label>Opacity</Label>
           </div>
           <SliderSpinbox min={20} max={100} value={settings.opacity} suffix="%" onChange={settings.setOpacity} />
         </div>
@@ -80,7 +81,7 @@ function DisplayPage() {
       >
         <div className="control-row">
           <div className="control-row__label">
-            <span>Theme</span>
+            <Label>Theme</Label>
           </div>
           <Select value={themeName} onChange={(e) => setThemeName(e.target.value)}>
             {themeNames.map((name) => (
@@ -220,7 +221,7 @@ function HotkeyPage() {
     <div className="settings-tab__display">
       <Card title="Playback Toggle">
         <div className="control-row">
-          <span className="control-row__label">{listeningPlayback ? "Listening..." : playbackLabel}</span>
+          <Label className="control-row__label">{listeningPlayback ? "Listening..." : playbackLabel}</Label>
           <Button
             disabled={!isTauri() || listeningPlayback}
             onClick={() => {
@@ -234,7 +235,7 @@ function HotkeyPage() {
       </Card>
       <Card title="Save Playback">
         <div className="control-row">
-          <span className="control-row__label">{listeningSave ? "Listening..." : saveLabel}</span>
+          <Label className="control-row__label">{listeningSave ? "Listening..." : saveLabel}</Label>
           <Button
             disabled={!isTauri() || listeningSave}
             onClick={() => {
@@ -294,7 +295,7 @@ function SystemPage() {
       <Card title="MIDI Import">
         <div className="control-row">
           <div className="control-row__label">
-            <span>Pedal Prompt Threshold</span>
+            <Label>Pedal Prompt Threshold</Label>
           </div>
           <SliderSpinbox
             min={1}

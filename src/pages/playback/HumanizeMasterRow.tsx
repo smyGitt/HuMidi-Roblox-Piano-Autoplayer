@@ -2,6 +2,7 @@ import { Card } from "../../components/Card";
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { Button } from "../../components/Button";
+import { Label } from "../../components/Label";
 
 interface HumanizeMasterRowProps {
   humanizeAll: boolean;
@@ -33,15 +34,15 @@ export function HumanizeMasterRow({
     >
       <div className="check-pair">
         <ToggleSwitch checked={humanizeAll} onChange={onHumanizeAllChange} label="Humanize all" />
-        <span className="check-pair__desc">enable or disable all humanization</span>
+        <Label className="check-pair__desc">enable or disable all humanization</Label>
       </div>
       <div className="check-pair">
         <ToggleSwitch checked={simulateHands} onChange={onSimulateHandsChange} label="Simulate Hands" />
-        <span className="check-pair__desc">separate timing per hand</span>
+        <Label className="check-pair__desc">separate timing per hand</Label>
       </div>
       <div className="check-pair">
         <ToggleSwitch checked={chordRoll} onChange={onChordRollChange} label="Chord Roll" />
-        <span className="check-pair__desc">slight arpeggiation of simultaneous notes</span>
+        <Label className="check-pair__desc">slight arpeggiation of simultaneous notes</Label>
       </div>
     </Card>
   );

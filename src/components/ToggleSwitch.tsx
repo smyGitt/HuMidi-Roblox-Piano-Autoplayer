@@ -1,4 +1,5 @@
 import { Button } from "./Button";
+import { Label } from "./Label";
 
 interface ToggleSwitchProps {
   checked: boolean;
@@ -20,7 +21,7 @@ export function ToggleSwitch({ checked, onChange, label, disabled }: ToggleSwitc
       <span className={`toggle-switch__track${checked ? " toggle-switch__track--on" : ""}`}>
         <span className={`toggle-switch__knob${checked ? " toggle-switch__knob--on" : ""}`} />
       </span>
-      {label && <span className="toggle-switch__label">{label}</span>}
+      {label && <Label className="toggle-switch__label">{label}</Label>}
     </Button>
   );
 }

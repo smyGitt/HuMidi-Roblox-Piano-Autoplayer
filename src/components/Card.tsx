@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Label } from "./Label";
 
 interface CardProps {
   title: string;
@@ -15,7 +16,7 @@ export function Card({ title, titleButtons, footer, children, className }: CardP
     >
       {title && (
         <div className="card__title-row">
-          <span className="card__title">{title}</span>
+          <Label className="card__title">{title}</Label>
           {titleButtons}
         </div>
       )}

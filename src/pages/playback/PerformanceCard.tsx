@@ -4,6 +4,7 @@ import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { PEDAL_MAPPING, type PlaybackConfig } from "./types";
 import { Button } from "../../components/Button";
 import { NumberInput, Select } from "../../components/Field";
+import { Label } from "../../components/Label";
 
 const PEDAL_LABELS = Object.keys(PEDAL_MAPPING);
 const PEDAL_MAPPING_INV: Record<string, string> = Object.fromEntries(
@@ -30,7 +31,7 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
     >
       <div className="control-row">
         <div className="control-row__label">
-          <span>Pedal Style</span>
+          <Label>Pedal Style</Label>
         </div>
         <Select
           value={PEDAL_MAPPING_INV[config.pedal_style] ?? "PedalAI"}
@@ -46,7 +47,7 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
 
       <div className="control-row">
         <div className="control-row__label">
-          <span>Transpose</span>
+          <Label>Transpose</Label>
         </div>
         <NumberInput
           min={-24}

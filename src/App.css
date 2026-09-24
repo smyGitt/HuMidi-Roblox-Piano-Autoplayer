@@ -212,6 +212,17 @@ button:disabled {
   border-radius: 0;
 }
 
+.label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.label__text {
+  display: inline-block;
+}
+
 .field {
   background: var(--bg_input);
   border: var(--border-width) solid var(--border);
@@ -666,9 +677,6 @@ button:disabled {
 
 .file-header__name {
   font-weight: var(--font-weight-bold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .file-header__meta {
@@ -845,6 +853,7 @@ button:disabled {
 
 .control-row__label {
   flex: 1;
+  min-width: 0;
   color: var(--text_primary);
 }
 

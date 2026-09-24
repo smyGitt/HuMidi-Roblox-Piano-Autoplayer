@@ -3,6 +3,7 @@ import { Button } from "./Button";
 import { usePlaybackEngine } from "../state/PlaybackEngineContext";
 import { isTauri } from "../lib/tauri";
 import { pickMidiFile } from "../lib/pickMidiFile";
+import { Label } from "./Label";
 
 export function FileHeader() {
   const engine = usePlaybackEngine();
@@ -22,8 +23,8 @@ export function FileHeader() {
         <MusicNoteIcon weight="duotone" />
       </div>
       <div className="file-header__info">
-        <span className="file-header__name">{engine.fileName || "No file loaded"}</span>
-        {meta && <span className="file-header__meta">{meta}</span>}
+        <Label className="file-header__name" slide>{engine.fileName || "No file loaded"}</Label>
+        {meta && <Label className="file-header__meta">{meta}</Label>}
       </div>
       <Button
         variant="icon"
