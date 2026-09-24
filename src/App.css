@@ -678,12 +678,12 @@ button:disabled {
 
 /* --- Part / save cards --- */
 
-.loaded-parts-card {
+.saved-songs-card {
   flex: 1;
   min-height: 0;
 }
 
-.loaded-parts-card .card__body {
+.saved-songs-card .card__body {
   flex: 1;
   min-height: 0;
   align-items: stretch;
@@ -695,11 +695,7 @@ button:disabled {
   flex: 1;
   min-height: 0;
   gap: var(--space-1);
-  width: 100%;
-}
-
-.loaded-parts > .btn {
-  align-self: flex-start;
+  padding: 0 var(--space-1) var(--space-1);
 }
 
 .loaded-parts__cards {
@@ -767,12 +763,7 @@ button:disabled {
 
 /* --- Saved songs --- */
 
-.saved-songs__title-btns {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.saved-songs-sidebar {
+.side-panel {
   position: absolute;
   top: 0;
   right: 0;
@@ -786,11 +777,11 @@ button:disabled {
   transition: width var(--duration) var(--easing);
 }
 
-.saved-songs-sidebar:hover {
+.side-panel:hover {
   width: var(--space-33);
 }
 
-.saved-songs-sidebar__handle {
+.side-panel__handle {
   flex: none;
   width: var(--space-5);
   display: flex;
@@ -799,15 +790,10 @@ button:disabled {
   color: var(--text_muted);
 }
 
-.saved-songs-sidebar__handle svg {
+.side-panel__handle svg {
   width: var(--space-2);
   height: var(--space-2);
   transform: rotate(var(--rotate-expandable));
-}
-
-.saved-songs__title-btns svg {
-  width: var(--space-2);
-  height: var(--space-2);
 }
 
 .save-card__time svg {
@@ -815,11 +801,11 @@ button:disabled {
   height: var(--space-1);
 }
 
-.saved-songs-sidebar:hover .saved-songs-sidebar__handle {
+.side-panel:hover .side-panel__handle {
   color: var(--text_primary);
 }
 
-.saved-songs-sidebar__content {
+.side-panel__content {
   flex: none;
   width: calc(var(--space-33) - var(--space-5) - var(--border-width));
   display: flex;
@@ -827,7 +813,7 @@ button:disabled {
   min-height: 0;
 }
 
-.saved-songs-sidebar__head {
+.side-panel__head {
   flex: none;
   height: var(--space-5);
   display: flex;
@@ -836,7 +822,7 @@ button:disabled {
   padding-right: var(--space-1);
 }
 
-.saved-songs-sidebar .card__title {
+.side-panel .card__title {
   white-space: nowrap;
 }
 
@@ -846,7 +832,6 @@ button:disabled {
   gap: var(--space-1);
   flex: 1;
   min-height: 0;
-  padding: 0 var(--space-1) var(--space-1);
   overflow-y: auto;
 }
 
