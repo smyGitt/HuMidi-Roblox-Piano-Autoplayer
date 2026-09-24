@@ -424,18 +424,35 @@ button:disabled {
 
 /* --- Playback tab layout --- */
 
+.app-page-area:has(> .playback-tab) {
+  padding: 0;
+  overflow: hidden;
+}
+
 .playback-tab {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   height: 100%;
   position: relative;
   overflow: hidden;
 }
 
+.playback-tab__header {
+  flex: none;
+  background: var(--bg_surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.playback-tab__header .sub-tab-bar {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding: 0 24px;
+}
+
 .playback-tab__page {
   flex: 1;
   overflow: auto;
+  padding: 24px;
 }
 
 .playback-tab__file-page,
@@ -456,16 +473,10 @@ button:disabled {
 /* --- File strip --- */
 
 .file-strip {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-  background: var(--bg_surface);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  padding: 10px 24px;
 }
 
 .file-strip__tile {

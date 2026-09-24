@@ -143,13 +143,15 @@ export function PlaybackTab() {
 
   return (
     <div className="playback-tab">
-      <FileStrip
-        name={engine.fileName}
-        meta={engine.fileName ? `${engine.parts.length} track(s)` : ""}
-        onReplace={() => document.querySelector<HTMLButtonElement>(".midi-drop-zone__btn")?.click()}
-        onReveal={() => void handleReveal()}
-      />
-      <SubTabBar active={subTab} onChange={setSubTab} />
+      <div className="playback-tab__header">
+        <FileStrip
+          name={engine.fileName}
+          meta={engine.fileName ? `${engine.parts.length} track(s)` : ""}
+          onReplace={() => document.querySelector<HTMLButtonElement>(".midi-drop-zone__btn")?.click()}
+          onReveal={() => void handleReveal()}
+        />
+        <SubTabBar active={subTab} onChange={setSubTab} />
+      </div>
 
       <div className="playback-tab__page">
         {subTab === 0 && (
