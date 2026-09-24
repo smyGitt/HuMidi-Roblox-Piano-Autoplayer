@@ -895,43 +895,44 @@ pub fn save_playback_logic(
         .unwrap_or_else(|| original_filename.to_string());
     let output_path = save_dir.join(format!("{stem}_{timestamp_str}.json"));
 
-    let serialized = serde_json::to_string_pretty(&save_data).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(save_dir).map_err(|e| e.to_string())?;
-    std::fs::write(&output_path, serialized).map_err(|e| e.to_string())?;
+    write_json_atomic(&output_path, &save_data).map_err(|e| e.to_string())?;
 
     Ok(output_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn save_playback(
-    state: State<AppState>,
-    app: tauri::AppHandle,
+pub async fn save_playback<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     config: PlaybackConfig,
     selected_tracks_info: Vec<(i32, String)>,
     original_filename: String,
 ) -> Result<String, String> {
-    let model = pedal_model_for(&state, &config, || pedal_resource_path(&app))?;
-    let tracks = state
-        .parsed_tracks
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No MIDI file has been parsed.")?;
-    let save_dir = state
-        .config_manager
-        .lock()
-        .map_err(|e| e.to_string())?
-        .save_dir
-        .clone();
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let model = pedal_model_for(&state, &config, || pedal_resource_path(&app))?;
+        let tracks = state
+            .parsed_tracks
+            .lock()
+            .map_err(|e| e.to_string())?
+            .clone()
+            .ok_or("No MIDI file has been parsed.")?;
+        let save_dir = state
+            .config_manager
+            .lock()
+            .map_err(|e| e.to_string())?
+            .save_dir
+            .clone();
 
-    save_playback_logic(
-        &config,
-        model.as_deref(),
-        &tracks,
-        &selected_tracks_info,
-        &save_dir,
-        &original_filename,
-    )
+        save_playback_logic(
+            &config,
+            model.as_deref(),
+            &tracks,
+            &selected_tracks_info,
+            &save_dir,
+            &original_filename,
+        )
+    })
+    .await
 }
 
 pub fn validate_save_data(data: &Value) -> Result<(), String> {

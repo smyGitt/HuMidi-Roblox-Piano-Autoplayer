@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 
 use humidi_tauri_lib::commands::{
     clear_loaded_song, compile_notes, compile_notes_from_sheet, compile_pedal,
-    compile_pedal_and_play, parse_midi_structure, resume_from_save, start_playback, PedalData, TimelineData,
+    compile_pedal_and_play, parse_midi_structure, resume_from_save, save_playback, start_playback, PedalData,
+    TimelineData,
 };
 use humidi_tauri_lib::core::config::PlaybackConfig;
 use humidi_tauri_lib::core::midi::KeyMapper;
@@ -365,6 +366,31 @@ fn clear_loaded_song_does_not_block_the_invoker_while_the_session_is_locked() {
     finish_while_holding(holder, Box::pin(clear_loaded_song(harness.handle()))).unwrap();
     assert!(harness.with_state(|s| s.playback_session.lock().unwrap().merged_events.is_none()));
     assert!(harness.with_state(|s| s.playback_session.lock().unwrap().final_notes.is_none()));
+}
+
+#[test]
+fn save_playback_does_not_block_the_invoker_while_its_state_is_locked() {
+    let harness = MockHarness::new();
+    let midi = write_temp_midi_single_note();
+    let config = temp_midi_config(&midi);
+    tauri::async_runtime::block_on(parse_midi_structure(
+        harness.handle(),
+        config.midi_file.clone(),
+    ))
+    .unwrap();
+    let holder = hold(&harness.handle(), |s| &s.parsed_tracks);
+
+    let result = finish_while_holding(
+        holder,
+        Box::pin(save_playback(
+            harness.handle(),
+            config,
+            vec![(0, "Right Hand".to_string())],
+            "song.mid".to_string(),
+        )),
+    );
+    let saved_path = result.unwrap();
+    assert!(Path::new(&saved_path).exists());
 }
 
 #[test]
