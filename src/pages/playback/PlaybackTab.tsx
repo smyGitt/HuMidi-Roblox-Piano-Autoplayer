@@ -66,6 +66,10 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
     if (loadDialogOpen) void refreshSaves();
   }, [loadDialogOpen, refreshSaves]);
 
+  useEffect(() => {
+    if (engine.saveCount > 0) void refreshSaves();
+  }, [engine.saveCount, refreshSaves]);
+
   async function handleRenameSave(filepath: string, newName: string) {
     try {
       await renameSave(filepath, newName);

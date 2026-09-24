@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { PlaybackConfigProvider, usePlaybackConfig } from "./PlaybackConfigContext";
 import { LogProvider, useLog } from "./LogContext";
-import { PlaybackEngineProvider, usePlaybackEngine } from "./PlaybackEngineContext";
+import { PlaybackEngineProvider, usePlaybackEngine, type SaveResult } from "./PlaybackEngineContext";
 
 const eventHandlers = vi.hoisted(() => new Map<string, (payload: unknown) => void>());
 
@@ -157,13 +157,13 @@ describe("PlaybackEngineContext (preview mode, isTauri() = false)", () => {
     expect(tauriMocks.seekPlayback).not.toHaveBeenCalled();
   });
 
-  it("save() logs unavailability and resolves to null instead of calling the backend", async () => {
+  it("save() logs unavailability and resolves to an error instead of calling the backend", async () => {
     const { result } = renderEngine();
-    let saveResult: string | null = "unset";
+    let saveResult: SaveResult | null = null;
     await act(async () => {
       saveResult = await result.current.engine.save();
     });
-    expect(saveResult).toBeNull();
+    expect(saveResult).toEqual({ error: "Save unavailable outside the desktop app" });
     expect(result.current.log.entries.some((e) => e.line.toLowerCase().includes("unavailable"))).toBe(true);
     expect(tauriMocks.savePlayback).not.toHaveBeenCalled();
   });
@@ -508,22 +508,152 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     tauriMocks.savePlayback.mockResolvedValue("/saves/song_20260101_000000.json");
     const { result } = renderEngine();
     await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
-    let path: string | null = null;
+    let saved: SaveResult | null = null;
     await act(async () => {
-      path = await result.current.engine.save();
+      saved = await result.current.engine.save("my name");
     });
-    expect(path).toBe("/saves/song_20260101_000000.json");
+    expect(saved).toEqual({ path: "/saves/song_20260101_000000.json" });
     expect(tauriMocks.savePlayback.mock.calls[0][3]).toBe("song.mid");
+    expect(tauriMocks.savePlayback.mock.calls[0][4]).toBe("my name");
+  });
+
+  it("save generates the pedal first when none is compiled and saves with the generated AI thresholds", async () => {
+    const calls: string[] = [];
+    tauriMocks.compilePedal.mockImplementation(async () => {
+      calls.push("compilePedal");
+      return { pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] };
+    });
+    tauriMocks.savePlayback.mockImplementation(async () => {
+      calls.push("savePlayback");
+      return "/saves/x.json";
+    });
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    expect(result.current.engine.hasCompiledPedal).toBe(false);
+    await act(async () => {
+      await result.current.engine.save("named");
+    });
+    expect(calls).toEqual(["compilePedal", "savePlayback"]);
+    expect(result.current.engine.hasCompiledPedal).toBe(true);
+    const savedConfig = tauriMocks.savePlayback.mock.calls[0][0];
+    expect(savedConfig.pedal_threshold_on).toBe(0.62);
+    expect(savedConfig.pedal_threshold_off).toBe(0.38);
+  });
+
+  it("save does not regenerate a pedal that is already compiled", async () => {
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: null });
+    tauriMocks.savePlayback.mockResolvedValue("/saves/x.json");
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    await act(async () => result.current.engine.generatePedal());
+    tauriMocks.compilePedal.mockClear();
+    await act(async () => {
+      await result.current.engine.save("named");
+    });
+    expect(tauriMocks.compilePedal).not.toHaveBeenCalled();
+    expect(tauriMocks.savePlayback).toHaveBeenCalledTimes(1);
+  });
+
+  it("isGeneratingPedal is true while save generates the pedal", async () => {
+    let finish: (data: unknown) => void = () => {};
+    tauriMocks.compilePedal.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    tauriMocks.savePlayback.mockResolvedValue("/saves/x.json");
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    let pending: Promise<SaveResult> = Promise.resolve({ error: "unset" });
+    act(() => {
+      pending = result.current.engine.save("named");
+    });
+    expect(result.current.engine.isGeneratingPedal).toBe(true);
+    await act(async () => {
+      finish({ pedal_intervals: [], ai_thresholds: null });
+      await pending;
+    });
+    expect(result.current.engine.isGeneratingPedal).toBe(false);
+  });
+
+  it("save is refused while a pedal generation is already running", async () => {
+    let finish: (data: unknown) => void = () => {};
+    tauriMocks.compilePedal.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    let generating: Promise<void> = Promise.resolve();
+    act(() => {
+      generating = result.current.engine.generatePedal();
+    });
+    let saved: SaveResult | null = null;
+    await act(async () => {
+      saved = await result.current.engine.save("named");
+    });
+    expect(saved).toEqual({ error: "Pedal is still generating." });
+    expect(tauriMocks.savePlayback).not.toHaveBeenCalled();
+    await act(async () => {
+      finish({ pedal_intervals: [], ai_thresholds: null });
+      await generating;
+    });
+  });
+
+  it("save without a name uses the file name plus a timestamp suffix as the default", async () => {
+    tauriMocks.savePlayback.mockResolvedValue("/saves/out.json");
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    await act(async () => {
+      await result.current.engine.save();
+    });
+    expect(tauriMocks.savePlayback.mock.calls[0][4]).toMatch(/^song_\d{8}_\d{6}$/);
+  });
+
+  it("saveCount goes up by one after each successful save and not after a failed one", async () => {
+    tauriMocks.savePlayback.mockResolvedValueOnce("/saves/a.json").mockRejectedValueOnce(new Error("boom"));
+    tauriMocks.savePlayback.mockResolvedValueOnce("/saves/b.json");
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    expect(result.current.engine.saveCount).toBe(0);
+    await act(async () => {
+      await result.current.engine.save("a");
+    });
+    expect(result.current.engine.saveCount).toBe(1);
+    await act(async () => {
+      await result.current.engine.save("fails");
+    });
+    expect(result.current.engine.saveCount).toBe(1);
+    await act(async () => {
+      await result.current.engine.save("b");
+    });
+    expect(result.current.engine.saveCount).toBe(2);
+  });
+
+  it("isSaving is true while the backend call is pending and a second save is refused", async () => {
+    let finish: (path: string) => void = () => {};
+    tauriMocks.savePlayback.mockReturnValue(new Promise<string>((resolve) => (finish = resolve)));
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    let first: Promise<SaveResult> = Promise.resolve({ error: "unset" });
+    act(() => {
+      first = result.current.engine.save("one");
+    });
+    expect(result.current.engine.isSaving).toBe(true);
+    let second: SaveResult | null = null;
+    await act(async () => {
+      second = await result.current.engine.save("two");
+    });
+    expect(second).toEqual({ error: "A save is already in progress." });
+    expect(tauriMocks.savePlayback).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish("/saves/one.json");
+      await first;
+    });
+    expect(result.current.engine.isSaving).toBe(false);
   });
 
   it("save logs a failure message and returns null when the backend call rejects", async () => {
     tauriMocks.savePlayback.mockRejectedValue(new Error("No save directory is configured."));
     const { result } = renderEngine();
-    let path: string | null = "unset";
+    let failed: SaveResult | null = null;
     await act(async () => {
-      path = await result.current.engine.save();
+      failed = await result.current.engine.save("x");
     });
-    expect(path).toBeNull();
+    expect(failed).toEqual({ error: "Error: No save directory is configured." });
     expect(result.current.log.entries.some((e) => e.level === "WARN" && e.line.includes("Failed to save"))).toBe(
       true,
     );

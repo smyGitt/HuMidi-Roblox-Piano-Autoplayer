@@ -378,6 +378,13 @@ fn save_playback_does_not_block_the_invoker_while_its_state_is_locked() {
         config.midi_file.clone(),
     ))
     .unwrap();
+    tauri::async_runtime::block_on(compile_notes(
+        harness.handle(),
+        config.clone(),
+        vec![(0, "Right Hand".to_string())],
+    ))
+    .unwrap();
+    tauri::async_runtime::block_on(compile_pedal(harness.handle(), config.clone())).unwrap();
     let holder = hold(&harness.handle(), |s| &s.parsed_tracks);
 
     let result = finish_while_holding(
@@ -387,10 +394,33 @@ fn save_playback_does_not_block_the_invoker_while_its_state_is_locked() {
             config,
             vec![(0, "Right Hand".to_string())],
             "song.mid".to_string(),
+            "my_save".to_string(),
         )),
     );
     let saved_path = result.unwrap();
+    assert!(saved_path.ends_with("my_save.json"));
     assert!(Path::new(&saved_path).exists());
+}
+
+#[test]
+fn save_playback_refuses_to_save_before_the_pedal_is_compiled() {
+    let harness = MockHarness::new();
+    let midi = write_temp_midi_single_note();
+    let config = temp_midi_config(&midi);
+    tauri::async_runtime::block_on(parse_midi_structure(
+        harness.handle(),
+        config.midi_file.clone(),
+    ))
+    .unwrap();
+
+    let result = tauri::async_runtime::block_on(save_playback(
+        harness.handle(),
+        config,
+        vec![(0, "Right Hand".to_string())],
+        "song.mid".to_string(),
+        "early".to_string(),
+    ));
+    assert_eq!(result.unwrap_err(), "Pedal must be compiled before saving.");
 }
 
 #[test]

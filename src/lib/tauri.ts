@@ -272,12 +272,18 @@ export async function savePlayback(
   midiFile: string,
   selectedTracksInfo: SelectedTrackInfo[],
   originalFilename: string,
+  saveName: string,
 ): Promise<string> {
   return invoke("save_playback", {
     config: toBackendConfig(config, midiFile),
     selectedTracksInfo,
     originalFilename,
+    saveName,
   });
+}
+
+export async function checkSaveName(name: string): Promise<string> {
+  return invoke("check_save_name", { name });
 }
 
 export async function loadSaveFile(filepath: string): Promise<unknown> {

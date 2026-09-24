@@ -4,13 +4,14 @@ import { Button } from "./Button";
 interface ModalProps {
   title: string;
   onClose: () => void;
+  hideClose?: boolean;
   footer?: ReactNode;
   width?: number;
   height?: number;
   children: ReactNode;
 }
 
-export function Modal({ title, onClose, footer, width = 600, height = 400, children }: ModalProps) {
+export function Modal({ title, onClose, hideClose, footer, width = 600, height = 400, children }: ModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -20,9 +21,11 @@ export function Modal({ title, onClose, footer, width = 600, height = 400, child
       >
         <div className="modal__title-row">
           <span className="modal__title">{title}</span>
-          <Button variant="icon" subtle onClick={onClose}>
-            ×
-          </Button>
+          {!hideClose && (
+            <Button variant="icon" subtle onClick={onClose}>
+              ×
+            </Button>
+          )}
         </div>
         <div className="modal__body">{children}</div>
         {footer && <div className="modal__footer">{footer}</div>}

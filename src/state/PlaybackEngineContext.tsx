@@ -20,11 +20,13 @@ import {
   getMidiDir,
   type TrackSummary,
   type SelectedTrackInfo,
+  type PedalData,
   type BackendNote,
   type TempoEvent,
   type TimeSignatureEvent,
   type MeasureBoundary,
 } from "../lib/tauri";
+import { defaultSaveName } from "../lib/saveName";
 import type { HandRole } from "../dialogs/TrackSelectionDialog";
 import type { TrackPart } from "../pages/playback/LoadedParts";
 import type { PedalAiStats } from "../pages/playback/PedalAiCard";
@@ -62,11 +64,15 @@ interface PlaybackEngineValue {
   togglePause: () => Promise<void>;
   stop: () => Promise<void>;
   seek: (time: number) => Promise<void>;
-  save: () => Promise<string | null>;
+  isSaving: boolean;
+  saveCount: number;
+  save: (name?: string) => Promise<SaveResult>;
   resumeSave: (filepath: string, label: string) => Promise<void>;
   playTranslatedSheet: (sheetText: string, bpm: number) => Promise<void>;
   clearSong: () => Promise<void>;
 }
+
+export type SaveResult = { path: string } | { error: string };
 
 const PlaybackEngineContext = createContext<PlaybackEngineValue | null>(null);
 
@@ -106,6 +112,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [hasCompiledNotes, setHasCompiledNotes] = useState(false);
   const [hasCompiledPedal, setHasCompiledPedal] = useState(false);
   const [isGeneratingPedal, setIsGeneratingPedal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveCount, setSaveCount] = useState(0);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
   const [defaultAiThresholds, setDefaultAiThresholds] = useState<[number, number] | null>(null);
@@ -123,6 +131,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const isGeneratingPedalRef = useRef(false);
+  const isSavingRef = useRef(false);
   const songVersionRef = useRef(0);
   const playRef = useRef(play);
   playRef.current = play;
@@ -279,15 +288,19 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }
 
   async function generatePedal() {
+    await compilePedalNow();
+  }
+
+  async function compilePedalNow(): Promise<PedalData | null> {
     if (!isTauri()) {
       setPedalIntervals([[0, 1.8], [3, 4.8], [6, 7.8]]);
       setAiThresholds([0.5, 0.5]);
       captureDefaultThresholds([0.5, 0.5]);
       setHasCompiledPedal(true);
       appendLog("Pedal compiled successful (preview mode)");
-      return;
+      return null;
     }
-    if (isGeneratingPedalRef.current) return;
+    if (isGeneratingPedalRef.current) return null;
     isGeneratingPedalRef.current = true;
     setIsGeneratingPedal(true);
     try {
@@ -301,8 +314,10 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       }
       updateSnapshot({ pedal: `${data.pedal_intervals.length} presses` });
       appendLog("Pedal compiled successful");
+      return data;
     } catch (e) {
       appendLog(`Failed to compile pedal: ${String(e)}`);
+      return null;
     } finally {
       isGeneratingPedalRef.current = false;
       setIsGeneratingPedal(false);
@@ -352,18 +367,43 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     await invokeSeekPlayback(time);
   }
 
-  async function save(): Promise<string | null> {
+  async function save(name?: string): Promise<SaveResult> {
     if (!isTauri()) {
       appendLog("Save unavailable outside the desktop app");
-      return null;
+      return { error: "Save unavailable outside the desktop app" };
     }
+    if (isSavingRef.current) return { error: "A save is already in progress." };
+    if (isGeneratingPedalRef.current) return { error: "Pedal is still generating." };
+    isSavingRef.current = true;
+    setIsSaving(true);
     try {
-      const path = await invokeSavePlayback(configRef.current, midiFilePath, selectedTracksInfo, fileName);
+      let saveConfig = configRef.current;
+      if (!hasCompiledPedal) {
+        const data = await compilePedalNow();
+        if (data?.ai_thresholds) {
+          saveConfig = {
+            ...saveConfig,
+            pedal_threshold_on: data.ai_thresholds[0],
+            pedal_threshold_off: data.ai_thresholds[1],
+          };
+        }
+      }
+      const path = await invokeSavePlayback(
+        saveConfig,
+        midiFilePath,
+        selectedTracksInfo,
+        fileName,
+        name ?? defaultSaveName(fileName),
+      );
       appendLog(`Saved to ${path}`);
-      return path;
+      setSaveCount((c) => c + 1);
+      return { path };
     } catch (e) {
       appendLog(`Failed to save: ${String(e)}`);
-      return null;
+      return { error: String(e) };
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
     }
   }
 
@@ -484,6 +524,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     hasCompiledNotes,
     hasCompiledPedal,
     isGeneratingPedal,
+    isSaving,
+    saveCount,
     pedalIntervals,
     aiThresholds,
     defaultAiThresholds,

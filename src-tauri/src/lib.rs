@@ -73,6 +73,7 @@ pub fn run() {
             commands::export_theme_file,
             commands::import_theme_file,
             commands::save_playback,
+            commands::check_save_name,
             commands::load_save_file,
             commands::list_saves,
             commands::resume_from_save,

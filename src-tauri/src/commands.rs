@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use crate::core::atomic_write::write_json_atomic;
-use crate::core::compiler::{compile_events, compile_note_events, compile_pedal_events, merge_compiled};
+use crate::core::compiler::{compile_note_events, compile_pedal_events, merge_compiled};
 use crate::core::config::PlaybackConfig;
 use crate::core::keyboard_driver::{EnigoDriver, KeyboardDriver};
 use crate::core::midi::{KeyMapper, MidiParser, TempoMap};
@@ -815,27 +815,44 @@ fn ser_save_event(ev: &KeyEvent) -> Value {
     })
 }
 
+fn save_output_path(save_dir: &Path, save_name: &str) -> Result<(String, std::path::PathBuf), String> {
+    let name = sanitize_save_name(save_name)?;
+    let output_path = save_dir.join(format!("{name}.json"));
+    if output_path.exists() {
+        return Err(format!("A save named \"{name}\" already exists."));
+    }
+    Ok((name, output_path))
+}
+
+#[tauri::command]
+pub fn check_save_name(state: State<AppState>, name: String) -> Result<String, String> {
+    let save_dir = state
+        .config_manager
+        .lock()
+        .map_err(|e| e.to_string())?
+        .save_dir
+        .clone();
+    save_output_path(&save_dir, &name).map(|(cleaned, _)| cleaned)
+}
+
 pub fn save_playback_logic(
     config: &PlaybackConfig,
-    model: Option<&PedalModel>,
+    session: &PlaybackSession,
     tracks: &[MidiTrack],
     selected_tracks_info: &[(i32, String)],
     save_dir: &Path,
     original_filename: &str,
+    save_name: &str,
 ) -> Result<String, String> {
-    let (final_notes, tempo_map, midi_pedal_events) =
-        prepare_notes(config, selected_tracks_info).map_err(|e| e.to_string())?;
-    let sections = SectionAnalyzer::new(final_notes.clone(), &tempo_map).analyze();
-    let midi_pedal_opt = if midi_pedal_events.is_empty() {
-        None
-    } else {
-        Some(midi_pedal_events.as_slice())
-    };
-    let (events, _ai_meta) = compile_events(model, config, &final_notes, &sections, midi_pedal_opt);
+    save_output_path(save_dir, save_name)?;
+    let events = session
+        .merged_events
+        .as_deref()
+        .ok_or("Pedal must be compiled before saving.")?;
 
     if events.is_empty() {
         return Err(
-            "Compilation produced zero events -- nothing to save. Verify that the selected \
+            "The compiled playback has zero events -- nothing to save. Verify that the selected \
              tracks contain notes within the keyboard's playable range."
                 .to_string(),
         );
@@ -864,7 +881,7 @@ pub fn save_playback_logic(
     let mut action_counts: HashMap<&str, i64> =
         [("press", 0i64), ("release", 0), ("pedal", 0)].into_iter().collect();
     let mut compiled_pedal_count = 0i64;
-    for ev in &events {
+    for ev in events {
         if let Some(c) = action_counts.get_mut(ev.action.as_str()) {
             *c += 1;
         }
@@ -888,12 +905,7 @@ pub fn save_playback_logic(
         "compiled_events": serialized_events,
     });
 
-    let timestamp_str = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-    let stem = Path::new(original_filename)
-        .file_stem()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| original_filename.to_string());
-    let output_path = save_dir.join(format!("{stem}_{timestamp_str}.json"));
+    let (_, output_path) = save_output_path(save_dir, save_name)?;
 
     write_json_atomic(&output_path, &save_data).map_err(|e| e.to_string())?;
 
@@ -906,10 +918,10 @@ pub async fn save_playback<R: tauri::Runtime>(
     config: PlaybackConfig,
     selected_tracks_info: Vec<(i32, String)>,
     original_filename: String,
+    save_name: String,
 ) -> Result<String, String> {
     run_blocking(move || {
         let state = app.state::<AppState>();
-        let model = pedal_model_for(&state, &config, || pedal_resource_path(&app))?;
         let tracks = state
             .parsed_tracks
             .lock()
@@ -923,13 +935,15 @@ pub async fn save_playback<R: tauri::Runtime>(
             .save_dir
             .clone();
 
+        let session = state.playback_session.lock().map_err(|e| e.to_string())?;
         save_playback_logic(
             &config,
-            model.as_deref(),
+            &session,
             &tracks,
             &selected_tracks_info,
             &save_dir,
             &original_filename,
+            &save_name,
         )
     })
     .await
@@ -2385,6 +2399,13 @@ mod tests {
     mod test_save_playback_logic {
         use super::*;
 
+        fn compiled_session(config: &PlaybackConfig, selected: &[(i32, String)]) -> PlaybackSession {
+            let mut session = PlaybackSession::default();
+            compile_notes_logic(config, selected, &mut session).unwrap();
+            compile_pedal_logic(config, None, &mut session).unwrap();
+            session
+        }
+
         #[test]
         fn test_writes_file_and_returns_path() {
             let path = write_temp_midi_single_note();
@@ -2393,18 +2414,103 @@ mod tests {
             let save_dir = tempfile::tempdir().unwrap();
             let tracks = vec![track_fixture()];
 
+            let session = compiled_session(&config, &[(0, "Right Hand".to_string())]);
             let result = save_playback_logic(
                 &config,
-                None,
+                &session,
                 &tracks,
                 &[(0, "Right Hand".to_string())],
                 save_dir.path(),
                 "song.mid",
+                "song_20260101_000000",
             )
             .unwrap();
 
             assert!(std::path::Path::new(&result).exists());
-            assert!(result.contains("song_"));
+            assert!(result.ends_with("song_20260101_000000.json"));
+        }
+
+        #[test]
+        fn test_uses_the_exact_name_with_no_timestamp_suffix() {
+            let path = write_temp_midi_single_note();
+            let mut config = PlaybackConfig::default();
+            config.midi_file = path.to_string_lossy().to_string();
+            let save_dir = tempfile::tempdir().unwrap();
+            let tracks = vec![track_fixture()];
+
+            let session = compiled_session(&config, &[(0, "Right Hand".to_string())]);
+            let result = save_playback_logic(
+                &config,
+                &session,
+                &tracks,
+                &[(0, "Right Hand".to_string())],
+                save_dir.path(),
+                "song.mid",
+                "  My Song  ",
+            )
+            .unwrap();
+
+            assert_eq!(
+                std::path::Path::new(&result).file_name().unwrap().to_string_lossy(),
+                "My Song.json"
+            );
+        }
+
+        #[test]
+        fn test_refuses_to_overwrite_an_existing_save() {
+            let path = write_temp_midi_single_note();
+            let mut config = PlaybackConfig::default();
+            config.midi_file = path.to_string_lossy().to_string();
+            let save_dir = tempfile::tempdir().unwrap();
+            std::fs::write(save_dir.path().join("taken.json"), "keep me").unwrap();
+            let tracks = vec![track_fixture()];
+
+            let session = compiled_session(&config, &[(0, "Right Hand".to_string())]);
+            let result = save_playback_logic(
+                &config,
+                &session,
+                &tracks,
+                &[(0, "Right Hand".to_string())],
+                save_dir.path(),
+                "song.mid",
+                "taken",
+            );
+
+            assert_eq!(result.unwrap_err(), "A save named \"taken\" already exists.");
+            assert_eq!(
+                std::fs::read_to_string(save_dir.path().join("taken.json")).unwrap(),
+                "keep me"
+            );
+        }
+
+        #[test]
+        fn test_save_output_path_returns_the_cleaned_name() {
+            let save_dir = tempfile::tempdir().unwrap();
+            let (name, path) = save_output_path(save_dir.path(), "  My Song.json ").unwrap();
+            assert_eq!(name, "My Song");
+            assert_eq!(path, save_dir.path().join("My Song.json"));
+        }
+
+        #[test]
+        fn test_rejects_invalid_names_before_compiling() {
+            let config = PlaybackConfig::default();
+            let save_dir = tempfile::tempdir().unwrap();
+
+            for bad in [
+                "", "   ", "a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "a\nb", "CON", "...",
+            ] {
+                let result = save_playback_logic(
+                    &config,
+                    &PlaybackSession::default(),
+                    &[],
+                    &[],
+                    save_dir.path(),
+                    "song.mid",
+                    bad,
+                );
+                assert!(result.is_err(), "{bad:?} should be rejected");
+                assert!(!result.unwrap_err().contains("compiled"), "{bad:?} reached the compile check");
+            }
         }
 
         #[test]
@@ -2415,13 +2521,15 @@ mod tests {
             let save_dir = tempfile::tempdir().unwrap();
             let tracks = vec![track_fixture()];
 
+            let session = compiled_session(&config, &[(0, "Right Hand".to_string())]);
             let result_path = save_playback_logic(
                 &config,
-                None,
+                &session,
                 &tracks,
                 &[(0, "Right Hand".to_string())],
                 save_dir.path(),
                 "song.mid",
+                "song_20260101_000000",
             )
             .unwrap();
 
@@ -2442,13 +2550,15 @@ mod tests {
             let save_dir = tempfile::tempdir().unwrap();
             let tracks = vec![track_fixture()];
 
+            let session = compiled_session(&config, &[(0, "Left Hand".to_string())]);
             let result_path = save_playback_logic(
                 &config,
-                None,
+                &session,
                 &tracks,
                 &[(0, "Left Hand".to_string())],
                 save_dir.path(),
                 "song.mid",
+                "song_20260101_000000",
             )
             .unwrap();
             let data: Value =
@@ -2461,16 +2571,81 @@ mod tests {
         }
 
         #[test]
-        fn test_empty_selection_errors_with_zero_events_message() {
+        fn test_empty_compiled_playback_errors_with_zero_events_message() {
+            let config = PlaybackConfig::default();
+            let save_dir = tempfile::tempdir().unwrap();
+            let mut session = PlaybackSession::default();
+            session.merged_events = Some(Vec::new());
+
+            let result = save_playback_logic(
+                &config,
+                &session,
+                &[],
+                &[],
+                save_dir.path(),
+                "song.mid",
+                "song_20260101_000000",
+            );
+            assert!(result.unwrap_err().contains("zero events"));
+        }
+
+        #[test]
+        fn test_errors_when_nothing_is_compiled_yet() {
+            let config = PlaybackConfig::default();
+            let save_dir = tempfile::tempdir().unwrap();
+
+            let result = save_playback_logic(
+                &config,
+                &PlaybackSession::default(),
+                &[],
+                &[],
+                save_dir.path(),
+                "song.mid",
+                "song_20260101_000000",
+            );
+            assert_eq!(result.unwrap_err(), "Pedal must be compiled before saving.");
+            assert!(std::fs::read_dir(save_dir.path()).unwrap().next().is_none());
+        }
+
+        #[test]
+        fn test_saves_exactly_the_compiled_session_events() {
             let path = write_temp_midi_single_note();
             let mut config = PlaybackConfig::default();
             config.midi_file = path.to_string_lossy().to_string();
+            config.pedal_style = "harmonic".to_string();
+            config.vary_timing = true;
+            config.timing_variance = 0.05;
             let save_dir = tempfile::tempdir().unwrap();
             let tracks = vec![track_fixture()];
+            let selected = [(0, "Right Hand".to_string())];
+            let session = compiled_session(&config, &selected);
 
-            let result = save_playback_logic(&config, None, &tracks, &[], save_dir.path(), "song.mid");
-            assert!(result.is_err());
-            assert!(result.unwrap_err().contains("zero events"));
+            let result = save_playback_logic(
+                &config,
+                &session,
+                &tracks,
+                &selected,
+                save_dir.path(),
+                "song.mid",
+                "exact",
+            )
+            .unwrap();
+
+            let data: Value = serde_json::from_str(&std::fs::read_to_string(result).unwrap()).unwrap();
+            let saved: Vec<(f64, String)> = data["compiled_events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| (e["time"].as_f64().unwrap(), e["action"].as_str().unwrap().to_string()))
+                .collect();
+            let compiled: Vec<(f64, String)> = session
+                .merged_events
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|e| (e.time, e.action.clone()))
+                .collect();
+            assert_eq!(saved, compiled);
         }
     }
 
