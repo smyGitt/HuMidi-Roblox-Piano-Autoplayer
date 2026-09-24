@@ -19,6 +19,8 @@ import {
   importThemeFile,
   type CustomThemeColors,
 } from "../lib/tauri";
+import { Button } from "../components/Button";
+import { ColorInput, Select, TextInput } from "../components/Field";
 
 interface ThemeDialogProps {
   onClose: () => void;
@@ -43,13 +45,10 @@ function ColorSwatch({
 
   return (
     <div className="theme-dialog__swatch">
-      <label className="theme-dialog__swatch-color">
-        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-        <span style={{ background: value }} />
-      </label>
+      <ColorInput value={value} onChange={onChange} />
       <div className="theme-dialog__swatch-info">
         <span className="theme-dialog__swatch-label">{label}</span>
-        <input
+        <TextInput
           className="theme-dialog__swatch-hex"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -216,19 +215,19 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
       height={620}
       footer={
         <>
-          <button className="modal__btn" onClick={handleCancel}>
+          <Button onClick={handleCancel}>
             Cancel
-          </button>
-          <button className="modal__btn modal__btn--accent" onClick={handleAccept}>
+          </Button>
+          <Button variant="accent" onClick={handleAccept}>
             OK
-          </button>
+          </Button>
         </>
       }
     >
       <div className="theme-dialog">
         <div className="theme-dialog__toolbar">
-          <select
-            className="control-row__select theme-dialog__select"
+          <Select
+            className="theme-dialog__select"
             value={current.name}
             onChange={(e) => selectByName(e.target.value)}
           >
@@ -237,32 +236,32 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
                 {t.name}
               </option>
             ))}
-          </select>
-          <button className="theme-dialog__icon-btn" title="New (duplicate current)" onClick={() => void handleNew()}>
-            <PlusSquareIcon size={18} weight="duotone" />
-          </button>
-          <button
-            className="theme-dialog__icon-btn"
+          </Select>
+          <Button variant="icon" subtle outlined title="New (duplicate current)" onClick={() => void handleNew()}>
+            <PlusSquareIcon weight="duotone" />
+          </Button>
+          <Button
+            variant="icon" subtle outlined
             title="Rename"
             disabled={isBuiltin}
             onClick={() => void handleRename()}
           >
-            <NotePencilIcon size={18} weight="duotone" />
-          </button>
-          <button
-            className="theme-dialog__icon-btn"
+            <NotePencilIcon weight="duotone" />
+          </Button>
+          <Button
+            variant="icon" subtle outlined
             title="Delete"
             disabled={isBuiltin}
             onClick={() => void handleDelete()}
           >
-            <TrashIcon size={18} weight="duotone" />
-          </button>
-          <button className="theme-dialog__icon-btn" title="Export" onClick={() => void handleExport()}>
-            <FileArrowDownIcon size={18} weight="duotone" />
-          </button>
-          <button className="theme-dialog__icon-btn" title="Import" onClick={() => void handleImport()}>
-            <FileArrowUpIcon size={18} weight="duotone" />
-          </button>
+            <TrashIcon weight="duotone" />
+          </Button>
+          <Button variant="icon" subtle outlined title="Export" onClick={() => void handleExport()}>
+            <FileArrowDownIcon weight="duotone" />
+          </Button>
+          <Button variant="icon" subtle outlined title="Import" onClick={() => void handleImport()}>
+            <FileArrowUpIcon weight="duotone" />
+          </Button>
         </div>
 
         <div className="theme-dialog__groups">
@@ -284,12 +283,12 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
         </div>
 
         <div className="theme-dialog__save-row">
-          <button className="modal__btn" disabled={!dirty || isBuiltin} onClick={() => void handleSave()}>
+          <Button disabled={!dirty || isBuiltin} onClick={() => void handleSave()}>
             Save
-          </button>
-          <button className="modal__btn" disabled={!dirty} onClick={handleRevert}>
+          </Button>
+          <Button disabled={!dirty} onClick={handleRevert}>
             Revert
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

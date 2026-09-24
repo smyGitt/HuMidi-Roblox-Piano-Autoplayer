@@ -1,4 +1,5 @@
 import { Modal } from "../components/Modal";
+import { Button } from "../components/Button";
 
 interface UpdateCheckPromptProps {
   onChoice: (v: boolean) => void;
@@ -13,12 +14,12 @@ export function UpdateCheckPrompt({ onChoice }: UpdateCheckPromptProps) {
       height={220}
       footer={
         <>
-          <button className="modal__btn" onClick={() => onChoice(false)}>
+          <Button onClick={() => onChoice(false)}>
             Nah
-          </button>
-          <button className="modal__btn modal__btn--accent" onClick={() => onChoice(true)}>
+          </Button>
+          <Button variant="accent" onClick={() => onChoice(true)}>
             Sure
-          </button>
+          </Button>
         </>
       }
     >

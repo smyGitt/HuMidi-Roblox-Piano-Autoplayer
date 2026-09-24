@@ -1,4 +1,5 @@
 import { ArrowsClockwiseIcon, ClockIcon, ListIcon, ListMagnifyingGlassIcon } from "@phosphor-icons/react";
+import { Button } from "../../components/Button";
 
 export interface SavedSong {
   filepath: string;
@@ -24,12 +25,12 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
         <div className="saved-songs-sidebar__head">
           <span className="card__title">SAVED SONGS</span>
           <div className="saved-songs__title-btns">
-            <button className="icon-btn" onClick={onRefresh} title="Refresh">
+            <Button variant="icon" subtle onClick={onRefresh} title="Refresh">
               <ArrowsClockwiseIcon weight="duotone" />
-            </button>
-            <button className="icon-btn" onClick={onOpenAll} title="All saves">
+            </Button>
+            <Button variant="icon" subtle onClick={onOpenAll} title="All saves">
               <ListMagnifyingGlassIcon weight="duotone" />
-            </button>
+            </Button>
           </div>
         </div>
         <div className="saved-songs__list">

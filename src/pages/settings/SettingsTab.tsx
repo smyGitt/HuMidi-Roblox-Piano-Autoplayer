@@ -25,6 +25,8 @@ import {
   checkForUpdatesNow,
   type UpdateCheckOutcome,
 } from "../../lib/tauri";
+import { Button } from "../../components/Button";
+import { Select, TextInput } from "../../components/Field";
 
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
 type SettingsNav = (typeof NAV_ITEMS)[number];
@@ -67,22 +69,22 @@ function DisplayPage() {
       <Card
         title="Appearance"
         footer={
-          <button className="settings-tab__customize-btn" onClick={() => setThemeDialogOpen(true)}>
+          <Button onClick={() => setThemeDialogOpen(true)}>
             Customize...
-          </button>
+          </Button>
         }
       >
         <div className="control-row">
           <div className="control-row__label">
             <span>Theme</span>
           </div>
-          <select className="control-row__select" value={themeName} onChange={(e) => setThemeName(e.target.value)}>
+          <Select value={themeName} onChange={(e) => setThemeName(e.target.value)}>
             {themeNames.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </Card>
 
@@ -105,18 +107,17 @@ function DirectoryRow({
   return (
     <Card title={title}>
       <div className="control-row">
-        <input className="control-row__select settings-tab__path-input" readOnly value={path || "Not set"} />
-        <button
-          className="modal__btn"
+        <TextInput className="settings-tab__path-input" readOnly value={path || "Not set"} />
+        <Button
           onClick={() => void openPath(path)}
           disabled={!isTauri() || !path}
           title="Open in file explorer"
         >
           Open
-        </button>
-        <button className="modal__btn" onClick={onBrowse} disabled={!isTauri()}>
+        </Button>
+        <Button onClick={onBrowse} disabled={!isTauri()}>
           Browse...
-        </button>
+        </Button>
       </div>
       <span className="page-placeholder__hint">{hint}</span>
     </Card>
@@ -216,8 +217,7 @@ function HotkeyPage() {
       <Card title="Playback Toggle">
         <div className="control-row">
           <span className="control-row__label">{listeningPlayback ? "Listening..." : playbackLabel}</span>
-          <button
-            className="modal__btn"
+          <Button
             disabled={!isTauri() || listeningPlayback}
             onClick={() => {
               setListeningPlayback(true);
@@ -225,14 +225,13 @@ function HotkeyPage() {
             }}
           >
             Change
-          </button>
+          </Button>
         </div>
       </Card>
       <Card title="Save Playback">
         <div className="control-row">
           <span className="control-row__label">{listeningSave ? "Listening..." : saveLabel}</span>
-          <button
-            className="modal__btn"
+          <Button
             disabled={!isTauri() || listeningSave}
             onClick={() => {
               setListeningSave(true);
@@ -240,7 +239,7 @@ function HotkeyPage() {
             }}
           >
             Change
-          </button>
+          </Button>
         </div>
       </Card>
     </div>
@@ -276,13 +275,13 @@ function SystemPage() {
           />
         </div>
         <div className="control-row">
-          <button className="modal__btn" disabled={checking} onClick={() => void handleCheckNow()}>
+          <Button disabled={checking} onClick={() => void handleCheckNow()}>
             {checking ? "Checking..." : "Check Now"}
-          </button>
+          </Button>
           {checkResult?.status === "update_available" && (
-            <button className="modal__btn modal__btn--accent" onClick={() => void openUrl(checkResult.url)}>
+            <Button variant="accent" onClick={() => void openUrl(checkResult.url)}>
               Update available ({checkResult.tag}): Open
-            </button>
+            </Button>
           )}
           {checkResult?.status === "no_update" && <span>Up to date.</span>}
           {checkResult?.status === "indeterminate" && <span>Couldn't check for updates.</span>}
@@ -306,8 +305,7 @@ function SystemPage() {
         </span>
       </Card>
       <Card title="Reset">
-        <button
-          className="modal__btn"
+        <Button
           onClick={() =>
             setConfig((c) => ({
               ...DEFAULT_CONFIG,
@@ -317,7 +315,7 @@ function SystemPage() {
           }
         >
           Reset All Settings
-        </button>
+        </Button>
         <span className="page-placeholder__hint">
           Restore all playback and humanization settings to their defaults. Pedal AI thresholds have their own
           Reset button on the Playback tab and are not affected here.
@@ -350,13 +348,13 @@ export function SettingsTab() {
 
       <div className="sub-tab-bar">
         {NAV_ITEMS.map((item) => (
-          <button
+          <Button
             key={item}
-            className={`sub-tab-bar__btn${nav === item ? " sub-tab-bar__btn--active" : ""}`}
+            variant="tab" active={nav === item}
             onClick={() => setNav(item)}
           >
             {item}
-          </button>
+          </Button>
         ))}
       </div>
 

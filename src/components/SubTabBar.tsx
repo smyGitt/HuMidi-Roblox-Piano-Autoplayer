@@ -1,3 +1,5 @@
+import { Button } from "./Button";
+
 const LABELS = ["File", "Playback", "Humanize"];
 
 interface SubTabBarProps {
@@ -9,13 +11,13 @@ export function SubTabBar({ active, onChange }: SubTabBarProps) {
   return (
     <div className="sub-tab-bar">
       {LABELS.map((label, i) => (
-        <button
+        <Button
           key={label}
-          className={`sub-tab-bar__btn${active === i ? " sub-tab-bar__btn--active" : ""}`}
+          variant="tab" active={active === i}
           onClick={() => onChange(i)}
         >
           {label}
-        </button>
+        </Button>
       ))}
     </div>
   );

@@ -1,5 +1,6 @@
 import { Card } from "../../components/Card";
 import { PartCard } from "./PartCard";
+import { Button } from "../../components/Button";
 
 export interface TrackPart {
   name: string;
@@ -27,9 +28,9 @@ export function LoadedRow({ parts, pedalCount, onEditSelection, editEnabled }: L
         <div className="loaded-row__pedal">
           <PartCard title="Pedal" meta={`${pedalCount} events`} />
         </div>
-        <button className="loaded-row__edit-btn" disabled={!editEnabled} onClick={onEditSelection}>
+        <Button disabled={!editEnabled} onClick={onEditSelection}>
           Edit Selection
-        </button>
+        </Button>
       </div>
     </Card>
   );

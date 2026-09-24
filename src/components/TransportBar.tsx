@@ -1,4 +1,6 @@
 import { FloppyDiskIcon, PauseIcon, PlayIcon, ResizeIcon, StopIcon } from "@phosphor-icons/react";
+import { Button } from "./Button";
+import { RangeInput } from "./Field";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -40,9 +42,8 @@ export function TransportBar({
       {!isCollapsed && (
         <div className="transport-bar__scrubber-row">
           <span className="transport-bar__time">{formatTime(currentTime)}</span>
-          <input
+          <RangeInput
             className="transport-bar__scrubber"
-            type="range"
             min={0}
             max={10000}
             value={totalTime > 0 ? (currentTime / totalTime) * 10000 : 0}
@@ -54,17 +55,17 @@ export function TransportBar({
       )}
 
       <div className="transport-bar__btn-row">
-        <button
-          className="transport-bar__btn"
+        <Button
+          variant="icon" size="md"
           onClick={onPlayPause}
           disabled={!playEnabled}
           title={isPlaying ? "Pause" : "Play"}
         >
-          {isPlaying ? <PauseIcon size={20} weight="duotone" /> : <PlayIcon size={20} weight="duotone" />}
-        </button>
-        <button className="transport-bar__btn" onClick={onStop} title="Stop">
-          <StopIcon size={20} weight="duotone" />
-        </button>
+          {isPlaying ? <PauseIcon weight="duotone" /> : <PlayIcon weight="duotone" />}
+        </Button>
+        <Button variant="icon" size="md" onClick={onStop} title="Stop">
+          <StopIcon weight="duotone" />
+        </Button>
 
         {isCollapsed && (
           <span className="transport-bar__time transport-bar__time--collapsed">
@@ -74,21 +75,21 @@ export function TransportBar({
 
         <div className="transport-bar__stretch" />
 
-        <button
-          className="transport-bar__btn"
+        <Button
+          variant="icon" size="md"
           onClick={onSave}
           disabled={!saveEnabled}
           title="Save playback"
         >
-          <FloppyDiskIcon size={20} weight="duotone" />
-        </button>
-        <button
-          className="transport-bar__btn"
+          <FloppyDiskIcon weight="duotone" />
+        </Button>
+        <Button
+          variant="icon" size="md"
           onClick={onToggleCollapsed}
           title={isCollapsed ? "Expand" : "Collapse"}
         >
-          <ResizeIcon size={20} weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
-        </button>
+          <ResizeIcon weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
+        </Button>
       </div>
     </div>
   );

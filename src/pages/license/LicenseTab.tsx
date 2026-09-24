@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../../components/Button";
 
 const MIT_LICENSE = (year: string, holder: string) => `MIT License
 
@@ -113,13 +114,13 @@ export function LicenseTab() {
     <div className="license-tab">
       <div className="license-tab__nav">
         {NAV_ITEMS.map((item) => (
-          <button
+          <Button
             key={item}
-            className={`license-tab__nav-btn${active === item ? " license-tab__nav-btn--active" : ""}`}
+            variant="item" subtle active={active === item}
             onClick={() => setActive(item)}
           >
             {item}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="license-tab__divider" />

@@ -2,6 +2,7 @@ import { Card } from "../../components/Card";
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import type { PlaybackConfig } from "./types";
+import { Button } from "../../components/Button";
 
 interface OptionsCardProps {
   config: PlaybackConfig;
@@ -14,9 +15,9 @@ export function OptionsCard({ config, onChange, onReset }: OptionsCardProps) {
     <Card
       title="OPTIONS"
       titleButtons={
-        <button className="icon-btn icon-btn--danger" onClick={onReset} title="Reset">
-          <ArrowCounterClockwiseIcon size={16} weight="duotone" />
-        </button>
+        <Button variant="icon" subtle danger onClick={onReset} title="Reset">
+          <ArrowCounterClockwiseIcon weight="duotone" />
+        </Button>
       }
       className="options-card"
     >

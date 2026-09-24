@@ -1,6 +1,7 @@
 import { Card } from "../../components/Card";
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
+import { Button } from "../../components/Button";
 
 interface HumanizeMasterRowProps {
   humanizeAll: boolean;
@@ -25,9 +26,9 @@ export function HumanizeMasterRow({
     <Card
       title="GENERAL SETTINGS"
       titleButtons={
-        <button className="icon-btn icon-btn--danger" onClick={onReset} title="Reset">
-          <ArrowCounterClockwiseIcon size={16} weight="duotone" />
-        </button>
+        <Button variant="icon" subtle danger onClick={onReset} title="Reset">
+          <ArrowCounterClockwiseIcon weight="duotone" />
+        </Button>
       }
     >
       <div className="check-pair">

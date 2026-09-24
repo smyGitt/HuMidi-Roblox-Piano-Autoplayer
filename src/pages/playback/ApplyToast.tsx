@@ -1,3 +1,5 @@
+import { Button } from "../../components/Button";
+
 interface ApplyToastProps {
   visible: boolean;
   onApply: () => void;
@@ -9,12 +11,12 @@ export function ApplyToast({ visible, onApply, onDiscard, shake }: ApplyToastPro
   return (
     <div className={`apply-toast${visible ? " apply-toast--visible" : ""}${shake ? " apply-toast--shake" : ""}`}>
       <span className="apply-toast__msg">Your changes aren't reflected in the compiled playback yet.</span>
-      <button className="apply-toast__btn apply-toast__btn--accent" onClick={onApply}>
+      <Button variant="accent" onClick={onApply}>
         Apply
-      </button>
-      <button className="apply-toast__btn" onClick={onDiscard}>
+      </Button>
+      <Button onClick={onDiscard}>
         Discard
-      </button>
+      </Button>
     </div>
   );
 }

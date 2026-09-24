@@ -1,5 +1,6 @@
 import { Card } from "../../components/Card";
 import { SliderSpinbox } from "../../components/SliderSpinbox";
+import { NumberInput } from "../../components/Field";
 
 interface TempoCardProps {
   tempo: number;
@@ -16,9 +17,7 @@ export function TempoCard({ tempo, originalBpm, onTempoChange }: TempoCardProps)
       <div className="tempo-card__bpm-row">
         <label>
           Resulting BPM
-          <input
-            className="control-row__number"
-            type="number"
+          <NumberInput
             disabled={originalBpm <= 0}
             value={Number(resultBpm.toFixed(1))}
             onChange={(e) => {

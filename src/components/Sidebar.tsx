@@ -13,6 +13,7 @@ import {
 import { StatusIndicator, type PlaybackStatus } from "./StatusIndicator";
 import logo from "../assets/humidi_logo.ico";
 import type { PageId } from "../pages/pageIds";
+import { Button, Link } from "./Button";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: PhosphorIcon }[] = [
   { id: "playback", label: "Playback", icon: MusicNoteIcon },
@@ -62,15 +63,15 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
 
       <nav className="sidebar__nav">
         {NAV_ITEMS.map(({ id, label, icon: NavIcon }) => (
-          <button
+          <Button
             key={id}
-            className={`sidebar__nav-btn${activePage === id ? " sidebar__nav-btn--active" : ""}`}
+            variant="nav" active={activePage === id}
             disabled={id === "visualizer" && visualizerDisabled}
             onClick={() => onNavigate(id)}
           >
-            <NavIcon size={24} weight="duotone" />
+            <NavIcon weight="duotone" />
             <span className="sidebar__nav-label">{label}</span>
-          </button>
+          </Button>
         ))}
       </nav>
 
@@ -78,20 +79,20 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
 
       <StatusIndicator status={status} label={statusLabel} />
 
-      <a className="sidebar__link-btn" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
-        <DiscordLogoIcon size={24} weight="duotone" />
+      <Link variant="nav" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
+        <DiscordLogoIcon weight="duotone" />
         <span className="sidebar__nav-label">Discord</span>
-      </a>
-      <a
-        className="sidebar__link-btn"
+      </Link>
+      <Link
+        variant="nav"
         href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/tree/main"
         target="_blank"
         rel="noreferrer"
         title="GitHub"
       >
-        <GithubLogoIcon size={24} weight="duotone" />
+        <GithubLogoIcon weight="duotone" />
         <span className="sidebar__nav-label">GitHub</span>
-      </a>
+      </Link>
     </aside>
   );
 }

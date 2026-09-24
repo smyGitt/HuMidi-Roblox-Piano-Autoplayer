@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Modal } from "../components/Modal";
+import { Button } from "../components/Button";
+import { Checkbox, Select } from "../components/Field";
 
 export type HandRole = "Auto-Detect" | "Left Hand" | "Right Hand";
 
@@ -41,11 +43,11 @@ export function TrackSelectionDialog({ tracks, onCancel, onConfirm }: TrackSelec
       height={400}
       footer={
         <>
-          <button className="modal__btn" onClick={onCancel}>
+          <Button onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className="modal__btn modal__btn--accent"
+          </Button>
+          <Button
+            variant="accent"
             onClick={() =>
               onConfirm(
                 tracks
@@ -55,7 +57,7 @@ export function TrackSelectionDialog({ tracks, onCancel, onConfirm }: TrackSelec
             }
           >
             OK
-          </button>
+          </Button>
         </>
       }
     >
@@ -76,8 +78,7 @@ export function TrackSelectionDialog({ tracks, onCancel, onConfirm }: TrackSelec
           {tracks.map((t) => (
             <tr key={t.index}>
               <td>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={rows[t.index].included}
                   onChange={(e) => updateRow(t.index, { included: e.target.checked })}
                 />
@@ -86,14 +87,14 @@ export function TrackSelectionDialog({ tracks, onCancel, onConfirm }: TrackSelec
               <td>{t.instrument}</td>
               <td>{t.noteCount}</td>
               <td>
-                <select
+                <Select
                   value={rows[t.index].role}
                   onChange={(e) => updateRow(t.index, { role: e.target.value as HandRole })}
                 >
                   <option>Auto-Detect</option>
                   <option>Left Hand</option>
                   <option>Right Hand</option>
-                </select>
+                </Select>
               </td>
             </tr>
           ))}

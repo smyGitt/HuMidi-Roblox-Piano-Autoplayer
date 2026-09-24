@@ -1,3 +1,5 @@
+import { NumberInput, RangeInput } from "./Field";
+
 interface SliderSpinboxProps {
   min: number;
   max: number;
@@ -22,9 +24,8 @@ export function SliderSpinbox({
   const resolvedStep = step ?? (decimals > 0 ? 1 / 10 ** decimals : 1);
   return (
     <div className="slider-spinbox">
-      <input
+      <RangeInput
         className="slider-spinbox__slider"
-        type="range"
         min={min}
         max={max}
         step={resolvedStep}
@@ -32,9 +33,8 @@ export function SliderSpinbox({
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <input
+      <NumberInput
         className="slider-spinbox__spinbox"
-        type="number"
         min={min}
         max={max}
         step={resolvedStep}

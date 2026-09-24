@@ -1,3 +1,5 @@
+import { Button } from "./Button";
+
 interface ToggleSwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -7,8 +9,8 @@ interface ToggleSwitchProps {
 
 export function ToggleSwitch({ checked, onChange, label, disabled }: ToggleSwitchProps) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="bare"
       className={`toggle-switch${disabled ? " toggle-switch--disabled" : ""}`}
       role="switch"
       aria-checked={checked}
@@ -19,6 +21,6 @@ export function ToggleSwitch({ checked, onChange, label, disabled }: ToggleSwitc
         <span className={`toggle-switch__knob${checked ? " toggle-switch__knob--on" : ""}`} />
       </span>
       {label && <span className="toggle-switch__label">{label}</span>}
-    </button>
+    </Button>
   );
 }

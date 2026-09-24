@@ -1,4 +1,5 @@
 import { FolderSimpleIcon, MusicNoteIcon, XSquareIcon } from "@phosphor-icons/react";
+import { Button } from "../../components/Button";
 
 interface FileStripProps {
   name: string;
@@ -17,12 +18,12 @@ export function FileStrip({ name, meta, onReplace, onClear }: FileStripProps) {
         <span className="file-strip__name">{name || "No file loaded"}</span>
         {meta && <span className="file-strip__meta">{meta}</span>}
       </div>
-      <button className="file-strip__btn" onClick={onReplace} aria-label="Replace">
+      <Button variant="icon" size="lg" outlined onClick={onReplace} aria-label="Replace">
         <FolderSimpleIcon weight="duotone" />
-      </button>
-      <button className="file-strip__btn" onClick={onClear} aria-label="Clear">
+      </Button>
+      <Button variant="icon" size="lg" outlined onClick={onClear} aria-label="Clear">
         <XSquareIcon weight="duotone" />
-      </button>
+      </Button>
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { usePlaybackConfig } from "../../state/PlaybackConfigContext";
 import { usePlaybackEngine } from "../../state/PlaybackEngineContext";
 import { useLog } from "../../state/LogContext";
 import { isTauri, translateSheetToNotes, notesToSheet } from "../../lib/tauri";
+import { Button } from "../../components/Button";
+import { NumberInput, Select, TextArea } from "../../components/Field";
 
 const FORMATS = ["Virtual Piano"];
 
@@ -63,24 +65,24 @@ export function TranslatorTab() {
   return (
     <div className="translator-tab">
       <div className="translator-tab__toolbar">
-        <select className="control-row__select" value={format} onChange={(e) => setFormat(e.target.value)}>
+        <Select value={format} onChange={(e) => setFormat(e.target.value)}>
           {FORMATS.map((f) => (
             <option key={f}>{f}</option>
           ))}
-        </select>
+        </Select>
         <div className="sub-tab-bar sub-tab-bar--compact">
-          <button
-            className={`sub-tab-bar__btn${mode === "import" ? " sub-tab-bar__btn--active" : ""}`}
+          <Button
+            variant="tab" active={mode === "import"}
             onClick={() => setMode("import")}
           >
             Import
-          </button>
-          <button
-            className={`sub-tab-bar__btn${mode === "export" ? " sub-tab-bar__btn--active" : ""}`}
+          </Button>
+          <Button
+            variant="tab" active={mode === "export"}
             onClick={() => setMode("export")}
           >
             Export
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -88,7 +90,7 @@ export function TranslatorTab() {
         <div className="translator-tab__workspace">
           <div className="playback-tab__two-col">
             <Card title="Source" className="translator-tab__card">
-              <textarea
+              <TextArea
                 className="translator-tab__textarea"
                 placeholder="Paste a sheet here..."
                 value={importText}
@@ -102,8 +104,7 @@ export function TranslatorTab() {
           <div className="translator-tab__action-bar">
             <label className="translator-tab__bpm">
               BPM
-              <input
-                type="number"
+              <NumberInput
                 min={20}
                 max={400}
                 value={bpm}
@@ -111,9 +112,9 @@ export function TranslatorTab() {
               />
             </label>
             <ToggleSwitch checked={humanize} onChange={setHumanize} label="Humanize" />
-            <button className="translator-tab__play-btn" disabled={!importText.trim()} onClick={playSheet}>
+            <Button variant="accent" disabled={!importText.trim()} onClick={playSheet}>
               Play Sheet
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -127,21 +128,21 @@ export function TranslatorTab() {
               )}
             </Card>
             <Card title="Output" className="translator-tab__card">
-              <textarea className="translator-tab__textarea" readOnly value={exportText} />
+              <TextArea className="translator-tab__textarea" readOnly value={exportText} />
               {exportStatus && <span className="translator-tab__status">{exportStatus}</span>}
             </Card>
           </div>
           <div className="translator-tab__action-bar">
-            <button className="translator-tab__play-btn" onClick={generateSheet}>
+            <Button variant="accent" onClick={generateSheet}>
               Generate Sheet
-            </button>
-            <button
-              className="translator-tab__play-btn"
+            </Button>
+            <Button
+              variant="accent"
               disabled={!exportText}
               onClick={() => navigator.clipboard.writeText(exportText)}
             >
               Copy
-            </button>
+            </Button>
           </div>
         </div>
       )}

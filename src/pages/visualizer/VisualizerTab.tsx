@@ -5,6 +5,7 @@ import { usePlaybackEngine } from "../../state/PlaybackEngineContext";
 import { PianoRoll } from "./PianoRoll";
 import { PianoKeyboard } from "./PianoKeyboard";
 import { buildDemoNotes, type VizNote } from "./demoNotes";
+import { Button } from "../../components/Button";
 
 const MIN_PITCH = 21;
 const MAX_PITCH = 108;
@@ -101,9 +102,9 @@ export function VisualizerTab() {
           visibility: Settings &gt; Display / Playback &gt; Options
         </span>
         {!usingRealData && (
-          <button className="visualizer-tab__play-btn" onClick={() => setDemoPlaying((p) => !p)}>
+          <Button className="visualizer-tab__play-btn" onClick={() => setDemoPlaying((p) => !p)}>
             {demoPlaying ? "Pause" : "Play"} demo
-          </button>
+          </Button>
         )}
       </div>
 

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "../../components/Card";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { useLog, type LogLevel, type SnapshotKey } from "../../state/LogContext";
+import { Button } from "../../components/Button";
+import { Select } from "../../components/Field";
 
 const LEVELS: LogLevel[] = ["INFO", "DEBUG", "WARN", "OK"];
 const FILTER_OPTIONS = ["All", ...LEVELS];
@@ -57,11 +59,11 @@ export function DebugTab() {
 
         <div className="debug-tab__sidebar">
           <Card title="Filter">
-            <select className="control-row__select" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
               {FILTER_OPTIONS.map((f) => (
                 <option key={f}>{f}</option>
               ))}
-            </select>
+            </Select>
             <ToggleSwitch checked={autoScroll} onChange={setAutoScroll} label="Auto-scroll" />
           </Card>
 
@@ -90,18 +92,14 @@ export function DebugTab() {
       </div>
 
       <div className="debug-tab__footer">
-        <button className="modal__btn" onClick={clear}>
+        <Button onClick={clear}>
           Clear
-        </button>
-        <button
-          className="modal__btn"
-          onClick={() => navigator.clipboard.writeText(filtered.map((e) => e.line).join("\n"))}
+        </Button>
+        <Button onClick={() => navigator.clipboard.writeText(filtered.map((e) => e.line).join("\n"))}
         >
           Copy Log
-        </button>
-        <button
-          className="modal__btn"
-          onClick={() => {
+        </Button>
+        <Button onClick={() => {
             const blob = new Blob([entries.map((e) => e.line).join("\n")], { type: "text/plain" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -112,7 +110,7 @@ export function DebugTab() {
           }}
         >
           Export Log
-        </button>
+        </Button>
       </div>
     </div>
   );

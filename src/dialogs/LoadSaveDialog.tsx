@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Modal } from "../components/Modal";
+import { Button } from "../components/Button";
 
 export interface SaveEntry {
   filepath: string;
@@ -43,12 +44,10 @@ export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: 
       height={520}
       footer={
         <>
-          <button className="modal__btn" disabled={!selectedSave} onClick={() => selectedSave && onRename(selectedSave.filepath, prompt("New name", selectedSave.saveName) ?? selectedSave.saveName)}>
+          <Button disabled={!selectedSave} onClick={() => selectedSave && onRename(selectedSave.filepath, prompt("New name", selectedSave.saveName) ?? selectedSave.saveName)}>
             Rename
-          </button>
-          <button
-            className="modal__btn"
-            disabled={!selectedSave}
+          </Button>
+          <Button disabled={!selectedSave}
             onClick={() =>
               selectedSave &&
               window.confirm(`Delete "${selectedSave.saveName}"? This cannot be undone.`) &&
@@ -56,17 +55,17 @@ export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: 
             }
           >
             Delete
-          </button>
-          <button className="modal__btn" onClick={onCancel}>
+          </Button>
+          <Button onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className="modal__btn modal__btn--accent"
+          </Button>
+          <Button
+            variant="accent"
             disabled={!selectedSave}
             onClick={() => selectedSave && onLoad(selectedSave)}
           >
             Load
-          </button>
+          </Button>
         </>
       }
     >
@@ -77,13 +76,14 @@ export function LoadSaveDialog({ saves, onCancel, onLoad, onRename, onDelete }: 
             <div key={midiName} className="load-save-dialog__group">
               <div className="load-save-dialog__group-label">{midiName}</div>
               {entries.map((s) => (
-                <button
+                <Button
                   key={s.filepath}
-                  className={`load-save-dialog__item${selected === s.filepath ? " load-save-dialog__item--active" : ""}`}
+                  variant="item"
+                  active={selected === s.filepath}
                   onClick={() => setSelected(s.filepath)}
                 >
                   {s.saveName}
-                </button>
+                </Button>
               ))}
             </div>
           ))}

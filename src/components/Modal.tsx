@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "./Button";
 
 interface ModalProps {
   title: string;
@@ -19,9 +20,9 @@ export function Modal({ title, onClose, footer, width = 600, height = 400, child
       >
         <div className="modal__title-row">
           <span className="modal__title">{title}</span>
-          <button className="modal__close-btn" onClick={onClose}>
+          <Button variant="icon" subtle onClick={onClose}>
             ×
-          </button>
+          </Button>
         </div>
         <div className="modal__body">{children}</div>
         {footer && <div className="modal__footer">{footer}</div>}

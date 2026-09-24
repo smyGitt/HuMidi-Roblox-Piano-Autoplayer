@@ -1,5 +1,7 @@
 import { Card } from "../../components/Card";
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import { Button } from "../../components/Button";
+import { NumberInput } from "../../components/Field";
 
 export interface PedalAiStats {
   avgDur: number;
@@ -91,9 +93,9 @@ export function PedalAiCard({
       title="PEDAL AI THRESHOLDS"
       titleButtons={
         hasThresholds && (
-          <button className="icon-btn icon-btn--danger" onClick={onReset} title="Reset">
-            <ArrowCounterClockwiseIcon size={16} weight="duotone" />
-          </button>
+          <Button variant="icon" subtle danger onClick={onReset} title="Reset">
+            <ArrowCounterClockwiseIcon weight="duotone" />
+          </Button>
         )
       }
       className="pedal-ai-card"
@@ -103,17 +105,16 @@ export function PedalAiCard({
           <span className="pedal-ai-card__hint">
             Generate AI-driven sustain pedal events from the loaded MIDI's dynamics.
           </span>
-          <button className="pedal-ai-card__generate-btn" disabled={!generateEnabled} onClick={onGenerate}>
+          <Button variant="accent" disabled={!generateEnabled} onClick={onGenerate}>
             Generate AI Pedal Events
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="pedal-ai-card__post">
           <div className="pedal-ai-card__thresholds">
             <label>
               On threshold
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={1}
                 step={0.001}
@@ -123,8 +124,7 @@ export function PedalAiCard({
             </label>
             <label>
               Off threshold
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={1}
                 step={0.001}
@@ -145,10 +145,10 @@ export function PedalAiCard({
             <div className="pedal-ai-card__diag">
               <div className="pedal-ai-card__diag-title">{diagnosis.title}</div>
               {diagnosis.rows.map((row) => (
-                <button key={row.label} className="pedal-ai-card__diag-row" onClick={row.onClick}>
+                <Button key={row.label} variant="item" className="pedal-ai-card__diag-row" onClick={row.onClick}>
                   {"→ "}
                   {row.label}
-                </button>
+                </Button>
               ))}
             </div>
           )}
