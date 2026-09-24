@@ -23,6 +23,7 @@ import {
   getThemesFile,
   setThemesDir,
   checkForUpdatesNow,
+  getAppVersion,
   type UpdateCheckOutcome,
 } from "../../lib/tauri";
 import { Button } from "../../components/Button";
@@ -256,6 +257,14 @@ function SystemPage() {
   const { setConfig } = usePlaybackConfig();
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<UpdateCheckOutcome | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    getAppVersion()
+      .then(setAppVersion)
+      .catch(() => {});
+  }, []);
 
   async function handleCheckNow() {
     if (!isTauri()) return;
@@ -271,6 +280,11 @@ function SystemPage() {
 
   return (
     <div className="settings-tab__display">
+      {appVersion && (
+        <Card title="">
+          <Label className="settings-tab__version">App version: {appVersion}</Label>
+        </Card>
+      )}
       <Card title="Updates">
         <div className="control-row">
           <ToggleSwitch

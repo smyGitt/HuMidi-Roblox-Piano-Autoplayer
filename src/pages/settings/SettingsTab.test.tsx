@@ -18,6 +18,7 @@ const tauriMocks = vi.hoisted(() => ({
   getMidiDir: vi.fn<() => Promise<string>>(() => Promise.resolve("")),
   getThemesFile: vi.fn<() => Promise<string>>(() => Promise.resolve("C:\\Users\\me\\.humidi\\themes.json")),
   setThemesDir: vi.fn<(p: string) => Promise<string>>((p) => Promise.resolve(`${p}\\themes.json`)),
+  getAppVersion: vi.fn<() => Promise<string>>(() => Promise.resolve("9.8.7")),
   loadAppConfig: vi.fn<() => Promise<Record<string, unknown>>>(() => Promise.resolve({})),
   saveAppConfig: vi.fn(() => Promise.resolve()),
   getActiveThemeName: vi.fn<() => Promise<string | null>>(() => Promise.resolve(null)),
@@ -71,6 +72,7 @@ beforeEach(() => {
   tauriMocks.getThemesFile.mockReset().mockReturnValue(Promise.resolve("C:\\Users\\me\\.humidi\\themes.json"));
   tauriMocks.setSaveDir.mockReset().mockReturnValue(Promise.resolve());
   tauriMocks.setMidiDir.mockReset().mockReturnValue(Promise.resolve());
+  tauriMocks.getAppVersion.mockClear();
   tauriMocks.loadAppConfig.mockReset().mockReturnValue(Promise.resolve({}));
   tauriMocks.saveAppConfig.mockReset().mockReturnValue(Promise.resolve());
   openDialog.mockReset();
@@ -179,6 +181,22 @@ describe("SettingsTab > System page", () => {
     expect(spinbox.value).toBe("8");
     fireEvent.change(spinbox, { target: { value: "42" } });
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ pedal_prompt_threshold: 42 }));
+  });
+
+  it("shows the app version in a card at the top of the System page with no card title", async () => {
+    renderSettings();
+    fireEvent.click(screen.getByText("System"));
+    await waitFor(() => expect(screen.getByText("App version: 9.8.7")).toBeTruthy());
+    expect(screen.getByText("App version: 9.8.7").closest(".card")).not.toBeNull();
+    expect(screen.queryByText("App info")).toBeNull();
+  });
+
+  it("shows no version and never calls the backend outside the desktop app", async () => {
+    tauriMocks.isTauri.mockReturnValue(false);
+    renderSettings();
+    fireEvent.click(screen.getByText("System"));
+    expect(document.querySelector(".settings-tab__version")).toBeNull();
+    expect(tauriMocks.getAppVersion).not.toHaveBeenCalled();
   });
 
   it("auto-check-updates toggle persists via save_app_config", async () => {

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PlaybackConfig } from "../pages/playback/types";
 
@@ -331,6 +332,10 @@ export type UpdateCheckOutcome =
 
 export async function checkForUpdatesNow(): Promise<UpdateCheckOutcome> {
   return invoke("check_for_updates_now");
+}
+
+export async function getAppVersion(): Promise<string> {
+  return getVersion();
 }
 
 export async function downloadAndInstallUpdate(): Promise<void> {
