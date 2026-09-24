@@ -804,11 +804,6 @@ button:disabled {
   transform: rotate(var(--rotate-expandable));
 }
 
-.save-card__time svg {
-  width: var(--space-1);
-  height: var(--space-1);
-}
-
 .side-panel:hover .side-panel__handle {
   color: var(--text_primary);
 }

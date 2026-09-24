@@ -1,4 +1,4 @@
-import { ArrowsClockwiseIcon, ClockIcon, ListMagnifyingGlassIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, ListMagnifyingGlassIcon } from "@phosphor-icons/react";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Label } from "../../components/Label";
@@ -43,7 +43,6 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
               <Label className="part-card__meta">{s.songName}</Label>
               {s.timeStr && (
                 <span className="save-card__time">
-                  <ClockIcon weight="duotone" />
                   <Label>{s.timeStr}</Label>
                 </span>
               )}
