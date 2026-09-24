@@ -10,7 +10,6 @@ import {
   WaveformIcon,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
-import { StatusIndicator, type PlaybackStatus } from "./StatusIndicator";
 import logo from "../assets/humidi_logo.ico";
 import type { PageId } from "../pages/pageIds";
 import { Button, Link } from "./Button";
@@ -27,12 +26,10 @@ const NAV_ITEMS: { id: PageId; label: string; icon: PhosphorIcon }[] = [
 interface SidebarProps {
   activePage: PageId;
   onNavigate: (page: PageId) => void;
-  status: PlaybackStatus;
-  statusLabel?: string;
   visualizerDisabled?: boolean;
 }
 
-export function Sidebar({ activePage, onNavigate, status, statusLabel, visualizerDisabled }: SidebarProps) {
+export function Sidebar({ activePage, onNavigate, visualizerDisabled }: SidebarProps) {
   const [expanded, setExpanded] = useState(false);
   const collapseTimer = useRef<number | null>(null);
 
@@ -76,8 +73,6 @@ export function Sidebar({ activePage, onNavigate, status, statusLabel, visualize
       </nav>
 
       <div className="sidebar__spacer" />
-
-      <StatusIndicator status={status} label={statusLabel} />
 
       <Link variant="nav" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
         <DiscordLogoIcon weight="duotone" />

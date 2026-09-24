@@ -398,17 +398,36 @@ button:disabled {
 }
 
 .transport-bar__btn-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.transport-bar__controls {
   display: flex;
   align-items: center;
   gap: var(--space-1);
 }
 
-.transport-bar__stretch {
-  flex: 1;
+.transport-bar__controls .btn {
+  --icon-size: var(--space-5);
+  padding: 0;
 }
 
-.transport-bar__time--collapsed {
-  margin-left: var(--space-1);
+.transport-bar__side {
+  display: flex;
+  align-items: center;
+}
+
+.transport-bar__side .status-indicator {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.transport-bar__side--end {
+  justify-content: flex-end;
 }
 
 /* --- Card --- */

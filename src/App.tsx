@@ -33,7 +33,7 @@ function AppShell() {
   const [activePage, setActivePage] = useState<PageId>("playback");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
-  const { opacity, showUpdatePrompt, resolveUpdatePrompt, updateAvailable, dismissUpdateAvailable } =
+  const { opacity, showStatusText, showUpdatePrompt, resolveUpdatePrompt, updateAvailable, dismissUpdateAvailable } =
     useAppSettings();
   const engine = usePlaybackEngine();
   const { config } = usePlaybackConfig();
@@ -73,7 +73,7 @@ function AppShell() {
     <div className={`app-window${isCollapsed ? " app-window--collapsed" : ""}`} style={{ opacity: opacity / 100 }}>
       {!isCollapsed && (
         <div className="app-body">
-          <Sidebar activePage={activePage} onNavigate={setActivePage} status={status} statusLabel={statusLabel} />
+          <Sidebar activePage={activePage} onNavigate={setActivePage} />
           <div className="app-page-area">
             <FileHeader />
             <div className="app-page-content">
@@ -102,6 +102,9 @@ function AppShell() {
         currentTime={engine.currentTime}
         totalTime={engine.totalDuration}
         isCollapsed={isCollapsed}
+        status={status}
+        statusLabel={statusLabel}
+        showStatusText={showStatusText}
         playEnabled={engine.hasCompiledNotes}
         onScrub={(v) => engine.seek(engine.totalDuration > 0 ? (v / 10000) * engine.totalDuration : 0)}
         onSeekCommit={() => {}}
@@ -110,6 +113,8 @@ function AppShell() {
           else void engine.play();
         }}
         onStop={() => void engine.stop()}
+        onSeekStart={() => void engine.seek(0)}
+        onSeekEnd={() => void engine.seek(engine.totalDuration)}
         onToggleCollapsed={() => setIsCollapsed((c) => !c)}
       />
 

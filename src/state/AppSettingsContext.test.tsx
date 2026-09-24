@@ -45,6 +45,7 @@ describe("AppSettingsContext (preview mode, isTauri() = false)", () => {
     expect(result.current.showPianoPedal).toBe(true);
     expect(result.current.pedalPromptThreshold).toBe(8);
     expect(result.current.autoCheckUpdates).toBe(false);
+    expect(result.current.showStatusText).toBe(false);
     expect(tauriMocks.loadAppConfig).not.toHaveBeenCalled();
   });
 
@@ -74,10 +75,12 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
         show_piano_pedal_visualizer: false,
         pedal_prompt_threshold: 42,
         auto_check_updates: false,
+        show_status_text: true,
       }),
     );
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await waitFor(() => expect(result.current.pedalPromptThreshold).toBe(42));
+    expect(result.current.showStatusText).toBe(true);
     expect(result.current.alwaysOnTop).toBe(true);
     expect(result.current.opacity).toBe(70);
     expect(result.current.showTimeline).toBe(false);
@@ -97,6 +100,12 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await act(async () => result.current.setPedalPromptThreshold(15));
     expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ pedal_prompt_threshold: 15 });
+  });
+
+  it("setShowStatusText persists under show_status_text", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await act(async () => result.current.setShowStatusText(true));
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ show_status_text: true });
   });
 
   it("setAlwaysOnTop persists to config AND calls the real Tauri window API", async () => {

@@ -10,6 +10,7 @@ interface AppSettings {
   showPianoPedal: boolean;
   pedalPromptThreshold: number;
   autoCheckUpdates: boolean;
+  showStatusText: boolean;
 }
 
 interface AppSettingsContextValue extends AppSettings {
@@ -20,6 +21,7 @@ interface AppSettingsContextValue extends AppSettings {
   setShowPianoPedal: (v: boolean) => void;
   setPedalPromptThreshold: (v: number) => void;
   setAutoCheckUpdates: (v: boolean) => void;
+  setShowStatusText: (v: boolean) => void;
   showUpdatePrompt: boolean;
   resolveUpdatePrompt: (v: boolean) => void;
   updateAvailable: { tag: string; url: string; currentVersion: string } | null;
@@ -34,6 +36,7 @@ const DEFAULTS: AppSettings = {
   showPianoPedal: true,
   pedalPromptThreshold: 8,
   autoCheckUpdates: false,
+  showStatusText: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -46,6 +49,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [showPianoPedal, setShowPianoPedalState] = useState(DEFAULTS.showPianoPedal);
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
+  const [showStatusText, setShowStatusTextState] = useState(DEFAULTS.showStatusText);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string; currentVersion: string } | null>(
     null,
@@ -74,6 +78,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         if (typeof cfg.pedal_prompt_threshold === "number") {
           setPedalPromptThresholdState(cfg.pedal_prompt_threshold);
         }
+        if (typeof cfg.show_status_text === "boolean") setShowStatusTextState(cfg.show_status_text);
         if (typeof cfg.auto_check_updates === "boolean") {
           setAutoCheckUpdatesState(cfg.auto_check_updates);
         } else {
@@ -122,6 +127,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (isTauri()) void saveAppConfig({ auto_check_updates: v });
   }
 
+  function setShowStatusText(v: boolean) {
+    setShowStatusTextState(v);
+    if (isTauri()) void saveAppConfig({ show_status_text: v });
+  }
+
   function resolveUpdatePrompt(v: boolean) {
     setShowUpdatePrompt(false);
     setAutoCheckUpdates(v);
@@ -140,6 +150,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showPianoPedal,
       pedalPromptThreshold,
       autoCheckUpdates,
+      showStatusText,
       setAlwaysOnTop,
       setOpacity,
       setShowTimeline,
@@ -147,6 +158,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setShowPianoPedal,
       setPedalPromptThreshold,
       setAutoCheckUpdates,
+      setShowStatusText,
       showUpdatePrompt,
       resolveUpdatePrompt,
       updateAvailable,
@@ -160,6 +172,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showPianoPedal,
       pedalPromptThreshold,
       autoCheckUpdates,
+      showStatusText,
       showUpdatePrompt,
       updateAvailable,
     ],

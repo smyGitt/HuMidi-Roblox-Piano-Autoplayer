@@ -1,6 +1,14 @@
-import { PauseIcon, PlayIcon, ResizeIcon, StopIcon } from "@phosphor-icons/react";
+import {
+  PauseCircleIcon,
+  PlayCircleIcon,
+  ResizeIcon,
+  SkipBackCircleIcon,
+  SkipForwardCircleIcon,
+  StopCircleIcon,
+} from "@phosphor-icons/react";
 import { Button } from "./Button";
 import { RangeInput } from "./Field";
+import { StatusIndicator, type PlaybackStatus } from "./StatusIndicator";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -13,11 +21,16 @@ interface TransportBarProps {
   currentTime: number;
   totalTime: number;
   isCollapsed: boolean;
+  status: PlaybackStatus;
+  statusLabel: string;
+  showStatusText: boolean;
   playEnabled: boolean;
   onScrub: (value: number) => void;
   onSeekCommit: (value: number) => void;
   onPlayPause: () => void;
   onStop: () => void;
+  onSeekStart: () => void;
+  onSeekEnd: () => void;
   onToggleCollapsed: () => void;
 }
 
@@ -26,11 +39,16 @@ export function TransportBar({
   currentTime,
   totalTime,
   isCollapsed,
+  status,
+  statusLabel,
+  showStatusText,
   playEnabled,
   onScrub,
   onSeekCommit,
   onPlayPause,
   onStop,
+  onSeekStart,
+  onSeekEnd,
   onToggleCollapsed,
 }: TransportBarProps) {
   return (
@@ -51,33 +69,44 @@ export function TransportBar({
       )}
 
       <div className="transport-bar__btn-row">
+        <div className="transport-bar__side">
+          <StatusIndicator status={status} label={statusLabel} showLabel={showStatusText} />
+          {isCollapsed && (
+            <span className="transport-bar__time">
+              {formatTime(currentTime)} / {formatTime(totalTime)}
+            </span>
+          )}
+        </div>
+
+        <div className="transport-bar__controls">
+        <Button variant="icon" subtle size="lg" onClick={onSeekStart} disabled={!playEnabled} title="To start">
+          <SkipBackCircleIcon weight="duotone" />
+        </Button>
         <Button
-          variant="icon" size="md"
+          variant="icon" subtle size="lg"
           onClick={onPlayPause}
           disabled={!playEnabled}
           title={isPlaying ? "Pause" : "Play"}
         >
-          {isPlaying ? <PauseIcon weight="duotone" /> : <PlayIcon weight="duotone" />}
+          {isPlaying ? <PauseCircleIcon weight="duotone" /> : <PlayCircleIcon weight="duotone" />}
         </Button>
-        <Button variant="icon" size="md" onClick={onStop} title="Stop">
-          <StopIcon weight="duotone" />
+        <Button variant="icon" subtle size="lg" onClick={onStop} disabled={status === "unloaded"} title="Stop">
+          <StopCircleIcon weight="duotone" />
         </Button>
-
-        {isCollapsed && (
-          <span className="transport-bar__time transport-bar__time--collapsed">
-            {formatTime(currentTime)} / {formatTime(totalTime)}
-          </span>
-        )}
-
-        <div className="transport-bar__stretch" />
-
-        <Button
-          variant="icon" size="md"
-          onClick={onToggleCollapsed}
-          title={isCollapsed ? "Expand" : "Collapse"}
-        >
-          <ResizeIcon weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
+        <Button variant="icon" subtle size="lg" onClick={onSeekEnd} disabled={!playEnabled} title="To end">
+          <SkipForwardCircleIcon weight="duotone" />
         </Button>
+        </div>
+
+        <div className="transport-bar__side transport-bar__side--end">
+          <Button
+            variant="icon" size="md"
+            onClick={onToggleCollapsed}
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            <ResizeIcon weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -108,9 +108,10 @@ function step(rotor: Rotor, seconds: number) {
 interface StatusIndicatorProps {
   status: PlaybackStatus;
   label?: string;
+  showLabel?: boolean;
 }
 
-export function StatusIndicator({ status, label }: StatusIndicatorProps) {
+export function StatusIndicator({ status, label, showLabel = true }: StatusIndicatorProps) {
   const spinnerRef = useRef<HTMLSpanElement>(null);
   const rotorRef = useRef<Rotor>({
     angle: 0,
@@ -159,7 +160,7 @@ export function StatusIndicator({ status, label }: StatusIndicatorProps) {
         <CircleIcon className="status-indicator__glyph" data-active={glyph === "circle"} size={40} weight="duotone" />
         <CheckCircleIcon className="status-indicator__glyph" data-active={glyph === "check"} size={40} weight="duotone" />
       </span>
-      {label && <span className="status-indicator__label">{label}</span>}
+      {label && showLabel && <span className="status-indicator__label">{label}</span>}
     </div>
   );
 }

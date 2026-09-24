@@ -49,6 +49,9 @@ function DisplayPage() {
           </div>
           <SliderSpinbox min={20} max={100} value={settings.opacity} suffix="%" onChange={settings.setOpacity} />
         </div>
+        <div className="control-row">
+          <ToggleSwitch checked={settings.showStatusText} onChange={settings.setShowStatusText} label="Show Status Text" />
+        </div>
       </Card>
 
       <Card title="Visualizer">
