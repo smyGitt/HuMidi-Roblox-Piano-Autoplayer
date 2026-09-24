@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "../../components/Button";
+import { TabPage } from "../../components/TabPage";
 
 const MIT_LICENSE = (year: string, holder: string) => `MIT License
 
@@ -108,23 +108,13 @@ dirs / rand / chrono
 const NAV_ITEMS = Object.keys(LICENSE_TEXTS);
 
 export function LicenseTab() {
-  const [active, setActive] = useState(NAV_ITEMS[0]);
+  const [active, setActive] = useState(0);
 
   return (
     <div className="license-tab">
-      <div className="license-tab__nav">
-        {NAV_ITEMS.map((item) => (
-          <Button
-            key={item}
-            variant="item" subtle active={active === item}
-            onClick={() => setActive(item)}
-          >
-            {item}
-          </Button>
-        ))}
-      </div>
-      <div className="license-tab__divider" />
-      <div className="license-tab__text">{LICENSE_TEXTS[active]}</div>
+      <TabPage title="About" tabs={NAV_ITEMS} active={active} onChange={setActive}>
+        <div className="license-tab__text">{LICENSE_TEXTS[NAV_ITEMS[active]]}</div>
+      </TabPage>
     </div>
   );
 }

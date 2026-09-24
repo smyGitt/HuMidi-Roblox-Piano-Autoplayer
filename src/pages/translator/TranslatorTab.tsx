@@ -6,9 +6,11 @@ import { usePlaybackEngine } from "../../state/PlaybackEngineContext";
 import { useLog } from "../../state/LogContext";
 import { isTauri, translateSheetToNotes, notesToSheet } from "../../lib/tauri";
 import { Button } from "../../components/Button";
+import { TabPage } from "../../components/TabPage";
 import { NumberInput, Select, TextArea } from "../../components/Field";
 
 const FORMATS = ["Virtual Piano"];
+const MODES = ["Import", "Export"] as const;
 
 export function TranslatorTab() {
   const [mode, setMode] = useState<"import" | "export">("import");
@@ -64,28 +66,21 @@ export function TranslatorTab() {
 
   return (
     <div className="translator-tab">
-      <div className="translator-tab__toolbar">
-        <Select value={format} onChange={(e) => setFormat(e.target.value)}>
-          {FORMATS.map((f) => (
-            <option key={f}>{f}</option>
-          ))}
-        </Select>
-        <div className="sub-tab-bar sub-tab-bar--compact">
-          <Button
-            variant="tab" active={mode === "import"}
-            onClick={() => setMode("import")}
-          >
-            Import
-          </Button>
-          <Button
-            variant="tab" active={mode === "export"}
-            onClick={() => setMode("export")}
-          >
-            Export
-          </Button>
-        </div>
-      </div>
-
+      <TabPage
+        title="Translator"
+        tabs={MODES}
+        active={mode === "import" ? 0 : 1}
+        onChange={(i) => setMode(i === 0 ? "import" : "export")}
+        lead={
+          <div className="translator-tab__toolbar">
+            <Select value={format} onChange={(e) => setFormat(e.target.value)}>
+              {FORMATS.map((f) => (
+                <option key={f}>{f}</option>
+              ))}
+            </Select>
+          </div>
+        }
+      >
       {mode === "import" ? (
         <div className="translator-tab__workspace">
           <div className="playback-tab__two-col">
@@ -146,6 +141,7 @@ export function TranslatorTab() {
           </div>
         </div>
       )}
+      </TabPage>
     </div>
   );
 }

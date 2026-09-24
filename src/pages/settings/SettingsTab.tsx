@@ -26,6 +26,7 @@ import {
   type UpdateCheckOutcome,
 } from "../../lib/tauri";
 import { Button } from "../../components/Button";
+import { TabPage } from "../../components/TabPage";
 import { Select, TextInput } from "../../components/Field";
 
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
@@ -344,27 +345,18 @@ export function SettingsTab() {
 
   return (
     <div className="settings-tab">
-      <h1 className="page-placeholder__title">Settings</h1>
-
-      <div className="sub-tab-bar">
-        {NAV_ITEMS.map((item) => (
-          <Button
-            key={item}
-            variant="tab" active={nav === item}
-            onClick={() => setNav(item)}
-          >
-            {item}
-          </Button>
-        ))}
-      </div>
-
-      <div className="settings-tab__page">
+      <TabPage
+        title="Settings"
+        tabs={NAV_ITEMS}
+        active={NAV_ITEMS.indexOf(nav)}
+        onChange={(i) => setNav(NAV_ITEMS[i])}
+      >
         {nav === "Display" && <DisplayPage />}
         {nav === "Files" && <FilesPage />}
         {nav === "Hotkey" && <HotkeyPage />}
         {nav === "System" && <SystemPage />}
         {nav === "Privacy" && <PrivacyPage />}
-      </div>
+      </TabPage>
     </div>
   );
 }
