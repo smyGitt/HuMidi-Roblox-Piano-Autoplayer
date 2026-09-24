@@ -1,32 +1,24 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+/*
+!/.github/
+!/.gitignore
+!/README.md
+!/index.html
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/tsconfig.node.json
+!/vite.config.ts
+!/vitest.config.ts
+!/public/
+!/src/
+!/src-tauri/
+!/.vscode/
+/.vscode/*
+!/.vscode/extensions.json
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Rust / Tauri
-/src-tauri/target
-/src-tauri/gen/schemas
-
-# Markdown docs: kept on disk locally only, never tracked in this repo
 *.md
 !README.md
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+*.log
+*.local
 *.sw?
+.DS_Store
