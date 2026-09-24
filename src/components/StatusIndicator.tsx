@@ -3,24 +3,29 @@ import { CheckCircleIcon, CircleDashedIcon, CircleIcon } from "@phosphor-icons/r
 
 export type PlaybackStatus = "unloaded" | "loading" | "loaded" | "ready";
 
-type Phase = "rest" | "cruise" | "burst" | "landing" | "bobble";
+type Phase = "rest" | "cruise" | "burst" | "bobble";
 
 interface Rotor {
   angle: number;
   velocity: number;
   phase: Phase;
   target: number;
+  shaking: boolean;
+  shakeTime: number;
+  offset: number;
 }
 
 const CRUISE_SPEED = 420;
 const SPIN_UP_SECONDS = 0.25;
 const BURST_SPEED = 1080;
 const BURST_STIFFNESS = 9;
-const LANDING_SPEED = 240;
-const LANDING_DECAY_SECONDS = 0.3;
-const MIN_LANDING_TRAVEL = 90;
+const READY_KICK_ANGLE = 50;
 const BOBBLE_STIFFNESS = 13;
-const BOBBLE_DAMPING_RATIO = 0.28;
+const BOBBLE_DAMPING_RATIO = 0.32;
+const SHAKE_AMPLITUDE = 4;
+const SHAKE_FREQUENCY = 6;
+const SHAKE_DECAY_SECONDS = 0.15;
+const SHAKE_SECONDS = 0.6;
 const MAX_FRAME_SECONDS = 0.05;
 const SUBSTEP_SECONDS = 1 / 240;
 
@@ -45,9 +50,10 @@ function retarget(rotor: Rotor, status: PlaybackStatus) {
     return;
   }
   if (status === "ready") {
-    if (rotor.velocity < CRUISE_SPEED / 2) rotor.velocity = CRUISE_SPEED;
-    rotor.target = nextUpright(rotor.angle, MIN_LANDING_TRAVEL);
-    rotor.phase = "landing";
+    rotor.angle = READY_KICK_ANGLE;
+    rotor.velocity = 0;
+    rotor.target = 0;
+    rotor.phase = "bobble";
     return;
   }
   if (status === "loaded") {
@@ -60,18 +66,26 @@ function retarget(rotor: Rotor, status: PlaybackStatus) {
     rotor.target = nextUpright(rotor.angle, 0);
     rotor.phase = "burst";
   }
+  rotor.shaking = true;
+  rotor.shakeTime = 0;
+}
+
+function advanceShake(rotor: Rotor, seconds: number) {
+  if (!rotor.shaking) return;
+  rotor.shakeTime += seconds;
+  if (rotor.shakeTime >= SHAKE_SECONDS) {
+    rotor.shaking = false;
+    rotor.offset = 0;
+    return;
+  }
+  rotor.offset =
+    SHAKE_AMPLITUDE * Math.exp(-rotor.shakeTime / SHAKE_DECAY_SECONDS) * Math.sin(2 * Math.PI * SHAKE_FREQUENCY * rotor.shakeTime);
 }
 
 function advance(rotor: Rotor, h: number) {
   if (rotor.phase === "cruise") {
     rotor.velocity += (CRUISE_SPEED - rotor.velocity) * (1 - Math.exp(-h / SPIN_UP_SECONDS));
     rotor.angle = (rotor.angle + rotor.velocity * h) % 360;
-    return;
-  }
-  if (rotor.phase === "landing") {
-    rotor.velocity = LANDING_SPEED + (rotor.velocity - LANDING_SPEED) * Math.exp(-h / LANDING_DECAY_SECONDS);
-    rotor.angle += rotor.velocity * h;
-    if (rotor.angle >= rotor.target) rotor.phase = "bobble";
     return;
   }
   const stiffness = rotor.phase === "burst" ? BURST_STIFFNESS : BOBBLE_STIFFNESS;
@@ -83,6 +97,7 @@ function advance(rotor: Rotor, h: number) {
 
 function step(rotor: Rotor, seconds: number) {
   let remaining = Math.min(seconds, MAX_FRAME_SECONDS);
+  advanceShake(rotor, remaining);
   while (remaining > 0 && rotor.phase !== "rest") {
     const h = Math.min(remaining, SUBSTEP_SECONDS);
     remaining -= h;
@@ -102,6 +117,9 @@ export function StatusIndicator({ status, label }: StatusIndicatorProps) {
     velocity: status === "loading" ? CRUISE_SPEED : 0,
     phase: status === "loading" ? "cruise" : "rest",
     target: 0,
+    shaking: false,
+    shakeTime: 0,
+    offset: 0,
   });
   const previousStatusRef = useRef(status);
   const frameRef = useRef(0);
@@ -112,14 +130,14 @@ export function StatusIndicator({ status, label }: StatusIndicatorProps) {
       retarget(rotor, status);
       previousStatusRef.current = status;
     }
-    if (rotor.phase === "rest" || frameRef.current !== 0) return;
+    if ((rotor.phase === "rest" && !rotor.shaking) || frameRef.current !== 0) return;
     let last = 0;
     function tick(now: number) {
       const seconds = last === 0 ? 0 : (now - last) / 1000;
       last = now;
       step(rotor, seconds);
-      if (spinnerRef.current) spinnerRef.current.style.transform = `rotate(${rotor.angle}deg)`;
-      frameRef.current = rotor.phase === "rest" ? 0 : requestAnimationFrame(tick);
+      if (spinnerRef.current) spinnerRef.current.style.transform = `translateX(${rotor.offset}px) rotate(${rotor.angle}deg)`;
+      frameRef.current = rotor.phase === "rest" && !rotor.shaking ? 0 : requestAnimationFrame(tick);
     }
     frameRef.current = requestAnimationFrame(tick);
   }, [status]);
