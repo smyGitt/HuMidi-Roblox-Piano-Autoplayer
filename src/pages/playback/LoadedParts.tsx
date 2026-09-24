@@ -1,4 +1,4 @@
-import { ListIcon, NotePencilIcon } from "@phosphor-icons/react";
+import { ListIcon, NotePencilIcon, SmileyMehIcon } from "@phosphor-icons/react";
 import { PartCard } from "./PartCard";
 import { Button } from "../../components/Button";
 import { Label } from "../../components/Label";
@@ -34,7 +34,10 @@ export function LoadedParts({ parts, pedalCount, onEditSelection, editEnabled }:
           </div>
           <div className="loaded-parts__cards">
             {parts.length === 0 ? (
-              <Label className="loaded-parts__placeholder">No file loaded.</Label>
+              <div className="loaded-parts__empty">
+                <SmileyMehIcon weight="duotone" />
+                <Label className="loaded-parts__placeholder">No file loaded.</Label>
+              </div>
             ) : (
               parts.map((p, i) => <PartCard key={i} title={p.name} meta={p.meta} />)
             )}

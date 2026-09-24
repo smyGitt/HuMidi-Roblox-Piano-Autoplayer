@@ -718,6 +718,21 @@ button:disabled {
   min-height: 0;
 }
 
+.loaded-parts__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  color: var(--text_muted);
+}
+
+.loaded-parts__empty svg {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
 .loaded-parts__placeholder,
 .saved-songs__placeholder,
 .loaded-parts__pedal:empty {
