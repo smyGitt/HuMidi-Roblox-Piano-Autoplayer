@@ -9,6 +9,7 @@
   --line-height: 1.5;
   --letter-spacing: 0.04em;
   --border-width: 1px;
+  --scrollbar-width: 10px;
   --stroke-width: 1;
   --radius: 10px;
   --rotate-expandable: 90deg;
@@ -359,7 +360,9 @@ button:disabled {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-3);
+  padding-right: calc(var(--space-3) - var(--scrollbar-width));
 }
 
 .page-placeholder__title {
@@ -542,6 +545,7 @@ button:disabled {
 .app-page-content:has(> .license-tab) {
   padding: 0;
   overflow: hidden;
+  scrollbar-gutter: auto;
 }
 
 .playback-tab,
@@ -608,11 +612,13 @@ button:disabled {
   flex: 1;
   min-width: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-2);
+  padding-right: calc(var(--space-2) - var(--scrollbar-width));
 }
 
 .tab-page__page--with-overlay {
-  padding-right: calc(var(--space-5) + var(--border-width) + var(--space-2));
+  margin-right: calc(var(--space-5) + var(--border-width));
 }
 
 .playback-tab__file-page,
