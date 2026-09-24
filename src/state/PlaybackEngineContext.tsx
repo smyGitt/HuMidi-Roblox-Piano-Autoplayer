@@ -14,6 +14,7 @@ import {
   togglePause as invokeTogglePause,
   stopPlayback as invokeStopPlayback,
   seekPlayback as invokeSeekPlayback,
+  clearLoadedSong as invokeClearLoadedSong,
   savePlayback as invokeSavePlayback,
   resumeFromSave as invokeResumeFromSave,
   getSaveDir,
@@ -65,6 +66,7 @@ interface PlaybackEngineValue {
   save: () => Promise<string | null>;
   resumeSave: (filepath: string, label: string) => Promise<void>;
   playTranslatedSheet: (sheetText: string, bpm: number) => Promise<void>;
+  clearSong: () => Promise<void>;
 }
 
 const PlaybackEngineContext = createContext<PlaybackEngineValue | null>(null);
@@ -122,6 +124,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const isGeneratingPedalRef = useRef(false);
+  const songVersionRef = useRef(0);
   const playRef = useRef(play);
   playRef.current = play;
   const togglePauseRef = useRef(togglePause);
@@ -180,6 +183,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadFile = useCallback(async (path: string, name: string) => {
+    const version = ++songVersionRef.current;
     setMidiFilePath(path);
     setFileName(name);
     setHasCompiledNotes(false);
@@ -209,11 +213,13 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
     try {
       const parsed = await parseMidiStructure(path);
+      if (version !== songVersionRef.current) return;
       setTracks(parsed.tracks);
       setOriginalBpm(parsed.initial_bpm);
       updateSnapshot({ tempo: `${Math.round(parsed.initial_bpm)} BPM` });
       appendLog(`Parsed ${parsed.tracks.length} track(s) successful`);
     } catch (e) {
+      if (version !== songVersionRef.current) return;
       appendLog(`Failed to parse MIDI: ${String(e)}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,6 +242,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }
 
   async function confirmTrackSelection(selection: { index: number; role: HandRole }[]) {
+    const version = songVersionRef.current;
     const info: SelectedTrackInfo[] = selection.map((s) => [s.index, s.role]);
     setSelectedTracksInfo(info);
     setParts(
@@ -262,6 +269,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
     try {
       const timeline = await invokeCompileNotes(configRef.current, midiFilePath, info);
+      if (version !== songVersionRef.current) return;
       setTotalDuration(timeline.total_dur);
       setFinalNotes(timeline.final_notes);
       setTempoEvents(timeline.tempo_events);
@@ -276,6 +284,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       });
       appendLog("Notes compiled successful");
     } catch (e) {
+      if (version !== songVersionRef.current) return;
       appendLog(`Failed to compile notes: ${String(e)}`);
     }
   }
@@ -438,6 +447,44 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function clearSong() {
+    if (isGeneratingPedalRef.current) {
+      appendLog("Cannot clear the song while the pedal is generating");
+      return;
+    }
+    if (isPlayingRef.current) await stop();
+    if (isTauri()) {
+      try {
+        await invokeClearLoadedSong();
+      } catch (e) {
+        appendLog(`Failed to clear the song: ${String(e)}`);
+        return;
+      }
+    }
+    songVersionRef.current += 1;
+    setFileName("");
+    setMidiFilePath("");
+    setTracks([]);
+    setParts([]);
+    setSelectedTracksInfo([]);
+    setOriginalBpm(0);
+    setTotalDuration(0);
+    setFinalNotes([]);
+    setTempoEvents([]);
+    setTimeSignatures([]);
+    setMeasureBoundaries([]);
+    setHasCompiledNotes(false);
+    setHasCompiledPedal(false);
+    setPedalIntervals([]);
+    setAiThresholds(null);
+    setDefaultAiThresholds(null);
+    setCurrentTime(0);
+    setActivePitches(new Set());
+    setPedalActive(false);
+    clearSnapshot();
+    appendLog("Cleared the loaded song");
+  }
+
   const aiStats = useMemo(() => statsFromIntervals(pedalIntervals, totalDuration), [pedalIntervals, totalDuration]);
 
   const value: PlaybackEngineValue = {
@@ -475,6 +522,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     save,
     resumeSave,
     playTranslatedSheet,
+    clearSong,
   };
 
   return <PlaybackEngineContext.Provider value={value}>{children}</PlaybackEngineContext.Provider>;

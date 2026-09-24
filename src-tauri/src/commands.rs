@@ -1159,6 +1159,24 @@ pub async fn resume_from_save<R: tauri::Runtime>(
     .await
 }
 
+fn clear_loaded_song_logic(state: &AppState) -> Result<(), String> {
+    *state.playback_session.lock().map_err(|e| e.to_string())? = PlaybackSession::default();
+    *state.parsed_tracks.lock().map_err(|e| e.to_string())? = None;
+    *state.parsed_tempo_map.lock().map_err(|e| e.to_string())? = None;
+    *state.loaded_pedal_count.lock().map_err(|e| e.to_string())? = 0;
+    state.midi_pedal_events.lock().map_err(|e| e.to_string())?.clear();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_loaded_song<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        clear_loaded_song_logic(&state)
+    })
+    .await
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SaveSummary {
     pub path: String,
@@ -3938,6 +3956,60 @@ mod tests {
             }),
             app_config: Mutex::new(serde_json::json!({})),
             theme_manager: Mutex::new(ThemeManager::new()),
+        }
+    }
+
+    mod test_clear_loaded_song {
+        use super::*;
+
+        fn populated_state(dir: &Path) -> AppState {
+            let state = hermetic_state(dir);
+            {
+                let mut session = state.playback_session.lock().unwrap();
+                session.final_notes = Some(Vec::new());
+                session.note_events = Some(Vec::new());
+                session.pedal_events = Some(Vec::new());
+                session.merged_events = Some(Vec::new());
+                session.total_dur = 12.5;
+                session.midi_pedal_events.push((1.0, true));
+            }
+            *state.parsed_tracks.lock().unwrap() = Some(Vec::new());
+            *state.loaded_pedal_count.lock().unwrap() = 3;
+            state.midi_pedal_events.lock().unwrap().push((1.0, true));
+            state
+        }
+
+        #[test]
+        fn test_resets_the_session_to_its_default() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = populated_state(dir.path());
+            clear_loaded_song_logic(&state).unwrap();
+            let session = state.playback_session.lock().unwrap();
+            assert!(session.final_notes.is_none());
+            assert!(session.note_events.is_none());
+            assert!(session.pedal_events.is_none());
+            assert!(session.merged_events.is_none());
+            assert_eq!(session.total_dur, 0.0);
+            assert!(session.midi_pedal_events.is_empty());
+        }
+
+        #[test]
+        fn test_clears_the_parsed_file_and_midi_pedal_state() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = populated_state(dir.path());
+            clear_loaded_song_logic(&state).unwrap();
+            assert!(state.parsed_tracks.lock().unwrap().is_none());
+            assert!(state.parsed_tempo_map.lock().unwrap().is_none());
+            assert_eq!(*state.loaded_pedal_count.lock().unwrap(), 0);
+            assert!(state.midi_pedal_events.lock().unwrap().is_empty());
+        }
+
+        #[test]
+        fn test_clearing_an_already_empty_state_succeeds() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = hermetic_state(dir.path());
+            clear_loaded_song_logic(&state).unwrap();
+            clear_loaded_song_logic(&state).unwrap();
         }
     }
 

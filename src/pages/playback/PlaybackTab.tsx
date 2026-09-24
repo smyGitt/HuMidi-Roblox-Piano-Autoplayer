@@ -18,7 +18,6 @@ import { usePlaybackConfig } from "../../state/PlaybackConfigContext";
 import { usePlaybackEngine } from "../../state/PlaybackEngineContext";
 import { useLog } from "../../state/LogContext";
 import { isTauri, getSaveDir, listSaves, renameSave, deleteSave, type SaveSummary } from "../../lib/tauri";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 function toSaveEntry(s: SaveSummary): SaveEntry {
   return {
@@ -85,22 +84,6 @@ export function PlaybackTab() {
     }
   }
 
-  async function handleReveal() {
-    if (!isTauri()) {
-      appendLog("Reveal unavailable outside the desktop app");
-      return;
-    }
-    if (!engine.midiFilePath) {
-      appendLog("No file loaded to reveal");
-      return;
-    }
-    try {
-      await revealItemInDir(engine.midiFilePath);
-    } catch (e) {
-      appendLog(`Failed to reveal file: ${String(e)}`);
-    }
-  }
-
   function trackedUpdateConfig(patch: Parameters<typeof updateConfig>[0]) {
     updateConfig(patch);
     if (engine.fileName) setToastVisible(true);
@@ -148,7 +131,7 @@ export function PlaybackTab() {
           name={engine.fileName}
           meta={engine.fileName ? `${engine.parts.length} track(s)` : ""}
           onReplace={() => document.querySelector<HTMLButtonElement>(".midi-drop-zone__btn")?.click()}
-          onReveal={() => void handleReveal()}
+          onClear={() => void engine.clearSong()}
         />
         <SubTabBar active={subTab} onChange={setSubTab} />
       </div>

@@ -575,10 +575,18 @@ button:disabled {
 }
 
 .file-strip__btn {
-  padding: var(--space-1) var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
   color: var(--text_primary);
+}
+
+.file-strip__btn svg {
+  width: var(--space-4);
+  height: var(--space-4);
 }
 
 .file-strip__btn:hover {

@@ -181,6 +181,10 @@ export async function stopPlayback(): Promise<void> {
   return invoke("stop_playback");
 }
 
+export async function clearLoadedSong(): Promise<void> {
+  return invoke("clear_loaded_song");
+}
+
 export async function seekPlayback(targetTime: number): Promise<void> {
   return invoke("seek_playback", { targetTime });
 }
