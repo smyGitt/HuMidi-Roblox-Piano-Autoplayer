@@ -1,7 +1,10 @@
 import { Card } from "../../components/Card";
-import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { Button } from "../../components/Button";
-import { NumberInput } from "../../components/Field";
+import type { PedalConfidence } from "../../lib/pedalPreview";
+import { ThresholdChart } from "./ThresholdChart";
+import { ThresholdLegend } from "./ThresholdLegend";
+import { ThresholdStepper } from "./ThresholdStepper";
 
 export interface PedalAiStats {
   avgDur: number;
@@ -16,64 +19,30 @@ interface PedalAiCardProps {
   thresholdOn: number;
   thresholdOff: number;
   stats: PedalAiStats | null;
+  confidence?: PedalConfidence | null;
   onGenerate: () => void;
   onThresholdChange: (on: number, off: number) => void;
   onReset: () => void;
 }
 
-interface DiagRow {
-  label: string;
-  onClick: () => void;
-}
+const CHATTER_MAX_PRESSES_PER_MIN = 45;
+const CHATTER_MIN_AVG_HOLD = 0.25;
+const CHATTER_MIN_HOLD = 0.08;
+const SPARSE_MIN_PRESSES_PER_MIN = 3;
+const SPARSE_MAX_HOLD = 12;
+const SPARSE_MAX_HOLD_RATIO = 8;
 
-interface Diagnosis {
-  title: string;
-  rows: DiagRow[];
-}
-
-function round3(n: number): number {
-  return Math.round(n * 1000) / 1000;
-}
-
-function diagnose(
-  stats: PedalAiStats,
-  thresholdOn: number,
-  thresholdOff: number,
-  onThresholdChange: (on: number, off: number) => void,
-  onGenerate: () => void,
-): Diagnosis | null {
-  const isChattering = stats.pressesPerMin > 45 || stats.avgDur < 0.25 || stats.minDur < 0.08;
+function diagnose(stats: PedalAiStats): string | null {
+  const isChattering =
+    stats.pressesPerMin > CHATTER_MAX_PRESSES_PER_MIN ||
+    stats.avgDur < CHATTER_MIN_AVG_HOLD ||
+    stats.minDur < CHATTER_MIN_HOLD;
+  if (isChattering) return "⚠ Pedal chattering detected";
   const isSparse =
-    !isChattering &&
-    (stats.pressesPerMin < 3 || stats.maxDur > 12 || (stats.avgDur > 0 && stats.maxDur / stats.avgDur > 8));
-
-  if (!isChattering && !isSparse) return null;
-
-  const rows: DiagRow[] = [];
-  if (isChattering) {
-    const suggestedOn = Math.min(0.99, round3(thresholdOn + 0.08));
-    const suggestedOff = Math.max(0.01, round3(thresholdOff - 0.05));
-    rows.push({
-      label: `Raise On Threshold to ${suggestedOn.toFixed(3)} (fewer false triggers)`,
-      onClick: () => onThresholdChange(suggestedOn, thresholdOff),
-    });
-    rows.push({
-      label: `Lower Off Threshold to ${suggestedOff.toFixed(3)} (widen hysteresis gap)`,
-      onClick: () => onThresholdChange(thresholdOn, suggestedOff),
-    });
-  } else {
-    const suggestedOff = Math.max(0.01, Math.min(round3(thresholdOn - 0.02), round3(thresholdOff + 0.05)));
-    rows.push({
-      label: `Raise Off Threshold to ${suggestedOff.toFixed(3)} (releases more easily)`,
-      onClick: () => onThresholdChange(thresholdOn, suggestedOff),
-    });
-  }
-  rows.push({ label: "Regenerate with fresh auto-thresholds", onClick: onGenerate });
-
-  return {
-    title: isChattering ? "⚠ Pedal chattering detected" : "⚠ Pedal holds too long or too sparse",
-    rows,
-  };
+    stats.pressesPerMin < SPARSE_MIN_PRESSES_PER_MIN ||
+    stats.maxDur > SPARSE_MAX_HOLD ||
+    (stats.avgDur > 0 && stats.maxDur / stats.avgDur > SPARSE_MAX_HOLD_RATIO);
+  return isSparse ? "⚠ Pedal holds too long or too sparse" : null;
 }
 
 export function PedalAiCard({
@@ -82,20 +51,24 @@ export function PedalAiCard({
   thresholdOn,
   thresholdOff,
   stats,
+  confidence = null,
   onGenerate,
   onThresholdChange,
   onReset,
 }: PedalAiCardProps) {
-  const diagnosis = stats ? diagnose(stats, thresholdOn, thresholdOff, onThresholdChange, onGenerate) : null;
+  const warning = stats ? diagnose(stats) : null;
 
   return (
     <Card
       title="PEDAL AI THRESHOLDS"
       titleButtons={
         hasThresholds && (
-          <Button variant="icon" subtle danger onClick={onReset} title="Reset">
-            <ArrowCounterClockwiseIcon weight="duotone" />
-          </Button>
+          <>
+            {warning && <span className="pedal-ai-card__warning">{warning}</span>}
+            <Button variant="icon" subtle danger onClick={onReset} title="Reset">
+              <ArrowCounterClockwiseIcon weight="duotone" />
+            </Button>
+          </>
         )
       }
       className="pedal-ai-card"
@@ -103,54 +76,49 @@ export function PedalAiCard({
       {!hasThresholds ? (
         <div className="pedal-ai-card__pre">
           <span className="pedal-ai-card__hint">
-            Generate AI-driven sustain pedal events from the loaded MIDI's dynamics.
+            A trained model reads through your notes, forwards and backwards, and works out when a real player would
+            press and lift the pedal. Afterwards, the On and Off thresholds set the confidence the model needs before the pedal
+            goes down and before it lifts.
           </span>
           <Button variant="accent" disabled={!generateEnabled} onClick={onGenerate}>
-            Generate AI Pedal Events
+            Generate pedal events
           </Button>
         </div>
       ) : (
         <div className="pedal-ai-card__post">
-          <div className="pedal-ai-card__thresholds">
-            <label>
-              On threshold
-              <NumberInput
-                min={0}
-                max={1}
-                step={0.001}
+          <div className="pedal-ai-card__controls">
+            <div className="pedal-ai-card__thresholds">
+              <ThresholdStepper
+                label="On threshold"
                 value={thresholdOn}
-                onChange={(e) => onThresholdChange(Number(e.target.value), thresholdOff)}
+                onChange={(value) => onThresholdChange(value, thresholdOff)}
               />
-            </label>
-            <label>
-              Off threshold
-              <NumberInput
-                min={0}
-                max={1}
-                step={0.001}
+              <ThresholdStepper
+                label="Off threshold"
                 value={thresholdOff}
-                onChange={(e) => onThresholdChange(thresholdOn, Number(e.target.value))}
+                onChange={(value) => onThresholdChange(thresholdOn, value)}
               />
-            </label>
+            </div>
+            <div className="pedal-ai-card__side">
+              {stats && (
+                <div className="pedal-ai-card__stats">
+                  <span>Avg hold: {stats.avgDur.toFixed(2)}s</span>
+                  <span>Min hold: {stats.minDur.toFixed(2)}s</span>
+                  <span>Max hold: {stats.maxDur.toFixed(2)}s</span>
+                  <span>Presses/min: {stats.pressesPerMin.toFixed(1)}</span>
+                </div>
+              )}
+              <Button className="pedal-ai-card__regen" onClick={onGenerate}>
+                <ArrowClockwiseIcon weight="duotone" />
+                Regenerate
+              </Button>
+            </div>
           </div>
-          {stats && (
-            <div className="pedal-ai-card__stats">
-              <span>Avg hold: {stats.avgDur.toFixed(2)}s</span>
-              <span>Min hold: {stats.minDur.toFixed(2)}s</span>
-              <span>Max hold: {stats.maxDur.toFixed(2)}s</span>
-              <span>Presses/min: {stats.pressesPerMin.toFixed(1)}</span>
-            </div>
-          )}
-          {diagnosis && (
-            <div className="pedal-ai-card__diag">
-              <div className="pedal-ai-card__diag-title">{diagnosis.title}</div>
-              {diagnosis.rows.map((row) => (
-                <Button key={row.label} variant="item" className="pedal-ai-card__diag-row" onClick={row.onClick}>
-                  {"→ "}
-                  {row.label}
-                </Button>
-              ))}
-            </div>
+          {confidence && (
+            <>
+              <ThresholdChart confidence={confidence} thresholdOn={thresholdOn} thresholdOff={thresholdOff} />
+              <ThresholdLegend />
+            </>
           )}
         </div>
       )}

@@ -5,15 +5,16 @@ use crate::core::midi::get_time_groups;
 use crate::core::models::{KeyEvent, MusicalSection, Note};
 use model::{PedalModel, FEATURES};
 
-const FPS: f64 = 50.0;
+pub const FPS: f64 = 50.0;
 const MIN_CONFIDENCE_GATE: f32 = 0.3;
 const PEDAL_LAG: f64 = 0.05;
 const UNSAFE_INTERVALS: [i32; 2] = [1, 6];
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AiThresholds {
     pub threshold_on: f32,
     pub threshold_off: f32,
+    pub confidence: Vec<f32>,
 }
 
 pub fn otsu_threshold(preds: &[f32]) -> f32 {
@@ -404,6 +405,7 @@ fn process_ai_predictions(
         Some(AiThresholds {
             threshold_on: final_threshold_on,
             threshold_off: final_threshold_off,
+            confidence: preds,
         }),
     )
 }
@@ -919,6 +921,54 @@ mod tests {
                 assert_eq!(m.threshold_on, 0.4);
                 assert_eq!(m.threshold_off, 0.3);
             }
+        }
+
+        #[test]
+        fn test_accepted_result_carries_the_silence_masked_confidence_curve() {
+            let mut preds = vec![0.0; 100];
+            for (i, p) in preds.iter_mut().enumerate().take(80) {
+                let phase = (i as f32) * 0.3;
+                *p = 0.5 + 0.45 * phase.sin();
+            }
+            let notes = vec![note(0, 40, 0.0, 1.0, "left")];
+            let (events, meta) = process_ai_predictions(preds.clone(), &notes, 1.6, FPS, None, None);
+            assert!(!events.is_empty());
+            let curve = meta.unwrap().confidence;
+            assert_eq!(curve.len(), preds.len());
+            let silent_from = (((1.0 + 0.35) * FPS) as usize).min(preds.len());
+            assert_eq!(&curve[..silent_from], &preds[..silent_from]);
+            assert!(curve[silent_from..].iter().all(|&v| v == 0.0));
+        }
+
+        #[test]
+        fn test_curve_replays_into_the_same_events_with_the_returned_thresholds() {
+            let mut preds = vec![0.0; 100];
+            for (i, p) in preds.iter_mut().enumerate().take(80) {
+                let phase = (i as f32) * 0.3;
+                *p = 0.5 + 0.45 * phase.sin();
+            }
+            let notes = vec![note(0, 40, 0.0, 1.6, "left")];
+            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None, None);
+            let meta = meta.unwrap();
+            let mut replayed = Vec::new();
+            let mut down = false;
+            for (i, &value) in meta.confidence.iter().enumerate().skip(1) {
+                if value == 0.0 {
+                    continue;
+                }
+                if !down && value > meta.threshold_on {
+                    down = true;
+                    replayed.push((i as f64 / FPS, "down"));
+                } else if down && value <= meta.threshold_off {
+                    down = false;
+                    replayed.push((i as f64 / FPS, "up"));
+                }
+            }
+            if down {
+                replayed.push((1.6, "up"));
+            }
+            let produced: Vec<(f64, &str)> = events.iter().map(|e| (e.time, e.key_char.as_str())).collect();
+            assert_eq!(replayed, produced);
         }
 
         #[test]

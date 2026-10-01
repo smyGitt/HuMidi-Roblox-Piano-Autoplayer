@@ -129,6 +129,8 @@ export interface TimelineData {
 export interface PedalData {
   pedal_intervals: [number, number][];
   ai_thresholds: [number, number] | null;
+  confidence: number[];
+  confidence_fps: number;
 }
 
 export type SelectedTrackInfo = [number, string];

@@ -33,7 +33,8 @@ import type { TrackPart } from "../pages/playback/LoadedParts";
 import type { PedalAiStats } from "../pages/playback/PedalAiCard";
 import { PlaybackClock } from "./playbackClock";
 import { LiveKeys } from "./liveKeys";
-import { PREVIEW_SONG } from "./previewSong";
+import { PREVIEW_CONFIDENCE, PREVIEW_SONG } from "./previewSong";
+import type { PedalConfidence } from "../lib/pedalPreview";
 
 interface PlaybackEngineValue {
   fileName: string;
@@ -52,6 +53,7 @@ interface PlaybackEngineValue {
   isGeneratingPedal: boolean;
   pedalIntervals: [number, number][];
   aiThresholds: [number, number] | null;
+  pedalConfidence: PedalConfidence | null;
   defaultAiThresholds: [number, number] | null;
   aiStats: PedalAiStats | null;
   isPlaying: boolean;
@@ -121,6 +123,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [saveCount, setSaveCount] = useState(0);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
+  const [pedalConfidence, setPedalConfidence] = useState<PedalConfidence | null>(null);
   const [defaultAiThresholds, setDefaultAiThresholds] = useState<[number, number] | null>(null);
   const defaultAiThresholdsRef = useRef(defaultAiThresholds);
   defaultAiThresholdsRef.current = defaultAiThresholds;
@@ -212,6 +215,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setHasCompiledPedal(false);
     setPedalIntervals([]);
     setAiThresholds(null);
+    setPedalConfidence(null);
     setDefaultAiThresholds(null);
     setParts([]);
     setSelectedTracksInfo([]);
@@ -323,6 +327,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     if (!isTauri()) {
       setPedalIntervals(PREVIEW_SONG.pedalIntervals);
       setAiThresholds([0.5, 0.5]);
+      setPedalConfidence(PREVIEW_CONFIDENCE);
       captureDefaultThresholds([0.5, 0.5]);
       setHasCompiledPedal(true);
       appendLog("Pedal compiled successful (preview mode)");
@@ -335,6 +340,9 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       const data = await invokeCompilePedal(configRef.current, midiFilePath);
       setPedalIntervals(data.pedal_intervals);
       setAiThresholds(data.ai_thresholds);
+      setPedalConfidence(
+        data.confidence.length > 0 ? { values: data.confidence, fps: data.confidence_fps } : null,
+      );
       if (data.ai_thresholds) captureDefaultThresholds(data.ai_thresholds);
       setHasCompiledPedal(true);
       if (data.ai_thresholds) {
@@ -453,6 +461,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setHasCompiledPedal(true);
       setPedalIntervals([]);
       setAiThresholds(null);
+      setPedalConfidence(null);
       setDefaultAiThresholds(null);
       setFileName(label);
       setMidiFilePath("");
@@ -532,6 +541,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setHasCompiledPedal(false);
     setPedalIntervals([]);
     setAiThresholds(null);
+    setPedalConfidence(null);
     setDefaultAiThresholds(null);
     clock.jump(0);
     liveKeys.clear();
@@ -560,6 +570,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     saveCount,
     pedalIntervals,
     aiThresholds,
+    pedalConfidence,
     defaultAiThresholds,
     aiStats,
     isPlaying,

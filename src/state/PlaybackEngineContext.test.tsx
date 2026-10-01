@@ -5,6 +5,8 @@ import { PlaybackConfigProvider, usePlaybackConfig } from "./PlaybackConfigConte
 import { LogProvider, useLog } from "./LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine, type SaveResult } from "./PlaybackEngineContext";
 
+const PEDAL_FPS = 50;
+
 const eventHandlers = vi.hoisted(() => new Map<string, (payload: unknown) => void>());
 
 const tauriMocks = vi.hoisted(() => ({
@@ -297,7 +299,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("generatePedal calls compile_pedal and writes the returned AI thresholds back into shared PlaybackConfig", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1], [2, 3]], ai_thresholds: [0.4, 0.6] });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1], [2, 3]], ai_thresholds: [0.4, 0.6], confidence: [], confidence_fps: PEDAL_FPS });
     const { result } = renderEngine();
     await act(async () => result.current.engine.generatePedal());
     expect(result.current.engine.hasCompiledPedal).toBe(true);
@@ -306,8 +308,21 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.playbackConfig.config.pedal_threshold_off).toBe(0.6);
   });
 
+  it("generatePedal keeps the confidence curve from the backend for the threshold chart, and null when there is none", async () => {
+    const curve = [0, 0.4, 0.8];
+    tauriMocks.compilePedal
+      .mockResolvedValueOnce({ pedal_intervals: [[0, 1]], ai_thresholds: [0.6, 0.3], confidence: curve, confidence_fps: PEDAL_FPS })
+      .mockResolvedValueOnce({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
+    const { result } = renderEngine();
+    expect(result.current.engine.pedalConfidence).toBeNull();
+    await act(async () => result.current.engine.generatePedal());
+    expect(result.current.engine.pedalConfidence).toEqual({ values: curve, fps: PEDAL_FPS });
+    await act(async () => result.current.engine.generatePedal());
+    expect(result.current.engine.pedalConfidence).toBeNull();
+  });
+
   it("play() compiles pedal first if it hasn't been compiled yet, then starts playback", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
     expect(result.current.engine.hasCompiledPedal).toBe(false);
@@ -318,8 +333,8 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
 
   it("defaultAiThresholds captures only the FIRST generation's thresholds, not later regenerations", async () => {
     tauriMocks.compilePedal
-      .mockResolvedValueOnce({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] })
-      .mockResolvedValueOnce({ pedal_intervals: [[0, 1], [2, 3]], ai_thresholds: [0.71, 0.29] });
+      .mockResolvedValueOnce({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38], confidence: [], confidence_fps: PEDAL_FPS })
+      .mockResolvedValueOnce({ pedal_intervals: [[0, 1], [2, 3]], ai_thresholds: [0.71, 0.29], confidence: [], confidence_fps: PEDAL_FPS });
     const { result } = renderEngine();
 
     await act(async () => result.current.engine.generatePedal());
@@ -332,7 +347,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("defaultAiThresholds resets on loadFile so the next song's first generation becomes the new default", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38], confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.parseMidiStructure.mockResolvedValue({ tracks: [], initial_bpm: 120 });
     const { result } = renderEngine();
 
@@ -344,7 +359,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("defaultAiThresholds resets on resumeSave", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38], confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.resumeFromSave.mockResolvedValue({
       final_notes: [],
       played_notes: [],
@@ -363,7 +378,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("play() skips re-compiling pedal if it's already compiled", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.5, 0.5] });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.5, 0.5], confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
     await act(async () => result.current.engine.generatePedal());
@@ -374,7 +389,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   describe("pedal generation state", () => {
-    const pedalResult = { pedal_intervals: [[0, 1]], ai_thresholds: null };
+    const pedalResult = { pedal_intervals: [[0, 1]], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS };
 
     it("isGeneratingPedal is true only while compile_pedal is in flight", async () => {
       const compile = deferred<typeof pedalResult>();
@@ -585,7 +600,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     const calls: string[] = [];
     tauriMocks.compilePedal.mockImplementation(async () => {
       calls.push("compilePedal");
-      return { pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] };
+      return { pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38], confidence: [], confidence_fps: PEDAL_FPS };
     });
     tauriMocks.savePlayback.mockImplementation(async () => {
       calls.push("savePlayback");
@@ -605,7 +620,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("save does not regenerate a pedal that is already compiled", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: null });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.savePlayback.mockResolvedValue("/saves/x.json");
     const { result } = renderEngine();
     await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
@@ -630,7 +645,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     });
     expect(result.current.engine.isGeneratingPedal).toBe(true);
     await act(async () => {
-      finish({ pedal_intervals: [], ai_thresholds: null });
+      finish({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
       await pending;
     });
     expect(result.current.engine.isGeneratingPedal).toBe(false);
@@ -652,7 +667,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(saved).toEqual({ error: "Pedal is still generating." });
     expect(tauriMocks.savePlayback).not.toHaveBeenCalled();
     await act(async () => {
-      finish({ pedal_intervals: [], ai_thresholds: null });
+      finish({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
       await generating;
     });
   });
@@ -740,7 +755,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("hotkey_toggle_requested calls play() when not playing, togglePause() when already playing", async () => {
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     tauriMocks.togglePause.mockResolvedValue(undefined);
     renderEngine();
@@ -823,7 +838,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
       time_signatures: [],
       measure_boundaries: [[0, 0.25]],
     });
-    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null });
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
 
@@ -891,7 +906,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     });
 
     it("generatePedal sets the pedal press count on the snapshot", async () => {
-      tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1], [2, 3], [4, 5]], ai_thresholds: null });
+      tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1], [2, 3], [4, 5]], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
       const { result } = renderEngine();
       await act(async () => result.current.engine.generatePedal());
       expect(result.current.log.snapshot.pedal).toBe("3 presses");
@@ -925,7 +940,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
         time_signatures: [],
         measure_boundaries: [],
       });
-      tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null });
+      tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
       tauriMocks.startPlayback.mockResolvedValue(undefined);
       const { result } = renderEngine();
       await act(async () => result.current.engine.playTranslatedSheet("y y y", 140));

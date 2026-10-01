@@ -13,7 +13,7 @@ use crate::core::keyboard_driver::{EnigoDriver, KeyboardDriver};
 use crate::core::midi::{KeyMapper, MidiParser, TempoMap};
 use crate::core::models::{KeyEvent, MidiTrack, Note};
 use crate::core::pedal::model::{PedalModel, FEATURES};
-use crate::core::pedal::AiThresholds;
+use crate::core::pedal::{AiThresholds, FPS as PEDAL_CONFIDENCE_FPS};
 use crate::core::player::{PlaybackEngine, PlayerEvent};
 use crate::core::section_analyzer::{assign_hands, SectionAnalyzer};
 use crate::core::session_cache;
@@ -268,6 +268,8 @@ fn timeline_tempo_fields(tempo_map: &TempoMap, total_dur: f64) -> TempoFields {
 pub struct PedalData {
     pub pedal_intervals: Vec<(f64, f64)>,
     pub ai_thresholds: Option<(f32, f32)>,
+    pub confidence: Vec<f32>,
+    pub confidence_fps: f64,
 }
 
 fn compute_total_dur(final_notes: &[Note]) -> f64 {
@@ -459,9 +461,14 @@ pub fn compile_pedal_logic(
         total_dur,
     );
 
+    let ai_thresholds = ai_meta.as_ref().map(|t: &AiThresholds| (t.threshold_on, t.threshold_off));
+    let confidence = ai_meta.map(|t| t.confidence).unwrap_or_default();
+
     Ok(PedalData {
         pedal_intervals,
-        ai_thresholds: ai_meta.map(|t: AiThresholds| (t.threshold_on, t.threshold_off)),
+        ai_thresholds,
+        confidence,
+        confidence_fps: PEDAL_CONFIDENCE_FPS,
     })
 }
 
@@ -2107,6 +2114,15 @@ mod tests {
             let result = compile_pedal_logic(&config, None, &mut session).unwrap();
             assert!(result.pedal_intervals.is_empty());
             assert_eq!(session.pedal_events, Some(vec![]));
+        }
+
+        #[test]
+        fn test_without_a_model_there_is_no_confidence_curve_but_the_rate_is_reported() {
+            let (config, mut session) = compiled_session();
+            let result = compile_pedal_logic(&config, None, &mut session).unwrap();
+            assert!(result.ai_thresholds.is_none());
+            assert!(result.confidence.is_empty());
+            assert_eq!(result.confidence_fps, crate::core::pedal::FPS);
         }
 
         #[test]
