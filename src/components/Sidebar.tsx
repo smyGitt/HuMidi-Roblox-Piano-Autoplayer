@@ -4,7 +4,6 @@ import {
   CertificateIcon,
   DiscordLogoIcon,
   GearSixIcon,
-  GithubLogoIcon,
   MusicNoteIcon,
   TranslateIcon,
   WaveformIcon,
@@ -77,16 +76,6 @@ export function Sidebar({ activePage, onNavigate, visualizerDisabled }: SidebarP
       <Link variant="nav" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
         <DiscordLogoIcon weight="duotone" />
         <span className="sidebar__nav-label">Discord</span>
-      </Link>
-      <Link
-        variant="nav"
-        href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/tree/main"
-        target="_blank"
-        rel="noreferrer"
-        title="GitHub"
-      >
-        <GithubLogoIcon weight="duotone" />
-        <span className="sidebar__nav-label">GitHub</span>
       </Link>
     </aside>
   );
