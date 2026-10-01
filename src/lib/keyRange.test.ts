@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { getKeyRange, isBlackKey } from "./keyRange";
+import { foldPitch, getKeyRange, isBlackKey } from "./keyRange";
+
+describe("foldPitch", () => {
+  const compact = getKeyRange(false);
+  const full = getKeyRange(true);
+
+  it("leaves a pitch already inside the range untouched", () => {
+    expect(foldPitch(36, compact)).toBe(36);
+    expect(foldPitch(60, compact)).toBe(60);
+    expect(foldPitch(96, compact)).toBe(96);
+  });
+
+  it("moves a pitch below the range up by whole octaves until it fits, like KeyMapper::get_key_data", () => {
+    expect(foldPitch(30, compact)).toBe(42);
+    expect(foldPitch(21, compact)).toBe(45);
+    expect(foldPitch(0, compact)).toBe(36);
+  });
+
+  it("moves a pitch above the range down by whole octaves until it fits", () => {
+    expect(foldPitch(100, compact)).toBe(88);
+    expect(foldPitch(108, compact)).toBe(96);
+    expect(foldPitch(127, full)).toBe(103);
+  });
+
+  it("keeps the pitch class, so a folded black key stays a black key", () => {
+    expect(isBlackKey(foldPitch(25, compact))).toBe(true);
+    expect(isBlackKey(foldPitch(105, compact))).toBe(false);
+  });
+});
 
 describe("getKeyRange", () => {
   it("returns the full 88-key range (A0-C8) when use88KeyLayout is true", () => {

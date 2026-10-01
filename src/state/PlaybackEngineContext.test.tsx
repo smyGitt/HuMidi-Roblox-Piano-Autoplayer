@@ -143,18 +143,40 @@ describe("PlaybackEngineContext (preview mode, isTauri() = false)", () => {
 
   it("play/stop/seek/togglePause mutate local state without any backend call", async () => {
     const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("test.mid", "test.mid"));
+    await act(async () => result.current.engine.confirmTrackSelection([{ index: 0, role: "Left Hand" }]));
     expect(result.current.engine.isPlaying).toBe(false);
     await act(async () => result.current.engine.play());
     expect(result.current.engine.isPlaying).toBe(true);
     await act(async () => result.current.engine.togglePause());
     expect(result.current.engine.isPlaying).toBe(false);
-    await act(async () => result.current.engine.seek(42));
-    expect(result.current.engine.currentTime).toBe(42);
+    await act(async () => result.current.engine.seek(12));
+    expect(result.current.engine.clock.time()).toBe(12);
     await act(async () => result.current.engine.stop());
-    expect(result.current.engine.currentTime).toBe(0);
+    expect(result.current.engine.clock.time()).toBe(0);
     expect(tauriMocks.startPlayback).not.toHaveBeenCalled();
     expect(tauriMocks.stopPlayback).not.toHaveBeenCalled();
     expect(tauriMocks.seekPlayback).not.toHaveBeenCalled();
+  });
+
+  it("confirmTrackSelection fills playedNotes with the preview song so the visualizer has notes to draw", async () => {
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("test.mid", "test.mid"));
+    await act(async () => result.current.engine.confirmTrackSelection([{ index: 0, role: "Left Hand" }]));
+    expect(result.current.engine.playedNotes.length).toBeGreaterThan(0);
+    expect(result.current.engine.clock.duration()).toBe(result.current.engine.totalDuration);
+  });
+
+  it("while playing, simulates pressed keys from the played notes at the clock's time", async () => {
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("test.mid", "test.mid"));
+    await act(async () => result.current.engine.confirmTrackSelection([{ index: 0, role: "Left Hand" }]));
+    await act(async () => result.current.engine.seek(0.1));
+    expect(result.current.engine.liveKeys.snapshot().pitches.size).toBe(0);
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.liveKeys.snapshot().pitches.size).toBeGreaterThan(0);
+    await act(async () => result.current.engine.stop());
+    expect(result.current.engine.liveKeys.snapshot().pitches.size).toBe(0);
   });
 
   it("save() logs unavailability and resolves to an error instead of calling the backend", async () => {
@@ -225,6 +247,9 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     });
     tauriMocks.compileNotes.mockResolvedValue({
       final_notes: [{ id: 0, pitch: 60, velocity: 80, start_time: 0, duration: 1, hand: "left", original_track_index: 0, channel: 0 }],
+      played_notes: [
+        { id: 0, pitch: 60, velocity: 80, start_time: 0.012, duration: 1, hand: "left", original_track_index: 0, channel: 0 },
+      ],
       total_dur: 12.5,
       tempo_events: [[0, 545_454]],
       time_signatures: [[0, 3, 4]],
@@ -240,6 +265,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(selectedTracksInfo).toEqual([[0, "Auto-Detect"]]);
     expect(result.current.engine.totalDuration).toBe(12.5);
     expect(result.current.engine.finalNotes).toHaveLength(1);
+    expect(result.current.engine.playedNotes[0].start_time).toBe(0.012);
     expect(result.current.engine.hasCompiledNotes).toBe(true);
     expect(result.current.engine.tempoEvents).toEqual([[0, 545_454]]);
     expect(result.current.engine.timeSignatures).toEqual([[0, 3, 4]]);
@@ -253,6 +279,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     });
     tauriMocks.compileNotes.mockResolvedValue({
       final_notes: [],
+      played_notes: [],
       total_dur: 1,
       tempo_events: [[0, 400_000]],
       time_signatures: [[0, 6, 8]],
@@ -320,6 +347,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38] });
     tauriMocks.resumeFromSave.mockResolvedValue({
       final_notes: [],
+      played_notes: [],
       total_dur: 1,
       tempo_events: [],
       time_signatures: [],
@@ -487,14 +515,14 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.engine.isPaused).toBe(false);
   });
 
-  it("stop calls the real command and resets currentTime", async () => {
+  it("stop calls the real command and resets the playback clock to the start", async () => {
     tauriMocks.stopPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
-    await act(async () => result.current.engine.seek(30));
-    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => result.current.engine.clock.report(30));
     await act(async () => result.current.engine.stop());
     expect(tauriMocks.stopPlayback).toHaveBeenCalledTimes(1);
-    expect(result.current.engine.currentTime).toBe(0);
+    expect(result.current.engine.clock.time()).toBe(0);
   });
 
   it("seek calls the real command with the given time", async () => {
@@ -502,6 +530,42 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     const { result } = renderEngine();
     await act(async () => result.current.engine.seek(17.5));
     expect(tauriMocks.seekPlayback).toHaveBeenCalledWith(17.5);
+  });
+
+  it("seek leaves the clock alone while nothing is playing, since the backend ignores it", async () => {
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => result.current.engine.seek(17.5));
+    expect(result.current.engine.clock.time()).toBe(0);
+  });
+
+  it("seek moves the clock right away during playback instead of waiting for the backend's progress event", async () => {
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("playback_started")).toBe(true));
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => eventHandlers.get("playback_started")!(null));
+    await act(async () => result.current.engine.seek(17.5));
+    expect(result.current.engine.clock.time()).toBe(17.5);
+  });
+
+  it("progress_updated events feed the playback clock", async () => {
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("progress_updated")).toBe(true));
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => eventHandlers.get("progress_updated")!(12.25));
+    expect(result.current.engine.clock.time()).toBe(12.25);
+  });
+
+  it("visualizer_updated and pedal_updated events feed the live key store", async () => {
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("visualizer_updated")).toBe(true));
+    await act(async () => eventHandlers.get("visualizer_updated")!([60, 64]));
+    await act(async () => eventHandlers.get("pedal_updated")!(true));
+    const snapshot = result.current.engine.liveKeys.snapshot();
+    expect([...snapshot.pitches].sort()).toEqual([60, 64]);
+    expect(snapshot.pedal).toBe(true);
   });
 
   it("save calls save_playback with the current file name and returns the output path", async () => {
@@ -696,10 +760,19 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("resumeSave calls resume_from_save and populates notes/duration, marking both notes and pedal as compiled", async () => {
+    const resumedNote = {
+      id: 0,
+      pitch: 60,
+      velocity: 80,
+      start_time: 0,
+      duration: 1,
+      hand: "unknown",
+      original_track_index: -1,
+      channel: -1,
+    };
     tauriMocks.resumeFromSave.mockResolvedValue({
-      final_notes: [
-        { id: 0, pitch: 60, velocity: 80, start_time: 0, duration: 1, hand: "unknown", original_track_index: -1, channel: -1 },
-      ],
+      final_notes: [resumedNote],
+      played_notes: [resumedNote],
       total_dur: 5.5,
       tempo_events: [[0, 500_000]],
       time_signatures: [],
@@ -709,6 +782,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     await act(async () => result.current.engine.resumeSave("/saves/song.json", "song"));
     expect(tauriMocks.resumeFromSave).toHaveBeenCalledWith("/saves/song.json");
     expect(result.current.engine.finalNotes).toHaveLength(1);
+    expect(result.current.engine.playedNotes).toEqual([resumedNote]);
     expect(result.current.engine.totalDuration).toBe(5.5);
     expect(result.current.engine.hasCompiledNotes).toBe(true);
     expect(result.current.engine.hasCompiledPedal).toBe(true);
@@ -727,7 +801,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("resumeSave, once played, does NOT trigger a redundant compile_pedal call from play()", async () => {
-    tauriMocks.resumeFromSave.mockResolvedValue({ final_notes: [], total_dur: 1 });
+    tauriMocks.resumeFromSave.mockResolvedValue({ final_notes: [], played_notes: [], total_dur: 1 });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
     await act(async () => result.current.engine.resumeSave("/saves/song.json", "song"));
@@ -739,6 +813,9 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   it("playTranslatedSheet compiles from the sheet, compiles pedal, then starts playback", async () => {
     tauriMocks.compileNotesFromSheet.mockResolvedValue({
       final_notes: [
+        { id: 0, pitch: 60, velocity: 64, start_time: 0, duration: 0.25, hand: "right", original_track_index: 0, channel: 0 },
+      ],
+      played_notes: [
         { id: 0, pitch: 60, velocity: 64, start_time: 0, duration: 0.25, hand: "right", original_track_index: 0, channel: 0 },
       ],
       total_dur: 0.25,
@@ -758,6 +835,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(bpm).toBe(140);
     expect(config.tempo).toBe(100);
     expect(result.current.engine.finalNotes).toHaveLength(1);
+    expect(result.current.engine.playedNotes).toHaveLength(1);
     expect(result.current.engine.totalDuration).toBe(0.25);
     expect(result.current.engine.hasCompiledNotes).toBe(true);
     expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
@@ -798,6 +876,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
         final_notes: [
           { id: 0, pitch: 60, velocity: 80, start_time: 0, duration: 1, hand: "left", original_track_index: 0, channel: 0 },
         ],
+        played_notes: [],
         total_dur: 125,
         tempo_events: [],
         time_signatures: [],
@@ -821,6 +900,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     it("resumeSave clears the snapshot then sets file/source/tracks/pedal from the resumed save", async () => {
       tauriMocks.resumeFromSave.mockResolvedValue({
         final_notes: [],
+        played_notes: [],
         total_dur: 5.5,
         tempo_events: [],
         time_signatures: [],
@@ -839,6 +919,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     it("playTranslatedSheet clears the snapshot then sets file/source/tempo for the pasted sheet", async () => {
       tauriMocks.compileNotesFromSheet.mockResolvedValue({
         final_notes: [],
+        played_notes: [],
         total_dur: 1,
         tempo_events: [],
         time_signatures: [],

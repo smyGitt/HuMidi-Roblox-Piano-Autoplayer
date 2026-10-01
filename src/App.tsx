@@ -33,8 +33,16 @@ function AppShell() {
   const [activePage, setActivePage] = useState<PageId>("playback");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
-  const { opacity, showStatusText, showUpdatePrompt, resolveUpdatePrompt, updateAvailable, dismissUpdateAvailable } =
-    useAppSettings();
+  const {
+    opacity,
+    showStatusText,
+    showTimeline,
+    showPiano,
+    showUpdatePrompt,
+    resolveUpdatePrompt,
+    updateAvailable,
+    dismissUpdateAvailable,
+  } = useAppSettings();
   const engine = usePlaybackEngine();
   const { config } = usePlaybackConfig();
 
@@ -73,7 +81,11 @@ function AppShell() {
     <div className={`app-window${isCollapsed ? " app-window--collapsed" : ""}`} style={{ opacity: opacity / 100 }}>
       {!isCollapsed && (
         <div className="app-body">
-          <Sidebar activePage={activePage} onNavigate={setActivePage} />
+          <Sidebar
+            activePage={activePage}
+            onNavigate={setActivePage}
+            visualizerDisabled={!showTimeline && !showPiano}
+          />
           <div className="app-page-area">
             <FileHeader />
             <div className="app-page-content">
@@ -99,15 +111,14 @@ function AppShell() {
 
       <TransportBar
         isPlaying={engine.isPlaying && !engine.isPaused}
-        currentTime={engine.currentTime}
+        clock={engine.clock}
         totalTime={engine.totalDuration}
         isCollapsed={isCollapsed}
         status={status}
         statusLabel={statusLabel}
         showStatusText={showStatusText}
         playEnabled={engine.hasCompiledNotes}
-        onScrub={(v) => engine.seek(engine.totalDuration > 0 ? (v / 10000) * engine.totalDuration : 0)}
-        onSeekCommit={() => {}}
+        onScrub={(time) => void engine.seek(time)}
         onPlayPause={() => {
           if (engine.isPlaying) void engine.togglePause();
           else void engine.play();
@@ -148,15 +159,15 @@ function AppShell() {
 function App() {
   return (
     <ThemeProvider>
-      <AppSettingsProvider>
-        <PlaybackConfigProvider>
-          <LogProvider>
+      <LogProvider>
+        <AppSettingsProvider>
+          <PlaybackConfigProvider>
             <PlaybackEngineProvider>
               <AppShell />
             </PlaybackEngineProvider>
-          </LogProvider>
-        </PlaybackConfigProvider>
-      </AppSettingsProvider>
+          </PlaybackConfigProvider>
+        </AppSettingsProvider>
+      </LogProvider>
     </ThemeProvider>
   );
 }

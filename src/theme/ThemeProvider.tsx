@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isTauri, getActiveThemeName, setActiveThemeName, getCustomThemes, type CustomThemeColors } from "../lib/tauri";
-import { THEMES, DEFAULT_THEME_NAME, applyThemeToRoot, type Theme, type ThemeTokens } from "./tokens";
+import { THEMES, DEFAULT_THEME_NAME, applyThemeToRoot, completeTokens, type Theme } from "./tokens";
 
 function toTheme(custom: CustomThemeColors): Theme {
   const { name, builtin: _builtin, ...tokens } = custom;
-  return { name, tokens: tokens as ThemeTokens };
+  return { name, tokens: completeTokens(tokens) };
 }
 
 interface ThemeContextValue {

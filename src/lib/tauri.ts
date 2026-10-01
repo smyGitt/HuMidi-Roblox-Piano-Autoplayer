@@ -108,6 +108,7 @@ export type MeasureBoundary = [number, number];
 
 export interface ResumedSession {
   final_notes: BackendNote[];
+  played_notes: BackendNote[];
   total_dur: number;
   tempo_events: TempoEvent[];
   time_signatures: TimeSignatureEvent[];
@@ -118,6 +119,7 @@ export interface ResumedSession {
 
 export interface TimelineData {
   final_notes: BackendNote[];
+  played_notes: BackendNote[];
   total_dur: number;
   tempo_events: TempoEvent[];
   time_signatures: TimeSignatureEvent[];
@@ -228,6 +230,14 @@ export interface CustomThemeColors {
   pedal_color: string;
   accent_loaded: string;
   knob_color: string;
+  viz_note_left: string;
+  viz_note_right: string;
+  viz_note_other: string;
+  viz_progress_line: string;
+  viz_measure_line: string;
+  viz_key_white: string;
+  viz_key_black: string;
+  viz_key_pressed: string;
   builtin: boolean;
 }
 

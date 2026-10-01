@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri, loadAppConfig, saveAppConfig, onEvent } from "../lib/tauri";
+import { useLog } from "./LogContext";
 
 interface AppSettings {
   alwaysOnTop: boolean;
@@ -8,6 +9,7 @@ interface AppSettings {
   showTimeline: boolean;
   showPiano: boolean;
   showPianoPedal: boolean;
+  visualizerHorizontal: boolean;
   pedalPromptThreshold: number;
   autoCheckUpdates: boolean;
   showStatusText: boolean;
@@ -20,6 +22,7 @@ interface AppSettingsContextValue extends AppSettings {
   setShowTimeline: (v: boolean) => void;
   setShowPiano: (v: boolean) => void;
   setShowPianoPedal: (v: boolean) => void;
+  setVisualizerHorizontal: (v: boolean) => void;
   setPedalPromptThreshold: (v: number) => void;
   setAutoCheckUpdates: (v: boolean) => void;
   setShowStatusText: (v: boolean) => void;
@@ -38,12 +41,19 @@ function clampVisibleSaves(v: number): number {
   return Math.min(MAX_VISIBLE_SAVES, Math.max(MIN_VISIBLE_SAVES, Math.round(v)));
 }
 
+function applyAlwaysOnTop(value: boolean, report: (message: string) => void) {
+  getCurrentWindow()
+    .setAlwaysOnTop(value)
+    .catch((error) => report(`Always on top failed: ${String(error)}`));
+}
+
 const DEFAULTS: AppSettings = {
   alwaysOnTop: false,
   opacity: 100,
   showTimeline: true,
   showPiano: true,
   showPianoPedal: true,
+  visualizerHorizontal: false,
   pedalPromptThreshold: 8,
   autoCheckUpdates: false,
   showStatusText: false,
@@ -53,11 +63,15 @@ const DEFAULTS: AppSettings = {
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
+  const { appendLog } = useLog();
+  const appendLogRef = useRef(appendLog);
+  appendLogRef.current = appendLog;
   const [alwaysOnTop, setAlwaysOnTopState] = useState(DEFAULTS.alwaysOnTop);
   const [opacity, setOpacityState] = useState(DEFAULTS.opacity);
   const [showTimeline, setShowTimelineState] = useState(DEFAULTS.showTimeline);
   const [showPiano, setShowPianoState] = useState(DEFAULTS.showPiano);
   const [showPianoPedal, setShowPianoPedalState] = useState(DEFAULTS.showPianoPedal);
+  const [visualizerHorizontal, setVisualizerHorizontalState] = useState(DEFAULTS.visualizerHorizontal);
   const [pedalPromptThreshold, setPedalPromptThresholdState] = useState(DEFAULTS.pedalPromptThreshold);
   const [autoCheckUpdates, setAutoCheckUpdatesState] = useState(DEFAULTS.autoCheckUpdates);
   const [showStatusText, setShowStatusTextState] = useState(DEFAULTS.showStatusText);
@@ -80,13 +94,17 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (!isTauri()) return;
     loadAppConfig()
       .then((cfg) => {
-        if (typeof cfg.always_on_top === "boolean") setAlwaysOnTopState(cfg.always_on_top);
+        if (typeof cfg.always_on_top === "boolean") {
+          setAlwaysOnTopState(cfg.always_on_top);
+          if (cfg.always_on_top) applyAlwaysOnTop(true, appendLogRef.current);
+        }
         if (typeof cfg.opacity === "number") setOpacityState(cfg.opacity);
         if (typeof cfg.show_timeline_visualizer === "boolean") setShowTimelineState(cfg.show_timeline_visualizer);
         if (typeof cfg.show_piano_visualizer === "boolean") setShowPianoState(cfg.show_piano_visualizer);
         if (typeof cfg.show_piano_pedal_visualizer === "boolean") {
           setShowPianoPedalState(cfg.show_piano_pedal_visualizer);
         }
+        if (typeof cfg.visualizer_horizontal === "boolean") setVisualizerHorizontalState(cfg.visualizer_horizontal);
         if (typeof cfg.pedal_prompt_threshold === "number") {
           setPedalPromptThresholdState(cfg.pedal_prompt_threshold);
         }
@@ -105,9 +123,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setAlwaysOnTopState(v);
     if (!isTauri()) return;
     void saveAppConfig({ always_on_top: v });
-    getCurrentWindow()
-      .setAlwaysOnTop(v)
-      .catch(() => {});
+    applyAlwaysOnTop(v, appendLog);
   }
 
   function setOpacity(v: number) {
@@ -128,6 +144,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   function setShowPianoPedal(v: boolean) {
     setShowPianoPedalState(v);
     if (isTauri()) void saveAppConfig({ show_piano_pedal_visualizer: v });
+  }
+
+  function setVisualizerHorizontal(v: boolean) {
+    setVisualizerHorizontalState(v);
+    if (isTauri()) void saveAppConfig({ visualizer_horizontal: v });
   }
 
   function setPedalPromptThreshold(v: number) {
@@ -167,6 +188,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showTimeline,
       showPiano,
       showPianoPedal,
+      visualizerHorizontal,
       pedalPromptThreshold,
       autoCheckUpdates,
       showStatusText,
@@ -176,6 +198,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setShowTimeline,
       setShowPiano,
       setShowPianoPedal,
+      setVisualizerHorizontal,
       setPedalPromptThreshold,
       setAutoCheckUpdates,
       setShowStatusText,
@@ -191,6 +214,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showTimeline,
       showPiano,
       showPianoPedal,
+      visualizerHorizontal,
       pedalPromptThreshold,
       autoCheckUpdates,
       showStatusText,

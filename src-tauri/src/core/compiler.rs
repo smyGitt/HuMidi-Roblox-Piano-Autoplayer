@@ -14,6 +14,15 @@ pub fn compile_note_events(
     notes: &[Note],
     sections: &[MusicalSection],
 ) -> (Vec<KeyEvent>, Vec<Note>) {
+    let (events, humanized, _) = compile_note_events_with_played(config, notes, sections);
+    (events, humanized)
+}
+
+pub fn compile_note_events_with_played(
+    config: &PlaybackConfig,
+    notes: &[Note],
+    sections: &[MusicalSection],
+) -> (Vec<KeyEvent>, Vec<Note>, Vec<Note>) {
     let mut humanizer = Humanizer::new(config.clone());
 
     let mut left_hand_notes: Vec<Note> = notes.iter().filter(|n| n.hand == "left").cloned().collect();
@@ -43,6 +52,7 @@ pub fn compile_note_events(
     let mistake_chance = config.mistake_chance / 100.0;
     let mut rng = rand::rng();
     let mut events: Vec<KeyEvent> = Vec::new();
+    let mut played: Vec<Note> = Vec::new();
 
     for note in &all_notes {
         let mut scheduled = false;
@@ -58,6 +68,10 @@ pub fn compile_note_events(
                         KeyEvent::new(note.start_time + note.duration, 4, "release", &mk_char);
                     release.pitch = Some(mistake_pitch);
                     events.push(release);
+                    played.push(Note {
+                        pitch: mistake_pitch,
+                        ..note.clone()
+                    });
                     scheduled = true;
                 }
             }
@@ -72,12 +86,13 @@ pub fn compile_note_events(
                 let mut release = KeyEvent::new(note.end_time(), 4, "release", &key_char);
                 release.pitch = Some(note.pitch);
                 events.push(release);
+                played.push(note.clone());
             }
         }
     }
 
     events.sort();
-    (events, all_notes)
+    (events, all_notes, played)
 }
 
 pub fn compile_midi_pedal_events(midi_pedal_events: &[(f64, bool)]) -> Vec<KeyEvent> {
@@ -325,6 +340,91 @@ mod tests {
             ];
             let (_, all_notes) = compile_note_events(&cfg, &notes, &[]);
             assert_eq!(all_notes.len(), 2);
+        }
+    }
+
+    mod test_compile_note_events_with_played {
+        use super::*;
+
+        fn press_events(events: &[KeyEvent]) -> Vec<&KeyEvent> {
+            events.iter().filter(|e| e.action == "press").collect()
+        }
+
+        #[test]
+        fn test_one_played_note_per_press_event() {
+            let notes = vec![
+                note(0, 60, 0.0, 0.5, "left"),
+                note(1, 62, 0.5, 0.5, "left"),
+                note(2, 64, 1.0, 0.5, "right"),
+            ];
+            let (events, _, played) = compile_note_events_with_played(&base_config(), &notes, &[]);
+            assert_eq!(played.len(), press_events(&events).len());
+        }
+
+        #[test]
+        fn test_played_notes_carry_the_humanized_timing() {
+            let mut cfg = base_config();
+            cfg.vary_timing = true;
+            cfg.timing_variance = 0.05;
+            let notes: Vec<Note> = (0..20)
+                .map(|i| note(i, 60 + (i % 12), f64::from(i) * 0.5, 0.25, "right"))
+                .collect();
+            let (_, humanized, played) = compile_note_events_with_played(&cfg, &notes, &[]);
+            let mut played_starts: Vec<f64> = played.iter().map(|n| n.start_time).collect();
+            let mut humanized_starts: Vec<f64> = humanized.iter().map(|n| n.start_time).collect();
+            played_starts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            humanized_starts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            assert_eq!(played_starts, humanized_starts);
+        }
+
+        #[test]
+        fn test_played_note_start_and_end_match_its_press_and_release_events() {
+            let notes = vec![note(0, 60, 1.0, 0.5, "left")];
+            let (events, _, played) = compile_note_events_with_played(&base_config(), &notes, &[]);
+            assert_eq!(played.len(), 1);
+            assert!((played[0].start_time - events[0].time).abs() < 1e-9);
+            assert!((played[0].end_time() - events[1].time).abs() < 1e-9);
+        }
+
+        #[test]
+        fn test_played_note_keeps_its_hand() {
+            let notes = vec![note(0, 60, 0.0, 0.5, "left"), note(1, 72, 0.0, 0.5, "right")];
+            let (_, _, played) = compile_note_events_with_played(&base_config(), &notes, &[]);
+            let hands: Vec<&str> = played.iter().map(|n| n.hand.as_str()).collect();
+            assert!(hands.contains(&"left"));
+            assert!(hands.contains(&"right"));
+        }
+
+        #[test]
+        fn test_unknown_hand_notes_are_not_played() {
+            let notes = vec![note(0, 60, 0.0, 0.5, "unknown"), note(1, 62, 1.0, 0.5, "left")];
+            let (_, _, played) = compile_note_events_with_played(&base_config(), &notes, &[]);
+            assert_eq!(played.len(), 1);
+            assert_eq!(played[0].id, 1);
+        }
+
+        #[test]
+        fn test_mistake_note_is_played_at_the_mistake_pitch() {
+            let mut cfg = base_config();
+            cfg.enable_mistakes = true;
+            cfg.mistake_chance = 100.0;
+            let notes = vec![note(0, 60, 0.0, 0.5, "left")];
+            let (events, _, played) = compile_note_events_with_played(&cfg, &notes, &[]);
+            assert_eq!(played.len(), 1);
+            assert_eq!(Some(played[0].pitch), events[0].pitch);
+            assert_ne!(played[0].pitch, 60);
+        }
+
+        #[test]
+        fn test_compile_note_events_returns_the_same_events_and_humanized_notes() {
+            let notes = vec![note(0, 60, 0.0, 0.5, "left"), note(1, 64, 0.5, 0.5, "right")];
+            let summarize = |events: &[KeyEvent]| -> Vec<(f64, String, Option<i32>)> {
+                events.iter().map(|e| (e.time, e.action.clone(), e.pitch)).collect()
+            };
+            let (events, humanized) = compile_note_events(&base_config(), &notes, &[]);
+            let (events_with, humanized_with, _) = compile_note_events_with_played(&base_config(), &notes, &[]);
+            assert_eq!(summarize(&events), summarize(&events_with));
+            assert_eq!(humanized, humanized_with);
         }
     }
 

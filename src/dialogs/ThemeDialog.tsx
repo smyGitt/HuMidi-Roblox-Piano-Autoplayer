@@ -7,6 +7,7 @@ import {
   THEMES,
   COLOR_FIELD_GROUPS,
   applyThemeToRoot,
+  completeTokens,
   uniqueCopyName,
   type Theme,
   type ThemeTokens,
@@ -187,7 +188,7 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
         n += 1;
       }
       const { name: _n, builtin: _b, ...tokens } = imported;
-      const theme: Theme = { name: candidate, tokens: tokens as ThemeTokens };
+      const theme: Theme = { name: candidate, tokens: completeTokens(tokens) };
       await persist(theme);
       setCurrent(theme);
       setDirty(false);

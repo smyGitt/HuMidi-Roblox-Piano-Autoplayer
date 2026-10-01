@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { AppSettingsProvider, useAppSettings } from "./AppSettingsContext";
+import { LogProvider, useLog } from "./LogContext";
 
 const tauriMocks = vi.hoisted(() => ({
   isTauri: vi.fn(() => false),
@@ -21,7 +22,11 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <AppSettingsProvider>{children}</AppSettingsProvider>;
+  return (
+    <LogProvider>
+      <AppSettingsProvider>{children}</AppSettingsProvider>
+    </LogProvider>
+  );
 }
 
 beforeEach(() => {
@@ -43,6 +48,7 @@ describe("AppSettingsContext (preview mode, isTauri() = false)", () => {
     expect(result.current.showTimeline).toBe(true);
     expect(result.current.showPiano).toBe(true);
     expect(result.current.showPianoPedal).toBe(true);
+    expect(result.current.visualizerHorizontal).toBe(false);
     expect(result.current.pedalPromptThreshold).toBe(8);
     expect(result.current.autoCheckUpdates).toBe(false);
     expect(result.current.showStatusText).toBe(false);
@@ -74,6 +80,7 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
         show_timeline_visualizer: false,
         show_piano_visualizer: false,
         show_piano_pedal_visualizer: false,
+        visualizer_horizontal: true,
         pedal_prompt_threshold: 42,
         auto_check_updates: false,
         show_status_text: true,
@@ -89,7 +96,15 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.showTimeline).toBe(false);
     expect(result.current.showPiano).toBe(false);
     expect(result.current.showPianoPedal).toBe(false);
+    expect(result.current.visualizerHorizontal).toBe(true);
     expect(result.current.autoCheckUpdates).toBe(false);
+  });
+
+  it("setVisualizerHorizontal persists under visualizer_horizontal", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await act(async () => result.current.setVisualizerHorizontal(true));
+    expect(result.current.visualizerHorizontal).toBe(true);
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: true });
   });
 
   it("an empty persisted config leaves every field at its default", async () => {
@@ -137,6 +152,30 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     await act(async () => result.current.setAlwaysOnTop(true));
     expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ always_on_top: true });
     expect(setAlwaysOnTop).toHaveBeenCalledWith(true);
+  });
+
+  it("applies a saved always_on_top = true to the window when the config loads", async () => {
+    tauriMocks.loadAppConfig.mockReturnValue(Promise.resolve({ always_on_top: true }));
+    renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(setAlwaysOnTop).toHaveBeenCalledWith(true));
+  });
+
+  it("does not touch the window when the saved always_on_top is false or absent", async () => {
+    tauriMocks.loadAppConfig.mockReturnValue(Promise.resolve({ always_on_top: false }));
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(tauriMocks.loadAppConfig).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.alwaysOnTop).toBe(false);
+    expect(setAlwaysOnTop).not.toHaveBeenCalled();
+  });
+
+  it("writes a rejected setAlwaysOnTop call to the app log instead of swallowing it", async () => {
+    setAlwaysOnTop.mockReturnValue(Promise.reject(new Error("not allowed")));
+    const { result } = renderHook(() => ({ settings: useAppSettings(), log: useLog() }), { wrapper });
+    await act(async () => result.current.settings.setAlwaysOnTop(true));
+    await waitFor(() =>
+      expect(result.current.log.entries.some((entry) => entry.line.includes("Always on top failed: Error: not allowed"))).toBe(true),
+    );
   });
 
   it("setAutoCheckUpdates persists under the exact Python key name", async () => {

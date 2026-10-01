@@ -55,13 +55,13 @@ function saveSummary(name: string, songName: string, tempo = 100) {
 
 function tree() {
   return (
-    <AppSettingsProvider>
-      <PlaybackConfigProvider>
-        <LogProvider>
+    <LogProvider>
+      <AppSettingsProvider>
+        <PlaybackConfigProvider>
           <PlaybackTab onEditTrackSelection={() => {}} />
-        </LogProvider>
-      </PlaybackConfigProvider>
-    </AppSettingsProvider>
+        </PlaybackConfigProvider>
+      </AppSettingsProvider>
+    </LogProvider>
   );
 }
 

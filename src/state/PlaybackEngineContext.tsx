@@ -27,9 +27,13 @@ import {
   type MeasureBoundary,
 } from "../lib/tauri";
 import { defaultSaveName } from "../lib/saveName";
+import { activePitchesAt, buildNoteTimeline, pedalActiveAt } from "../lib/noteTimeline";
 import type { HandRole } from "../dialogs/TrackSelectionDialog";
 import type { TrackPart } from "../pages/playback/LoadedParts";
 import type { PedalAiStats } from "../pages/playback/PedalAiCard";
+import { PlaybackClock } from "./playbackClock";
+import { LiveKeys } from "./liveKeys";
+import { PREVIEW_SONG } from "./previewSong";
 
 interface PlaybackEngineValue {
   fileName: string;
@@ -39,6 +43,7 @@ interface PlaybackEngineValue {
   originalBpm: number;
   totalDuration: number;
   finalNotes: BackendNote[];
+  playedNotes: BackendNote[];
   tempoEvents: TempoEvent[];
   timeSignatures: TimeSignatureEvent[];
   measureBoundaries: MeasureBoundary[];
@@ -51,9 +56,8 @@ interface PlaybackEngineValue {
   aiStats: PedalAiStats | null;
   isPlaying: boolean;
   isPaused: boolean;
-  currentTime: number;
-  activePitches: Set<number>;
-  pedalActive: boolean;
+  clock: PlaybackClock;
+  liveKeys: LiveKeys;
   saveDirConfigured: boolean;
 
   openFileBrowser: () => Promise<void>;
@@ -106,6 +110,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [originalBpm, setOriginalBpm] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [finalNotes, setFinalNotes] = useState<BackendNote[]>([]);
+  const [playedNotes, setPlayedNotes] = useState<BackendNote[]>([]);
   const [tempoEvents, setTempoEvents] = useState<TempoEvent[]>([]);
   const [timeSignatures, setTimeSignatures] = useState<TimeSignatureEvent[]>([]);
   const [measureBoundaries, setMeasureBoundaries] = useState<MeasureBoundary[]>([]);
@@ -121,10 +126,10 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   defaultAiThresholdsRef.current = defaultAiThresholds;
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [activePitches, setActivePitches] = useState<Set<number>>(new Set());
-  const [pedalActive, setPedalActive] = useState(false);
+  const [clock] = useState(() => new PlaybackClock({ selfTimed: !isTauri() }));
+  const [liveKeys] = useState(() => new LiveKeys());
   const [saveDirConfigured, setSaveDirConfigured] = useState(false);
+  const running = isPlaying && !isPaused;
 
   const configRef = useRef(config);
   configRef.current = config;
@@ -148,17 +153,42 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    clock.setRunning(running);
+  }, [clock, running]);
+
+  useEffect(() => {
+    clock.setDuration(totalDuration);
+  }, [clock, totalDuration]);
+
+  const previewTimeline = useMemo(() => buildNoteTimeline(playedNotes), [playedNotes]);
+
+  useEffect(() => {
+    if (isTauri()) return;
+    if (!running) {
+      liveKeys.clear();
+      return;
+    }
+    const simulateKeys = () => {
+      const time = clock.time();
+      liveKeys.setPitches(activePitchesAt(previewTimeline, time));
+      liveKeys.setPedal(pedalActiveAt(pedalIntervals, time));
+    };
+    simulateKeys();
+    return clock.subscribe(simulateKeys);
+  }, [clock, liveKeys, running, previewTimeline, pedalIntervals]);
+
+  useEffect(() => {
     if (!isTauri()) return;
     const unlisten: Promise<() => void>[] = [
       onEvent("status_updated", (msg) => appendLog(msg)),
-      onEvent("progress_updated", (t) => setCurrentTime(t)),
+      onEvent("progress_updated", (t) => clock.report(t)),
       onEvent("playback_finished", () => {
         setIsPlaying(false);
         setIsPaused(false);
         appendLog("Playback finished");
       }),
-      onEvent("visualizer_updated", (pitches) => setActivePitches(new Set(pitches))),
-      onEvent("pedal_updated", (active) => setPedalActive(active)),
+      onEvent("visualizer_updated", (pitches) => liveKeys.setPitches(pitches)),
+      onEvent("pedal_updated", (active) => liveKeys.setPedal(active)),
       onEvent("auto_paused", () => setIsPaused(true)),
       onEvent("error_occurred", (msg) => appendLog(`Error: ${msg}`)),
       onEvent("playback_started", () => setIsPlaying(true)),
@@ -172,7 +202,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     return () => {
       unlisten.forEach((p) => p.then((fn) => fn()));
     };
-  }, [appendLog]);
+  }, [appendLog, clock, liveKeys]);
 
   const loadFile = useCallback(async (path: string, name: string) => {
     const version = ++songVersionRef.current;
@@ -186,6 +216,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setParts([]);
     setSelectedTracksInfo([]);
     setFinalNotes([]);
+    setPlayedNotes([]);
     setTempoEvents([]);
     setTimeSignatures([]);
     setMeasureBoundaries([]);
@@ -214,7 +245,6 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       if (version !== songVersionRef.current) return;
       appendLog(`Failed to parse MIDI: ${String(e)}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appendLog]);
 
   async function openFileBrowser() {
@@ -245,15 +275,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       }),
     );
     if (!isTauri()) {
-      const previewDuration = 60;
-      setTotalDuration(previewDuration);
-      setTempoEvents([[0, 500_000]]);
+      setTotalDuration(PREVIEW_SONG.totalDuration);
+      setFinalNotes(PREVIEW_SONG.notes);
+      setPlayedNotes(PREVIEW_SONG.notes);
+      setTempoEvents(PREVIEW_SONG.tempoEvents);
       setTimeSignatures([]);
-      const previewBoundaries: MeasureBoundary[] = [];
-      for (let start = 0; start < previewDuration; start += 2) {
-        previewBoundaries.push([start, Math.min(start + 2, previewDuration)]);
-      }
-      setMeasureBoundaries(previewBoundaries);
+      setMeasureBoundaries(PREVIEW_SONG.measureBoundaries);
       setHasCompiledNotes(true);
       setHasCompiledPedal(false);
       appendLog("Notes compiled successful (preview mode)");
@@ -264,6 +291,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       if (version !== songVersionRef.current) return;
       setTotalDuration(timeline.total_dur);
       setFinalNotes(timeline.final_notes);
+      setPlayedNotes(timeline.played_notes);
       setTempoEvents(timeline.tempo_events);
       setTimeSignatures(timeline.time_signatures);
       setMeasureBoundaries(timeline.measure_boundaries);
@@ -293,7 +321,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
 
   async function compilePedalNow(): Promise<PedalData | null> {
     if (!isTauri()) {
-      setPedalIntervals([[0, 1.8], [3, 4.8], [6, 7.8]]);
+      setPedalIntervals(PREVIEW_SONG.pedalIntervals);
       setAiThresholds([0.5, 0.5]);
       captureDefaultThresholds([0.5, 0.5]);
       setHasCompiledPedal(true);
@@ -352,18 +380,19 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setIsPaused(false);
     if (!isTauri()) {
       setIsPlaying(false);
-      setCurrentTime(0);
+      clock.jump(0);
       return;
     }
     await invokeStopPlayback();
-    setCurrentTime(0);
+    clock.jump(0);
   }
 
   async function seek(time: number) {
     if (!isTauri()) {
-      setCurrentTime(time);
+      clock.jump(time);
       return;
     }
+    if (isPlayingRef.current) clock.jump(time);
     await invokeSeekPlayback(time);
   }
 
@@ -415,6 +444,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     try {
       const result = await invokeResumeFromSave(filepath);
       setFinalNotes(result.final_notes);
+      setPlayedNotes(result.played_notes);
       setTotalDuration(result.total_dur);
       setTempoEvents(result.tempo_events);
       setTimeSignatures(result.time_signatures);
@@ -449,6 +479,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     try {
       const timeline = await invokeCompileNotesFromSheet(configRef.current, sheetText, bpm);
       setFinalNotes(timeline.final_notes);
+      setPlayedNotes(timeline.played_notes);
       setTotalDuration(timeline.total_dur);
       setTempoEvents(timeline.tempo_events);
       setTimeSignatures(timeline.time_signatures);
@@ -493,6 +524,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setOriginalBpm(0);
     setTotalDuration(0);
     setFinalNotes([]);
+    setPlayedNotes([]);
     setTempoEvents([]);
     setTimeSignatures([]);
     setMeasureBoundaries([]);
@@ -501,9 +533,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setPedalIntervals([]);
     setAiThresholds(null);
     setDefaultAiThresholds(null);
-    setCurrentTime(0);
-    setActivePitches(new Set());
-    setPedalActive(false);
+    clock.jump(0);
+    liveKeys.clear();
     clearSnapshot();
     appendLog("Cleared the loaded song");
   }
@@ -518,6 +549,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     originalBpm,
     totalDuration,
     finalNotes,
+    playedNotes,
     tempoEvents,
     timeSignatures,
     measureBoundaries,
@@ -532,9 +564,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     aiStats,
     isPlaying,
     isPaused,
-    currentTime,
-    activePitches,
-    pedalActive,
+    clock,
+    liveKeys,
     saveDirConfigured,
     openFileBrowser,
     loadFile,

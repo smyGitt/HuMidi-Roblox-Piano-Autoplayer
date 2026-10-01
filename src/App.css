@@ -10,8 +10,7 @@
   --letter-spacing: 0.04em;
   --border-width: 1px;
   --scrollbar-width: 10px;
-  --stroke-width: 1;
-  --radius: 10px;
+  --radius: 0;
   --rotate-expandable: 90deg;
   --space-1: 8px;
   --space-2: 16px;
@@ -23,9 +22,9 @@
   --space-9: 72px;
   --space-10: 80px;
   --space-11: 88px;
-  --space-15: 120px;
   --space-16: 128px;
   --space-18: 144px;
+  --space-20: 160px;
   --space-21: 168px;
   --space-25: 200px;
   --space-28: 224px;
@@ -40,7 +39,6 @@
   --duration-spinner: 800ms;
   --easing: cubic-bezier(0.215, 0.61, 0.355, 1);
   --opacity-disabled: 0.5;
-  --opacity-fill: 0.7;
   --z-raised: 2;
   --z-sidebar: 10;
   --z-modal: 100;
@@ -49,6 +47,11 @@
   --modal-max-width: 90vw;
   --modal-max-height: 90vh;
   --black-key-height: 62%;
+  --piano-keys-height: var(--space-10);
+  --piano-pedal-height: var(--space-1);
+  --viz-second-length: var(--space-20);
+  --viz-note-gap: var(--border-width);
+  --viz-playhead-fraction: 0.25;
 }
 
 * {
@@ -513,7 +516,7 @@ button:disabled {
   left: 0;
   width: var(--space-2);
   height: var(--space-2);
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: var(--knob_color);
   transition: left var(--duration) var(--easing);
 }
@@ -545,7 +548,8 @@ button:disabled {
 .app-page-content:has(> .playback-tab),
 .app-page-content:has(> .settings-tab),
 .app-page-content:has(> .translator-tab),
-.app-page-content:has(> .license-tab) {
+.app-page-content:has(> .license-tab),
+.app-page-content:has(> .visualizer-tab) {
   padding: 0;
   overflow: hidden;
   scrollbar-gutter: auto;
@@ -1031,127 +1035,57 @@ button:disabled {
 .visualizer-tab {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  justify-content: flex-end;
   height: 100%;
 }
 
-.visualizer-tab__toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.visualizer-tab__play-btn {
-  margin-left: auto;
-}
-
-.visualizer-tab__empty {
-  color: var(--text_muted);
-  padding: var(--space-3);
-  text-align: center;
-}
-
-.piano-roll {
-  flex: 1;
-  min-height: var(--space-15);
-  overflow-x: auto;
-  overflow-y: hidden;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg_input);
-}
-
-.piano-roll__svg {
+.note-canvas {
   display: block;
-  cursor: pointer;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  cursor: grab;
   touch-action: none;
 }
 
-.piano-roll__bg {
-  fill: var(--bg_input);
-}
-
-.piano-roll__measure-line {
-  stroke: var(--border);
-  stroke-width: var(--stroke-width);
-}
-
-.piano-roll__note--left {
-  fill: var(--accent);
-  fill-opacity: var(--opacity-fill);
-}
-
-.piano-roll__note--right {
-  fill: var(--accent_play);
-  fill-opacity: var(--opacity-fill);
-}
-
-.piano-roll__note--unknown {
-  fill: var(--text_muted);
-  fill-opacity: var(--opacity-fill);
-}
-
-.piano-roll__pedal {
-  fill: var(--pedal_color);
-  fill-opacity: var(--opacity-fill);
-}
-
-.piano-roll__cursor {
-  stroke: var(--accent_stop);
-  stroke-width: var(--stroke-width);
+.note-canvas:active {
+  cursor: grabbing;
 }
 
 .piano-keyboard {
-  position: relative;
-  width: 100%;
-  flex-shrink: 0;
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg_input);
-  padding: var(--space-1) var(--space-1);
-  box-sizing: border-box;
+  flex: none;
 }
 
 .piano-keyboard__keys {
   position: relative;
-  display: flex;
-  width: 100%;
+  height: var(--piano-keys-height);
 }
 
-.piano-keyboard__white {
-  position: relative;
-  height: 100%;
-  background: var(--knob_color);
-  border: var(--border-width) solid var(--border);
-  border-radius: 0 0 var(--radius) var(--radius);
-  box-sizing: border-box;
-}
-
-.piano-keyboard__white--active {
-  background: var(--accent_play);
-}
-
-.piano-keyboard__black {
+.piano-keyboard__key {
   position: absolute;
   top: 0;
-  height: var(--black-key-height);
-  background: var(--bg_primary);
+  height: 100%;
   border: var(--border-width) solid var(--border);
   border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
+  border-radius: var(--radius);
+}
+
+.piano-keyboard__key--white {
+  background: var(--viz_key_white);
+}
+
+.piano-keyboard__key--black {
+  height: var(--black-key-height);
+  background: var(--viz_key_black);
   z-index: var(--z-raised);
 }
 
-.piano-keyboard__black--active {
-  background: var(--accent_play);
+.piano-keyboard__key--pressed {
+  background: var(--viz_key_pressed);
 }
 
-.piano-keyboard__pedal-strip {
-  width: 100%;
-  background: var(--bg_surface);
-  border-radius: var(--radius);
-  overflow: hidden;
+.piano-keyboard__pedal {
+  height: var(--piano-pedal-height);
 }
 
 .piano-keyboard__pedal-fill {
@@ -1161,13 +1095,8 @@ button:disabled {
   transition: width var(--duration-fast) linear;
 }
 
-.piano-keyboard__pedal-fill--active {
+.piano-keyboard__pedal-fill--down {
   width: 100%;
-}
-
-.visualizer-tab__hint {
-  color: var(--text_muted);
-  font-size: var(--font-size);
 }
 
 /* --- Settings tab --- */

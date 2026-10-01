@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use crate::core::atomic_write::write_json_atomic;
-use crate::core::compiler::{compile_note_events, compile_pedal_events, merge_compiled};
+use crate::core::compiler::{compile_note_events_with_played, compile_pedal_events, merge_compiled};
 use crate::core::config::PlaybackConfig;
 use crate::core::keyboard_driver::{EnigoDriver, KeyboardDriver};
 use crate::core::midi::{KeyMapper, MidiParser, TempoMap};
@@ -247,6 +247,7 @@ pub fn prepare_notes(
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TimelineData {
     pub final_notes: Vec<Note>,
+    pub played_notes: Vec<Note>,
     pub total_dur: f64,
     pub tempo_events: Vec<(f64, u32)>,
     pub time_signatures: Vec<(f64, u8, u8)>,
@@ -287,7 +288,8 @@ pub fn compile_notes_logic(
 ) -> io::Result<TimelineData> {
     let (final_notes, tempo_map, midi_pedal_events) = prepare_notes(config, selected_tracks_info)?;
     let sections = SectionAnalyzer::new(final_notes.clone(), &tempo_map).analyze();
-    let (note_events, humanized_notes) = compile_note_events(config, &final_notes, &sections);
+    let (note_events, humanized_notes, played_notes) =
+        compile_note_events_with_played(config, &final_notes, &sections);
     let total_dur = compute_total_dur(&final_notes);
     let (tempo_events, time_signatures, measure_boundaries) =
         timeline_tempo_fields(&tempo_map, total_dur);
@@ -305,6 +307,7 @@ pub fn compile_notes_logic(
 
     Ok(TimelineData {
         final_notes,
+        played_notes,
         total_dur,
         tempo_events,
         time_signatures,
@@ -336,7 +339,8 @@ pub fn compile_notes_from_notes_logic(
     apply_hand_assignment(&mut final_notes, config);
 
     let sections = SectionAnalyzer::new(final_notes.clone(), &tempo_map).analyze();
-    let (note_events, humanized_notes) = compile_note_events(config, &final_notes, &sections);
+    let (note_events, humanized_notes, played_notes) =
+        compile_note_events_with_played(config, &final_notes, &sections);
     let total_dur = compute_total_dur(&final_notes);
     let (tempo_events, time_signatures, measure_boundaries) =
         timeline_tempo_fields(&tempo_map, total_dur);
@@ -354,6 +358,7 @@ pub fn compile_notes_from_notes_logic(
 
     TimelineData {
         final_notes,
+        played_notes,
         total_dur,
         tempo_events,
         time_signatures,
@@ -1008,6 +1013,7 @@ pub fn load_save_file(filepath: String) -> Result<Value, String> {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ResumedSession {
     pub final_notes: Vec<Note>,
+    pub played_notes: Vec<Note>,
     pub total_dur: f64,
     pub tempo_events: Vec<(f64, u32)>,
     pub time_signatures: Vec<(f64, u8, u8)>,
@@ -1150,6 +1156,7 @@ pub fn resume_from_save_logic(
     session.pedal_config_snapshot = None;
 
     Ok(ResumedSession {
+        played_notes: final_notes.clone(),
         final_notes,
         total_dur,
         tempo_events,
@@ -1714,6 +1721,29 @@ mod tests {
         }
 
         #[test]
+        fn test_played_notes_match_the_compiled_press_events() {
+            let path = write_temp_midi_single_note();
+            let mut config = PlaybackConfig::default();
+            config.midi_file = path.to_string_lossy().to_string();
+            let mut session = PlaybackSession::default();
+
+            let result =
+                compile_notes_logic(&config, &[(0, "Right Hand".to_string())], &mut session)
+                    .unwrap();
+
+            let presses: Vec<&KeyEvent> = session
+                .note_events
+                .as_ref()
+                .unwrap()
+                .iter()
+                .filter(|e| e.action == "press")
+                .collect();
+            assert_eq!(result.played_notes.len(), presses.len());
+            assert!((result.played_notes[0].start_time - presses[0].time).abs() < 1e-9);
+            assert_eq!(Some(result.played_notes[0].pitch), presses[0].pitch);
+        }
+
+        #[test]
         fn test_returns_tempo_events_and_measure_boundaries_matching_session_tempo_map() {
             let path = write_temp_midi_single_note();
             let mut config = PlaybackConfig::default();
@@ -1866,6 +1896,20 @@ mod tests {
             assert_eq!(result.final_notes[0].pitch, raw[0].pitch);
             assert!((result.final_notes[0].start_time - raw[0].start_time).abs() < 1e-9);
             assert!((result.final_notes[0].duration - raw[0].duration).abs() < 1e-9);
+        }
+
+        #[test]
+        fn test_returns_played_notes_for_the_sheet() {
+            let mapper = km();
+            let ch = mapper.get_key_for_pitch(60).unwrap();
+            let mut session = PlaybackSession::default();
+            let config = PlaybackConfig::default();
+            let result =
+                compile_notes_from_sheet_logic(&config, &ch.to_string(), 120.0, &mut session)
+                    .unwrap();
+
+            assert_eq!(result.played_notes.len(), 1);
+            assert_eq!(result.played_notes[0].pitch, 60);
         }
 
         #[test]
@@ -3638,6 +3682,15 @@ mod tests {
             assert_eq!(session.merged_events.as_ref().unwrap().len(), 2);
             assert!(session.tempo_map.is_some());
             assert!((session.total_dur - 0.5).abs() < 1e-9);
+        }
+
+        #[test]
+        fn test_played_notes_are_the_notes_rebuilt_from_the_saved_events() {
+            let data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
+            let mut session = PlaybackSession::default();
+            let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+            assert_eq!(result.played_notes, result.final_notes);
         }
 
         #[test]

@@ -53,14 +53,14 @@ function renderSettings() {
   capturedConfig = { current: null };
   return render(
     <ThemeProvider>
-      <AppSettingsProvider>
-        <PlaybackConfigProvider>
-          <LogProvider>
+      <LogProvider>
+        <AppSettingsProvider>
+          <PlaybackConfigProvider>
             <ConfigSpy />
             <SettingsTab />
-          </LogProvider>
-        </PlaybackConfigProvider>
-      </AppSettingsProvider>
+          </PlaybackConfigProvider>
+        </AppSettingsProvider>
+      </LogProvider>
     </ThemeProvider>,
   );
 }
@@ -167,6 +167,17 @@ describe("SettingsTab > Display page", () => {
     renderSettings();
     const card = screen.getByText("Max visible saves").closest(".card") as HTMLElement;
     expect(card.querySelector(".card__title")?.textContent).toBe("Saved Songs");
+  });
+
+  it("Horizontal Scrolling sits in the Visualizer card, starts off, and persists under visualizer_horizontal", async () => {
+    renderSettings();
+    const toggle = screen.getByText("Horizontal Scrolling").closest("[role='switch']") as HTMLElement;
+    const card = toggle.closest(".card") as HTMLElement;
+    expect(card.querySelector(".card__title")?.textContent).toBe("Visualizer");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: true }));
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
   });
 });
 

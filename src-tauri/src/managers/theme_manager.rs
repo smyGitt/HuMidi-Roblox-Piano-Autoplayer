@@ -20,6 +20,22 @@ pub struct ThemeColors {
     pub accent_loaded: String,
     pub knob_color: String,
     #[serde(default)]
+    pub viz_note_left: String,
+    #[serde(default)]
+    pub viz_note_right: String,
+    #[serde(default)]
+    pub viz_note_other: String,
+    #[serde(default)]
+    pub viz_progress_line: String,
+    #[serde(default)]
+    pub viz_measure_line: String,
+    #[serde(default)]
+    pub viz_key_white: String,
+    #[serde(default)]
+    pub viz_key_black: String,
+    #[serde(default)]
+    pub viz_key_pressed: String,
+    #[serde(default)]
     pub builtin: bool,
 }
 
@@ -134,7 +150,40 @@ mod tests {
             pedal_color: "#ffaa00".to_string(),
             accent_loaded: "#ccaa00".to_string(),
             knob_color: "#ffffff".to_string(),
+            viz_note_left: "#5588ff".to_string(),
+            viz_note_right: "#33cc33".to_string(),
+            viz_note_other: "#999999".to_string(),
+            viz_progress_line: "#cc3333".to_string(),
+            viz_measure_line: "#444444".to_string(),
+            viz_key_white: "#ffffff".to_string(),
+            viz_key_black: "#222222".to_string(),
+            viz_key_pressed: "#33cc33".to_string(),
             builtin: false,
+        }
+    }
+
+    mod test_theme_colors_format {
+        use super::*;
+
+        #[test]
+        fn test_theme_saved_before_visualizer_colors_still_loads_with_them_empty() {
+            let dir = tempfile::tempdir().unwrap();
+            let legacy = r##"{"active":"Sunset","custom":[{"name":"Sunset","bg_primary":"#111111","bg_surface":"#222222","bg_input":"#333333","text_primary":"#eeeeee","text_muted":"#999999","border":"#444444","accent":"#5588ff","accent_play":"#33cc33","accent_stop":"#cc3333","pedal_color":"#ffaa00","accent_loaded":"#ccaa00","knob_color":"#ffffff"}]}"##;
+            std::fs::write(dir.path().join("themes.json"), legacy).unwrap();
+            let customs = manager_in(dir.path()).custom_themes();
+            assert_eq!(customs.len(), 1);
+            assert_eq!(customs[0].accent, "#5588ff");
+            assert_eq!(customs[0].viz_note_left, "");
+            assert_eq!(customs[0].viz_key_pressed, "");
+        }
+
+        #[test]
+        fn test_visualizer_colors_round_trip() {
+            let dir = tempfile::tempdir().unwrap();
+            let manager = manager_in(dir.path());
+            manager.save_custom(sample_theme("Sunset"));
+            let reloaded = manager_in(dir.path()).custom_themes();
+            assert_eq!(reloaded[0], sample_theme("Sunset"));
         }
     }
 

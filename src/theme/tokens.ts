@@ -11,6 +11,14 @@ export interface ThemeTokens {
   pedal_color: string;
   accent_loaded: string;
   knob_color: string;
+  viz_note_left: string;
+  viz_note_right: string;
+  viz_note_other: string;
+  viz_progress_line: string;
+  viz_measure_line: string;
+  viz_key_white: string;
+  viz_key_black: string;
+  viz_key_pressed: string;
 }
 
 export interface Theme {
@@ -34,6 +42,14 @@ export const THEMES: Theme[] = [
       pedal_color: "#f0a030",
       accent_loaded: "#d4a020",
       knob_color: "#dadbdc",
+      viz_note_left: "#58a6ff",
+      viz_note_right: "#3fb950",
+      viz_note_other: "#8b949e",
+      viz_progress_line: "#f85149",
+      viz_measure_line: "#30363d",
+      viz_key_white: "#dadbdc",
+      viz_key_black: "#161b22",
+      viz_key_pressed: "#3fb950",
     },
   },
   {
@@ -51,6 +67,14 @@ export const THEMES: Theme[] = [
       pedal_color: "#d08010",
       accent_loaded: "#b87010",
       knob_color: "#fcfcfd",
+      viz_note_left: "#4a7adb",
+      viz_note_right: "#2a9a60",
+      viz_note_other: "#6868a0",
+      viz_progress_line: "#cc3333",
+      viz_measure_line: "#d0d0e8",
+      viz_key_white: "#fcfcfd",
+      viz_key_black: "#1a1a2e",
+      viz_key_pressed: "#2a9a60",
     },
   },
   {
@@ -68,6 +92,14 @@ export const THEMES: Theme[] = [
       pedal_color: "#51a4cb",
       accent_loaded: "#d4bd0d",
       knob_color: "#dbdbdb",
+      viz_note_left: "#00ffff",
+      viz_note_right: "#4affff",
+      viz_note_other: "#2a7fa3",
+      viz_progress_line: "#ff0000",
+      viz_measure_line: "#2e5963",
+      viz_key_white: "#dbdbdb",
+      viz_key_black: "#2c2c2c",
+      viz_key_pressed: "#4affff",
     },
   },
 ];
@@ -107,7 +139,30 @@ export const COLOR_FIELD_GROUPS: { label: string; fields: { key: keyof ThemeToke
       { key: "pedal_color", label: "Pedal Color" },
     ],
   },
+  {
+    label: "Visualizer",
+    fields: [
+      { key: "viz_note_left", label: "Left Hand Notes" },
+      { key: "viz_note_right", label: "Right Hand Notes" },
+      { key: "viz_note_other", label: "Unassigned Notes" },
+      { key: "viz_progress_line", label: "Progress Line" },
+      { key: "viz_measure_line", label: "Measure Lines" },
+      { key: "viz_key_white", label: "White Keys" },
+      { key: "viz_key_black", label: "Black Keys" },
+      { key: "viz_key_pressed", label: "Pressed Keys" },
+    ],
+  },
 ];
+
+export function completeTokens(tokens: Partial<ThemeTokens>): ThemeTokens {
+  const fallback = THEMES.find((t) => t.name === DEFAULT_THEME_NAME)!.tokens;
+  const complete: ThemeTokens = { ...fallback };
+  for (const key of Object.keys(fallback) as (keyof ThemeTokens)[]) {
+    const value = tokens[key];
+    if (typeof value === "string" && value !== "") complete[key] = value;
+  }
+  return complete;
+}
 
 export function uniqueCopyName(baseName: string, existing: Set<string>): string {
   let candidate = `${baseName} Copy`;

@@ -61,6 +61,13 @@ function DisplayPage() {
           <ToggleSwitch checked={settings.showTimeline} onChange={settings.setShowTimeline} label="Show Timeline" />
         </div>
         <div className="control-row">
+          <ToggleSwitch
+            checked={settings.visualizerHorizontal}
+            onChange={settings.setVisualizerHorizontal}
+            label="Horizontal Scrolling"
+          />
+        </div>
+        <div className="control-row">
           <ToggleSwitch checked={settings.showPiano} onChange={settings.setShowPiano} label="Show Piano" />
         </div>
         <div className="control-row">
