@@ -1059,6 +1059,7 @@ button:disabled {
 .piano-keyboard__keys {
   position: relative;
   height: var(--piano-keys-height);
+  overflow: hidden;
 }
 
 .piano-keyboard__key {
@@ -1072,6 +1073,17 @@ button:disabled {
 
 .piano-keyboard__key--white {
   background: var(--viz_key_white);
+  border-right: none;
+}
+
+.piano-keyboard__key--white::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: var(--border-width);
+  height: 100%;
+  background: inherit;
 }
 
 .piano-keyboard__key--black {
