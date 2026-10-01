@@ -638,6 +638,7 @@ button:disabled {
 }
 
 .playback-tab__file-page,
+.playback-tab__playback-page,
 .playback-tab__humanize-page {
   display: flex;
   flex-direction: column;
@@ -648,15 +649,10 @@ button:disabled {
   min-height: var(--humanize-card-min-height);
 }
 
-.playback-tab__playback-page {
-  display: grid;
-  grid-auto-rows: 1fr;
-  gap: var(--space-2);
-}
-
 .playback-tab__two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
   gap: var(--space-2);
 }
 
