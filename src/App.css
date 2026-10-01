@@ -1176,7 +1176,6 @@ button:disabled {
   height: 100%;
   width: 0;
   background: var(--pedal_color);
-  transition: width var(--duration-fast) linear;
 }
 
 .piano-keyboard__pedal-fill--down {
