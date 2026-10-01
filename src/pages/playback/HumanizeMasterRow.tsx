@@ -34,15 +34,15 @@ export function HumanizeMasterRow({
     >
       <div className="check-pair">
         <ToggleSwitch checked={humanizeAll} onChange={onHumanizeAllChange} label="Humanize all" />
-        <Label className="check-pair__desc">enable or disable all humanization</Label>
+        <Label className="check-pair__desc">turn all the human touches on or off at once</Label>
       </div>
       <div className="check-pair">
         <ToggleSwitch checked={simulateHands} onChange={onSimulateHandsChange} label="Simulate Hands" />
-        <Label className="check-pair__desc">separate timing per hand</Label>
+        <Label className="check-pair__desc">each hand gets its own slightly different timing</Label>
       </div>
       <div className="check-pair">
         <ToggleSwitch checked={chordRoll} onChange={onChordRollChange} label="Chord Roll" />
-        <Label className="check-pair__desc">slight arpeggiation of simultaneous notes</Label>
+        <Label className="check-pair__desc">notes in a chord start just a hair apart, like a real hand</Label>
       </div>
     </Card>
   );

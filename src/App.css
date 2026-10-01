@@ -33,6 +33,7 @@
   --space-34: 272px;
   --space-58: 464px;
   --sidebar-width: var(--space-7);
+  --humanize-card-min-height: var(--space-25);
   --sidebar-width-expanded: var(--space-16);
   --duration: 200ms;
   --duration-fast: 80ms;
@@ -637,10 +638,19 @@ button:disabled {
 }
 
 .playback-tab__file-page,
-.playback-tab__playback-page,
 .playback-tab__humanize-page {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+
+.playback-tab__humanize-page .card {
+  min-height: var(--humanize-card-min-height);
+}
+
+.playback-tab__playback-page {
+  display: grid;
+  grid-auto-rows: 1fr;
   gap: var(--space-2);
 }
 
@@ -648,7 +658,6 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
-  align-items: start;
 }
 
 /* --- File strip --- */
@@ -966,6 +975,7 @@ button:disabled {
 .check-pair {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-1);
 }
 
