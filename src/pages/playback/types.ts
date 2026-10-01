@@ -22,7 +22,6 @@ export interface PlaybackConfig {
   tempo_sway_intensity: number;
   invert_tempo_sway: boolean;
   use_midi_pedal: boolean;
-  use_velocity_accent: boolean;
 }
 
 export const PEDAL_MAPPING: Record<string, string> = {
@@ -57,5 +56,4 @@ export const DEFAULT_CONFIG: PlaybackConfig = {
   tempo_sway_intensity: 0.015,
   invert_tempo_sway: false,
   use_midi_pedal: false,
-  use_velocity_accent: false,
 };

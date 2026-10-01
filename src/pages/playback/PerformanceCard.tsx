@@ -67,14 +67,6 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
           />
         </div>
       )}
-
-      <div className="control-row">
-        <ToggleSwitch
-          checked={config.use_velocity_accent}
-          onChange={(v) => onChange({ use_velocity_accent: v })}
-          label="Use Velocity"
-        />
-      </div>
     </Card>
   );
 }

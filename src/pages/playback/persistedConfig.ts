@@ -23,7 +23,6 @@ export const PERSISTED_NAMES: Record<ConfigKey, string> = {
   tempo_sway_intensity: "value_tempo_sway_intensity",
   invert_tempo_sway: "invert_tempo_sway",
   use_midi_pedal: "use_midi_pedal",
-  use_velocity_accent: "use_velocity_accent",
 };
 
 const CONFIG_KEYS = Object.keys(PERSISTED_NAMES) as ConfigKey[];

@@ -303,7 +303,7 @@ impl PlaybackEngine {
         let Some(key_data) = self.mapper.get_key_data(pitch) else {
             return (vec![], event.key_char.clone());
         };
-        let mut modifiers: Vec<kb::Key> = key_data
+        let modifiers: Vec<kb::Key> = key_data
             .modifiers
             .iter()
             .map(|m| match m {
@@ -311,9 +311,6 @@ impl PlaybackEngine {
                 Modifier::Shift => kb::Key::Shift,
             })
             .collect();
-        if self.config.use_velocity_accent && event.velocity.is_some() {
-            modifiers.push(kb::Key::Alt);
-        }
         (modifiers, key_data.key.to_string())
     }
 
@@ -1046,24 +1043,6 @@ mod tests {
             let (modifiers, key) = engine.get_press_info_from_event(&ev);
             assert!(modifiers.is_empty());
             assert_eq!(key, "down");
-        }
-
-        #[test]
-        fn test_velocity_accent_adds_alt_modifier() {
-            let mut cfg = config();
-            cfg.use_velocity_accent = true;
-            let engine = PlaybackEngine::new(cfg, vec![]);
-            let ev = press(0.0, 2, "1", 36, 100);
-            let (modifiers, _) = engine.get_press_info_from_event(&ev);
-            assert!(modifiers.contains(&kb::Key::Alt));
-        }
-
-        #[test]
-        fn test_velocity_accent_disabled_by_default() {
-            let engine = PlaybackEngine::new(config(), vec![]);
-            let ev = press(0.0, 2, "1", 36, 100);
-            let (modifiers, _) = engine.get_press_info_from_event(&ev);
-            assert!(!modifiers.contains(&kb::Key::Alt));
         }
 
         #[test]

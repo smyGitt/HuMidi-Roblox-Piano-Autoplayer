@@ -1095,6 +1095,10 @@ button:disabled {
 
 .apply-toast__msg {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--text_primary);
 }
 

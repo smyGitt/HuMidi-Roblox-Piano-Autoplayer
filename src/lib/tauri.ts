@@ -28,7 +28,6 @@ export interface BackendPlaybackConfig {
   tempo_sway_intensity: number;
   invert_tempo_sway: boolean;
   use_midi_pedal: boolean;
-  use_velocity_accent: boolean;
   use_ai_pedal: boolean;
 }
 
@@ -58,7 +57,6 @@ export function toBackendConfig(config: PlaybackConfig, midiFile: string): Backe
     tempo_sway_intensity: config.tempo_sway_intensity,
     invert_tempo_sway: config.invert_tempo_sway,
     use_midi_pedal: config.use_midi_pedal,
-    use_velocity_accent: config.use_velocity_accent,
     use_ai_pedal: false,
   };
 }

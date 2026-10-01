@@ -72,9 +72,8 @@ describe("toBackendConfig", () => {
   });
 
   it("round-trips every remaining field name unchanged", () => {
-    const c = config({ pedal_style: "legato", use_velocity_accent: true });
+    const c = config({ pedal_style: "legato" });
     const backend = toBackendConfig(c, "song.mid");
     expect(backend.pedal_style).toBe("legato");
-    expect(backend.use_velocity_accent).toBe(true);
   });
 });

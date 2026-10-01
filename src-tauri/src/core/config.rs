@@ -27,7 +27,6 @@ pub struct PlaybackConfig {
     pub tempo_sway_intensity: f64,
     pub invert_tempo_sway: bool,
     pub use_midi_pedal: bool,
-    pub use_velocity_accent: bool,
     pub use_ai_pedal: bool,
 }
 
@@ -58,7 +57,6 @@ impl Default for PlaybackConfig {
             tempo_sway_intensity: 0.0,
             invert_tempo_sway: false,
             use_midi_pedal: false,
-            use_velocity_accent: false,
             use_ai_pedal: true,
         }
     }
