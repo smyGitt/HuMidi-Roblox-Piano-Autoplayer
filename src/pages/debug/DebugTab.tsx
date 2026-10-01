@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Card } from "../../components/Card";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { useLog, type LogLevel, type SnapshotKey } from "../../state/LogContext";
 import { Button } from "../../components/Button";
 import { Select } from "../../components/Field";
+import { usePersistedState } from "../../state/usePersistedState";
+import { parseBoolean, parseOneOf } from "../../state/persistedParsers";
 
 const LEVELS: LogLevel[] = ["INFO", "DEBUG", "WARN", "OK"];
 const FILTER_OPTIONS = ["All", ...LEVELS];
@@ -21,8 +23,8 @@ const SNAPSHOT_ROWS: { key: SnapshotKey; label: string }[] = [
 
 export function DebugTab() {
   const { entries, clear, snapshot } = useLog();
-  const [filter, setFilter] = useState("All");
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [filter, setFilter] = usePersistedState("ui_debug_filter", "All", { parse: parseOneOf(FILTER_OPTIONS) });
+  const [autoScroll, setAutoScroll] = usePersistedState("ui_debug_auto_scroll", true, { parse: parseBoolean });
   const consoleRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(

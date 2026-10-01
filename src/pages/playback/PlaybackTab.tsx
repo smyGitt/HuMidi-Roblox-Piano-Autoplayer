@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePersistedState } from "../../state/usePersistedState";
+import { parseOneOf } from "../../state/persistedParsers";
 import { TabPage } from "../../components/TabPage";
 import { LoadedParts } from "./LoadedParts";
 import { SavedSongsPanel } from "./SavedSongsPanel";
@@ -39,13 +41,13 @@ interface PlaybackTabProps {
 }
 
 export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
-  const [subTab, setSubTab] = useState(0);
-  const { config, updateConfig, setConfig } = usePlaybackConfig();
+  const [subTab, setSubTab] = usePersistedState("ui_playback_subtab", 0, {
+    parse: parseOneOf(TABS.map((_, index) => index)),
+  });
+  const { config, updateConfig } = usePlaybackConfig();
   const engine = usePlaybackEngine();
   const { appendLog } = useLog();
 
-  const [toastVisible, setToastVisible] = useState(false);
-  const [savedInitial, setSavedInitial] = useState(config);
   const [saves, setSaves] = useState<SaveSummary[]>([]);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [loadDialogSelected, setLoadDialogSelected] = useState<string | null>(null);
@@ -96,11 +98,6 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
     }
   }
 
-  function trackedUpdateConfig(patch: Parameters<typeof updateConfig>[0]) {
-    updateConfig(patch);
-    if (engine.fileName) setToastVisible(true);
-  }
-
   const humanizeAll = useMemo(
     () =>
       config.vary_timing &&
@@ -114,7 +111,7 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
   );
 
   function toggleAll(v: boolean) {
-    trackedUpdateConfig({
+    updateConfig({
       simulate_hands: v,
       enable_chord_roll: v,
       vary_timing: v,
@@ -141,19 +138,13 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
             />
           )
         }
-      >          {subTab === 0 && (            <div className="playback-tab__file-page"> <SavedSongsPanel saves={saves.slice(0, maxVisibleSaves).map((s) => ({ filepath: s.path, saveName: s.filename.replace(/\.json$/i, ""), songName: s.song_name, timeStr: formatSaveTime(s.last_accessed), }))} onRefresh={() => void refreshSaves()} onOpenAll={() => openLoadDialog(null)} onSaveClick={(save) => openLoadDialog(save.filepath)} /> </div>          )}          {subTab === 1 && (            <div className="playback-tab__playback-page">              <div className="playback-tab__two-col">                <PerformanceCard                  config={config}                  onChange={trackedUpdateConfig}                  onReset={() => trackedUpdateConfig({ transpose: 0, pedal_style: "ai", use_velocity_accent: false })}                  midiPedalAvailable={false}                />                <OptionsCard                  config={config}                  onChange={trackedUpdateConfig}                  onReset={() => trackedUpdateConfig({ use_88_key_layout: false, countdown: true, debug_mode: false })}                />              </div>              <TempoCard                tempo={config.tempo}                originalBpm={engine.originalBpm}                onTempoChange={(v) => trackedUpdateConfig({ tempo: v })}              />              <PedalAiCard                hasThresholds={engine.hasCompiledPedal} confidence={engine.pedalConfidence}                generateEnabled={engine.hasCompiledNotes}                thresholdOn={config.pedal_threshold_on < 0 ? 0.5 : config.pedal_threshold_on}                thresholdOff={config.pedal_threshold_off < 0 ? 0.5 : config.pedal_threshold_off}                stats={engine.aiStats}                onGenerate={engine.generatePedal}                onThresholdChange={(on, off) => trackedUpdateConfig({ pedal_threshold_on: on, pedal_threshold_off: off })}                onReset={() => {                  const [on, off] = engine.defaultAiThresholds ?? [0.5, 0.5];                  trackedUpdateConfig({ pedal_threshold_on: on, pedal_threshold_off: off });                }}              />            </div>          )}          {subTab === 2 && (            <div className="playback-tab__humanize-page">              <HumanizeMasterRow                humanizeAll={humanizeAll}                simulateHands={config.simulate_hands}                chordRoll={config.enable_chord_roll}                onHumanizeAllChange={toggleAll}                onSimulateHandsChange={(v) => trackedUpdateConfig({ simulate_hands: v })}                onChordRollChange={(v) => trackedUpdateConfig({ enable_chord_roll: v })}                onReset={() => trackedUpdateConfig({ simulate_hands: false, enable_chord_roll: false })}              />              <Card title="TIMING & FEEL">                <HumRow                  name="Vary Timing"                  desc="notes start a little early or late, like a real player"                  checked={config.vary_timing}                  onCheckedChange={(v) => trackedUpdateConfig({ vary_timing: v })}                  min={0}                  max={0.1}                  value={config.timing_variance}                  suffix=" s"                  decimals={3}                  onValueChange={(v) => trackedUpdateConfig({ timing_variance: v })}                />                <HumRow                  name="Vary Articulation"                  desc="some notes get held a bit longer or shorter"                  checked={config.vary_articulation}                  onCheckedChange={(v) => trackedUpdateConfig({ vary_articulation: v })}                  min={50}                  max={100}                  value={config.articulation}                  suffix="%"                  decimals={1}                  onValueChange={(v) => trackedUpdateConfig({ articulation: v })}                />                <HumRow                  name="Tempo Sway"                  desc="the speed drifts a little faster and slower as the song goes"                  checked={config.enable_tempo_sway}                  onCheckedChange={(v) => trackedUpdateConfig({ enable_tempo_sway: v })}                  min={0}                  max={0.1}                  value={config.tempo_sway_intensity}                  suffix=" s"                  decimals={3}                  onValueChange={(v) => trackedUpdateConfig({ tempo_sway_intensity: v })}                />                <div className="check-pair">                  <label className="check-pair__inline">                    <Checkbox                      disabled={!config.enable_tempo_sway}                      checked={config.invert_tempo_sway}                      onChange={(e) => trackedUpdateConfig({ invert_tempo_sway: e.target.checked })}                    />                    Invert Sway                  </label>                  <span className="check-pair__desc">makes the speed changes go the opposite way</span>                </div>              </Card>              <Card title="HANDS & IMPERFECTION">                <HumRow                  name="Hand Drift"                  desc="your hands slowly slip out of sync with each other"                  checked={config.enable_drift_correction}                  onCheckedChange={(v) => trackedUpdateConfig({ enable_drift_correction: v })}                  min={0}                  max={100}                  value={config.drift_decay_factor}                  suffix="%"                  decimals={1}                  onValueChange={(v) => trackedUpdateConfig({ drift_decay_factor: v })}                />                <HumRow                  name="Mistake Chance"                  desc="once in a while a note gets missed or played wrong"                  checked={config.enable_mistakes}                  onCheckedChange={(v) => trackedUpdateConfig({ enable_mistakes: v })}                  min={0}                  max={10}                  value={config.mistake_chance}                  suffix="%"                  decimals={1}                  onValueChange={(v) => trackedUpdateConfig({ mistake_chance: v })}                />              </Card>            </div>          )}
+      >          {subTab === 0 && (            <div className="playback-tab__file-page"> <SavedSongsPanel saves={saves.slice(0, maxVisibleSaves).map((s) => ({ filepath: s.path, saveName: s.filename.replace(/\.json$/i, ""), songName: s.song_name, timeStr: formatSaveTime(s.last_accessed), }))} onRefresh={() => void refreshSaves()} onOpenAll={() => openLoadDialog(null)} onSaveClick={(save) => openLoadDialog(save.filepath)} /> </div>          )}          {subTab === 1 && (            <div className="playback-tab__playback-page">              <div className="playback-tab__two-col">                <PerformanceCard                  config={config}                  onChange={updateConfig}                  onReset={() => updateConfig({ transpose: 0, pedal_style: "ai", use_velocity_accent: false })}                  midiPedalAvailable={false}                />                <OptionsCard                  config={config}                  onChange={updateConfig}                  onReset={() => updateConfig({ use_88_key_layout: false, countdown: true, debug_mode: false })}                />              </div>              <TempoCard                tempo={config.tempo}                originalBpm={engine.originalBpm}                onTempoChange={(v) => updateConfig({ tempo: v })}              />              <PedalAiCard                hasThresholds={engine.hasCompiledPedal} confidence={engine.pedalConfidence}                generateEnabled={engine.hasCompiledNotes}                thresholdOn={config.pedal_threshold_on < 0 ? 0.5 : config.pedal_threshold_on}                thresholdOff={config.pedal_threshold_off < 0 ? 0.5 : config.pedal_threshold_off}                stats={engine.aiStats}                onGenerate={engine.generatePedal}                onThresholdChange={(on, off) => updateConfig({ pedal_threshold_on: on, pedal_threshold_off: off })}                onReset={() => {                  const [on, off] = engine.defaultAiThresholds ?? [0.5, 0.5];                  updateConfig({ pedal_threshold_on: on, pedal_threshold_off: off });                }}              />            </div>          )}          {subTab === 2 && (            <div className="playback-tab__humanize-page">              <HumanizeMasterRow                humanizeAll={humanizeAll}                simulateHands={config.simulate_hands}                chordRoll={config.enable_chord_roll}                onHumanizeAllChange={toggleAll}                onSimulateHandsChange={(v) => updateConfig({ simulate_hands: v })}                onChordRollChange={(v) => updateConfig({ enable_chord_roll: v })}                onReset={() => updateConfig({ simulate_hands: false, enable_chord_roll: false })}              />              <Card title="TIMING & FEEL">                <HumRow                  name="Vary Timing"                  desc="notes start a little early or late, like a real player"                  checked={config.vary_timing}                  onCheckedChange={(v) => updateConfig({ vary_timing: v })}                  min={0}                  max={0.1}                  value={config.timing_variance}                  suffix=" s"                  decimals={3}                  onValueChange={(v) => updateConfig({ timing_variance: v })}                />                <HumRow                  name="Vary Articulation"                  desc="some notes get held a bit longer or shorter"                  checked={config.vary_articulation}                  onCheckedChange={(v) => updateConfig({ vary_articulation: v })}                  min={50}                  max={100}                  value={config.articulation}                  suffix="%"                  decimals={1}                  onValueChange={(v) => updateConfig({ articulation: v })}                />                <HumRow                  name="Tempo Sway"                  desc="the speed drifts a little faster and slower as the song goes"                  checked={config.enable_tempo_sway}                  onCheckedChange={(v) => updateConfig({ enable_tempo_sway: v })}                  min={0}                  max={0.1}                  value={config.tempo_sway_intensity}                  suffix=" s"                  decimals={3}                  onValueChange={(v) => updateConfig({ tempo_sway_intensity: v })}                />                <div className="check-pair">                  <label className="check-pair__inline">                    <Checkbox                      disabled={!config.enable_tempo_sway}                      checked={config.invert_tempo_sway}                      onChange={(e) => updateConfig({ invert_tempo_sway: e.target.checked })}                    />                    Invert Sway                  </label>                  <span className="check-pair__desc">makes the speed changes go the opposite way</span>                </div>              </Card>              <Card title="HANDS & IMPERFECTION">                <HumRow                  name="Hand Drift"                  desc="your hands slowly slip out of sync with each other"                  checked={config.enable_drift_correction}                  onCheckedChange={(v) => updateConfig({ enable_drift_correction: v })}                  min={0}                  max={100}                  value={config.drift_decay_factor}                  suffix="%"                  decimals={1}                  onValueChange={(v) => updateConfig({ drift_decay_factor: v })}                />                <HumRow                  name="Mistake Chance"                  desc="once in a while a note gets missed or played wrong"                  checked={config.enable_mistakes}                  onCheckedChange={(v) => updateConfig({ enable_mistakes: v })}                  min={0}                  max={10}                  value={config.mistake_chance}                  suffix="%"                  decimals={1}                  onValueChange={(v) => updateConfig({ mistake_chance: v })}                />              </Card>            </div>          )}
       </TabPage>
 
       <ApplyToast
-        visible={toastVisible}
-        onApply={() => {
-          setSavedInitial(config);
-          setToastVisible(false);
-        }}
-        onDiscard={() => {
-          setConfig(savedInitial);
-          setToastVisible(false);
-        }}
+        visible={engine.configDirty}
+        onApply={() => void engine.applyConfigChanges()}
+        onDiscard={engine.discardConfigChanges}
       />
 
       {loadDialogOpen && (
@@ -162,7 +153,7 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
           initialSelected={loadDialogSelected}
           onCancel={() => setLoadDialogOpen(false)}
           onLoad={(save) => {
-            trackedUpdateConfig({ tempo: save.tempo, use_88_key_layout: save.use88Key });
+            updateConfig({ tempo: save.tempo, use_88_key_layout: save.use88Key });
             void engine.resumeSave(save.filepath, save.saveName);
             setLoadDialogOpen(false);
           }}

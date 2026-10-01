@@ -151,6 +151,41 @@ describe("useCollapsedWindowSize: collapsing and expanding", () => {
   });
 });
 
+describe("useCollapsedWindowSize: starting in the mini player", () => {
+  function renderStartingCollapsed() {
+    const rootRef = { current: buildRoot() };
+    return renderHook(({ collapsed }) => useCollapsedWindowSize(collapsed, rootRef, vi.fn()), {
+      initialProps: { collapsed: true },
+    });
+  }
+
+  it("opens straight at the mini size when the app starts collapsed", async () => {
+    renderStartingCollapsed();
+    await waitFor(() => expect(mocks.setSize).toHaveBeenCalledTimes(1));
+    expect(mocks.setSize).toHaveBeenCalledWith(
+      expect.objectContaining({ width: WINDOW_WIDTH, height: HEADER_HEIGHT + TRANSPORT_HEIGHT }),
+    );
+  });
+
+  it("opens at the saved mini size when there is one, and expands back to the saved full size", async () => {
+    mocks.loadAppConfig.mockReturnValue(Promise.resolve({ window_size_mini: SAVED_MINI, window_size_full: SAVED_FULL }));
+    const { rerender } = renderStartingCollapsed();
+    await waitFor(() => expect(mocks.setSize).toHaveBeenCalledWith(expect.objectContaining(SAVED_MINI)));
+    rerender({ collapsed: false });
+    await waitFor(() => expect(mocks.setSize).toHaveBeenLastCalledWith(expect.objectContaining(SAVED_FULL)));
+  });
+
+  it("expands back to the window size it had when it opened if no full size was saved", async () => {
+    const { rerender } = renderStartingCollapsed();
+    await waitFor(() => expect(mocks.setSize).toHaveBeenCalledTimes(1));
+    rerender({ collapsed: false });
+    await waitFor(() => expect(mocks.setSize).toHaveBeenCalledTimes(2));
+    expect(mocks.setSize).toHaveBeenLastCalledWith(
+      expect.objectContaining({ width: WINDOW_WIDTH, height: WINDOW_HEIGHT }),
+    );
+  });
+});
+
 describe("useCollapsedWindowSize: saving the size the user chooses", () => {
   it("saves a resize in full mode under the full key", async () => {
     renderResize();

@@ -343,6 +343,10 @@ export async function startSaveBinding(): Promise<void> {
   return invoke("start_save_binding");
 }
 
+export async function getHotkeys(): Promise<[string, string]> {
+  return invoke("get_hotkeys");
+}
+
 export type UpdateCheckOutcome =
   | { status: "update_available"; tag: string; url: string }
   | { status: "no_update" }

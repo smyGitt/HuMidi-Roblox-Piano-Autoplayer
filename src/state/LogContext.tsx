@@ -118,6 +118,10 @@ export function LogProvider({ children }: { children: ReactNode }) {
   return <LogContext.Provider value={value}>{children}</LogContext.Provider>;
 }
 
+export function useOptionalLog() {
+  return useContext(LogContext);
+}
+
 export function useLog() {
   const ctx = useContext(LogContext);
   if (!ctx) throw new Error("useLog must be used within LogProvider");

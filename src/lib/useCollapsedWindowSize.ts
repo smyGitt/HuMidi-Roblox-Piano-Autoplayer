@@ -20,6 +20,7 @@ export function useCollapsedWindowSize(
 ) {
   const previousCollapsed = useRef(isCollapsed);
   const collapsedNow = useRef(isCollapsed);
+  const miniApplied = useRef(false);
   const sizes = useRef<{ full: WindowSize | null; mini: WindowSize | null }>({ full: null, mini: null });
   const loaded = useRef(false);
   const applied = useRef<WindowSize | null>(null);
@@ -38,6 +39,11 @@ export function useCollapsedWindowSize(
     await getCurrentWindow().setSize(new LogicalSize(size.width, size.height));
   }
 
+  async function applyMini(fullWidth: number, height: number) {
+    miniApplied.current = true;
+    await applySize(sizes.current.mini ?? { width: fullWidth, height });
+  }
+
   useEffect(() => {
     if (!isTauri()) return;
     const appWindow = getCurrentWindow();
@@ -50,7 +56,17 @@ export function useCollapsedWindowSize(
       sizes.current.full = readSavedSize(config, FULL_SIZE_KEY);
       sizes.current.mini = readSavedSize(config, MINI_SIZE_KEY);
       loaded.current = true;
-      if (!cancelled && !collapsedNow.current && sizes.current.full) await applySize(sizes.current.full);
+      if (cancelled) return;
+      const root = rootRef.current;
+      if (collapsedNow.current && root) {
+        const inner = await appWindow.innerSize();
+        const factor = await appWindow.scaleFactor();
+        const logical = inner.toLogical(factor);
+        sizes.current.full ??= { width: logical.width, height: logical.height };
+        await applyMini(sizes.current.full.width, stripHeight(root));
+      } else if (sizes.current.full) {
+        await applySize(sizes.current.full);
+      }
     });
 
     async function saveResize(physical: { toLogical: (factor: number) => WindowSize }) {
@@ -92,14 +108,16 @@ export function useCollapsedWindowSize(
     if (isCollapsed) {
       const height = stripHeight(root);
       enqueue(async () => {
+        if (miniApplied.current) return;
         const [inner, factor] = await Promise.all([appWindow.innerSize(), appWindow.scaleFactor()]);
         const logical = inner.toLogical(factor);
         const full = { width: logical.width, height: logical.height };
         sizes.current.full = full;
-        await applySize(sizes.current.mini ?? { width: full.width, height });
+        await applyMini(full.width, height);
       });
     } else {
       enqueue(async () => {
+        miniApplied.current = false;
         if (sizes.current.full) await applySize(sizes.current.full);
       });
     }

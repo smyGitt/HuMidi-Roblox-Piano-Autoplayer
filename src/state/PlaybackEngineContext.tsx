@@ -35,6 +35,8 @@ import { PlaybackClock } from "./playbackClock";
 import { LiveKeys } from "./liveKeys";
 import { PREVIEW_CONFIDENCE, PREVIEW_SONG } from "./previewSong";
 import type { PedalConfidence } from "../lib/pedalPreview";
+import type { PlaybackConfig } from "../pages/playback/types";
+import { NOTES_CONFIG_KEYS, PEDAL_CONFIG_KEYS, configDiffers, pickConfig } from "../pages/playback/compileConfig";
 
 interface PlaybackEngineValue {
   fileName: string;
@@ -54,6 +56,7 @@ interface PlaybackEngineValue {
   pedalIntervals: [number, number][];
   aiThresholds: [number, number] | null;
   pedalConfidence: PedalConfidence | null;
+  configDirty: boolean;
   defaultAiThresholds: [number, number] | null;
   aiStats: PedalAiStats | null;
   isPlaying: boolean;
@@ -64,6 +67,8 @@ interface PlaybackEngineValue {
 
   openFileBrowser: () => Promise<void>;
   loadFile: (path: string, name: string) => Promise<void>;
+  applyConfigChanges: () => Promise<void>;
+  discardConfigChanges: () => void;
   confirmTrackSelection: (selection: { index: number; role: HandRole }[]) => Promise<void>;
   generatePedal: () => Promise<void>;
   play: () => Promise<void>;
@@ -124,6 +129,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
   const [pedalConfidence, setPedalConfidence] = useState<PedalConfidence | null>(null);
+  const [compiledNotesConfig, setCompiledNotesConfig] = useState<Partial<PlaybackConfig> | null>(null);
+  const [compiledPedalConfig, setCompiledPedalConfig] = useState<Partial<PlaybackConfig> | null>(null);
   const [defaultAiThresholds, setDefaultAiThresholds] = useState<[number, number] | null>(null);
   const defaultAiThresholdsRef = useRef(defaultAiThresholds);
   defaultAiThresholdsRef.current = defaultAiThresholds;
@@ -216,6 +223,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setPedalIntervals([]);
     setAiThresholds(null);
     setPedalConfidence(null);
+    setCompiledNotesConfig(null);
+    setCompiledPedalConfig(null);
     setDefaultAiThresholds(null);
     setParts([]);
     setSelectedTracksInfo([]);
@@ -268,7 +277,6 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }
 
   async function confirmTrackSelection(selection: { index: number; role: HandRole }[]) {
-    const version = songVersionRef.current;
     const info: SelectedTrackInfo[] = selection.map((s) => [s.index, s.role]);
     setSelectedTracksInfo(info);
     setParts(
@@ -278,6 +286,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
         return { name: t.name, meta: `♩ ${t.note_count} · ${roleLabel}` };
       }),
     );
+    await compileNotesNow(info);
+  }
+
+  async function compileNotesNow(info: SelectedTrackInfo[]): Promise<boolean> {
+    const version = songVersionRef.current;
+    const configUsed = configRef.current;
     if (!isTauri()) {
       setTotalDuration(PREVIEW_SONG.totalDuration);
       setFinalNotes(PREVIEW_SONG.notes);
@@ -287,12 +301,14 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setMeasureBoundaries(PREVIEW_SONG.measureBoundaries);
       setHasCompiledNotes(true);
       setHasCompiledPedal(false);
+      setCompiledNotesConfig(pickConfig(configUsed, NOTES_CONFIG_KEYS));
+      setCompiledPedalConfig(null);
       appendLog("Notes compiled successful (preview mode)");
-      return;
+      return true;
     }
     try {
-      const timeline = await invokeCompileNotes(configRef.current, midiFilePath, info);
-      if (version !== songVersionRef.current) return;
+      const timeline = await invokeCompileNotes(configUsed, midiFilePath, info);
+      if (version !== songVersionRef.current) return false;
       setTotalDuration(timeline.total_dur);
       setFinalNotes(timeline.final_notes);
       setPlayedNotes(timeline.played_notes);
@@ -306,10 +322,14 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
         notes: timeline.final_notes.length,
         duration: formatSnapshotDuration(timeline.total_dur),
       });
+      setCompiledNotesConfig(pickConfig(configUsed, NOTES_CONFIG_KEYS));
+      setCompiledPedalConfig(null);
       appendLog("Notes compiled successful");
+      return true;
     } catch (e) {
-      if (version !== songVersionRef.current) return;
+      if (version !== songVersionRef.current) return false;
       appendLog(`Failed to compile notes: ${String(e)}`);
+      return false;
     }
   }
 
@@ -323,11 +343,30 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     await compilePedalNow();
   }
 
+  const notesDirty = hasCompiledNotes && configDiffers(config, compiledNotesConfig, NOTES_CONFIG_KEYS);
+  const pedalDirty = hasCompiledPedal && configDiffers(config, compiledPedalConfig, PEDAL_CONFIG_KEYS);
+  const configDirty = notesDirty || pedalDirty;
+
+  async function applyConfigChanges() {
+    if (isPlayingRef.current) await stop();
+    if (notesDirty) {
+      const compiled = await compileNotesNow(selectedTracksInfo);
+      if (compiled) await compilePedalNow();
+    } else if (pedalDirty) {
+      await compilePedalNow();
+    }
+  }
+
+  function discardConfigChanges() {
+    updateConfig({ ...compiledNotesConfig, ...compiledPedalConfig });
+  }
+
   async function compilePedalNow(): Promise<PedalData | null> {
     if (!isTauri()) {
       setPedalIntervals(PREVIEW_SONG.pedalIntervals);
       setAiThresholds([0.5, 0.5]);
       setPedalConfidence(PREVIEW_CONFIDENCE);
+      setCompiledPedalConfig(pickConfig(configRef.current, PEDAL_CONFIG_KEYS));
       captureDefaultThresholds([0.5, 0.5]);
       setHasCompiledPedal(true);
       appendLog("Pedal compiled successful (preview mode)");
@@ -337,7 +376,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     isGeneratingPedalRef.current = true;
     setIsGeneratingPedal(true);
     try {
-      const data = await invokeCompilePedal(configRef.current, midiFilePath);
+      const configUsed = configRef.current;
+      const data = await invokeCompilePedal(configUsed, midiFilePath);
       setPedalIntervals(data.pedal_intervals);
       setAiThresholds(data.ai_thresholds);
       setPedalConfidence(
@@ -345,6 +385,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       );
       if (data.ai_thresholds) captureDefaultThresholds(data.ai_thresholds);
       setHasCompiledPedal(true);
+      setCompiledPedalConfig({
+        ...pickConfig(configUsed, PEDAL_CONFIG_KEYS),
+        ...(data.ai_thresholds
+          ? { pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] }
+          : {}),
+      });
       if (data.ai_thresholds) {
         updateConfig({ pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] });
       }
@@ -462,6 +508,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setPedalIntervals([]);
       setAiThresholds(null);
       setPedalConfidence(null);
+      setCompiledNotesConfig(null);
+      setCompiledPedalConfig(null);
       setDefaultAiThresholds(null);
       setFileName(label);
       setMidiFilePath("");
@@ -495,6 +543,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setMeasureBoundaries(timeline.measure_boundaries);
       setHasCompiledNotes(true);
       setHasCompiledPedal(false);
+      setCompiledNotesConfig(null);
+      setCompiledPedalConfig(null);
       setFileName("Translated sheet");
       setMidiFilePath("");
       setParts([]);
@@ -542,6 +592,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setPedalIntervals([]);
     setAiThresholds(null);
     setPedalConfidence(null);
+    setCompiledNotesConfig(null);
+    setCompiledPedalConfig(null);
     setDefaultAiThresholds(null);
     clock.jump(0);
     liveKeys.clear();
@@ -571,6 +623,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     pedalIntervals,
     aiThresholds,
     pedalConfidence,
+    configDirty,
     defaultAiThresholds,
     aiStats,
     isPlaying,
@@ -580,6 +633,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     saveDirConfigured,
     openFileBrowser,
     loadFile,
+    applyConfigChanges,
+    discardConfigChanges,
     confirmTrackSelection,
     generatePedal,
     play,

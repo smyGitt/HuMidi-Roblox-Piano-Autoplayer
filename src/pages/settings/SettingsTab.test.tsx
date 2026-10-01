@@ -12,6 +12,7 @@ const tauriMocks = vi.hoisted(() => ({
   onEvent: vi.fn(() => Promise.resolve(() => {})),
   startBinding: vi.fn(() => Promise.resolve()),
   startSaveBinding: vi.fn(() => Promise.resolve()),
+  getHotkeys: vi.fn<() => Promise<[string, string]>>(() => Promise.resolve(["F6", "Ctrl+S"])),
   setSaveDir: vi.fn(() => Promise.resolve()),
   getSaveDir: vi.fn<() => Promise<string>>(() => Promise.resolve("")),
   setMidiDir: vi.fn(() => Promise.resolve()),
@@ -232,5 +233,35 @@ describe("SettingsTab > System page", () => {
     fireEvent.click(screen.getByText("System"));
     fireEvent.click(screen.getByText("Automatically check for updates"));
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ auto_check_updates: true }));
+  });
+});
+
+describe("SettingsTab > Hotkey page and remembered page", () => {
+  it("shows the hotkeys the backend has bound instead of the defaults", async () => {
+    tauriMocks.getHotkeys.mockResolvedValue(["F9", "Alt+W"]);
+    renderSettings();
+    fireEvent.click(screen.getByText("Hotkey"));
+    await waitFor(() => expect(screen.getByText("F9")).toBeTruthy());
+    expect(screen.getByText("Alt+W")).toBeTruthy();
+  });
+
+  it("reopens on the page that was open last time", async () => {
+    tauriMocks.loadAppConfig.mockResolvedValue({ ui_settings_page: "System" });
+    renderSettings();
+    await waitFor(() => expect(screen.getByText("Automatically check for updates")).toBeTruthy());
+  });
+
+  it("remembers the page that was opened", async () => {
+    vi.useFakeTimers();
+    renderSettings();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByText("Privacy"));
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ ui_settings_page: "Privacy" });
+    vi.useRealTimers();
   });
 });

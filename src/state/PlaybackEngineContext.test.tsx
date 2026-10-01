@@ -26,6 +26,7 @@ const tauriMocks = vi.hoisted(() => ({
   savePlayback: vi.fn(),
   resumeFromSave: vi.fn(),
   getSaveDir: vi.fn(() => Promise.resolve(null)),
+  clearLoadedSong: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../lib/tauri", async () => {
@@ -948,5 +949,104 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
       expect(result.current.log.snapshot.source).toBe("Virtual Piano import");
       expect(result.current.log.snapshot.tempo).toBe("140 BPM");
     });
+  });
+});
+
+describe("PlaybackEngineContext config changes (Tauri mode)", () => {
+  const TIMELINE = {
+    final_notes: [{ id: 0, pitch: 60, velocity: 80, start_time: 0, duration: 1, hand: "left", original_track_index: 0, channel: 0 }],
+    played_notes: [],
+    total_dur: 4,
+    tempo_events: [],
+    time_signatures: [],
+    measure_boundaries: [],
+  };
+  const PEDAL = { pedal_intervals: [[0, 1]], ai_thresholds: [0.6, 0.3], confidence: [], confidence_fps: PEDAL_FPS };
+
+  async function loadCompiledSong() {
+    tauriMocks.isTauri.mockReturnValue(true);
+    tauriMocks.parseMidiStructure.mockResolvedValue({
+      tracks: [{ index: 0, name: "Melody", note_count: 50, instrument_name: "Piano", is_drum: false }],
+      initial_bpm: 120,
+    });
+    tauriMocks.compileNotes.mockReset().mockResolvedValue(TIMELINE);
+    tauriMocks.compilePedal.mockReset().mockResolvedValue(PEDAL);
+    const view = renderEngine();
+    await act(async () => view.result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    await act(async () => view.result.current.engine.confirmTrackSelection([{ index: 0, role: "Auto-Detect" }]));
+    await act(async () => view.result.current.engine.generatePedal());
+    return view;
+  }
+
+  it("is not dirty right after compiling, even though compiling writes the AI thresholds into the config", async () => {
+    const { result } = await loadCompiledSong();
+    expect(result.current.playbackConfig.config.pedal_threshold_on).toBe(0.6);
+    expect(result.current.engine.configDirty).toBe(false);
+  });
+
+  it("is not dirty before anything is compiled or after changes to settings that do not affect the compiled playback", async () => {
+    tauriMocks.isTauri.mockReturnValue(true);
+    const { result } = renderEngine();
+    act(() => result.current.playbackConfig.updateConfig({ tempo: 140 }));
+    expect(result.current.engine.configDirty).toBe(false);
+    const loaded = await loadCompiledSong();
+    act(() => loaded.result.current.playbackConfig.updateConfig({ countdown: false, transpose: 2, debug_mode: true }));
+    expect(loaded.result.current.engine.configDirty).toBe(false);
+  });
+
+  it("becomes dirty when a compiled setting really changes and clean again when it is changed back", async () => {
+    const { result } = await loadCompiledSong();
+    act(() => result.current.playbackConfig.updateConfig({ vary_timing: true }));
+    expect(result.current.engine.configDirty).toBe(true);
+    act(() => result.current.playbackConfig.updateConfig({ vary_timing: false }));
+    expect(result.current.engine.configDirty).toBe(false);
+  });
+
+  it("applying a notes change recompiles the notes and then the pedal with the new settings", async () => {
+    const { result } = await loadCompiledSong();
+    act(() => result.current.playbackConfig.updateConfig({ tempo: 150 }));
+    expect(result.current.engine.configDirty).toBe(true);
+    await act(async () => result.current.engine.applyConfigChanges());
+    expect(tauriMocks.compileNotes).toHaveBeenCalledTimes(2);
+    expect(tauriMocks.compileNotes.mock.calls[1][0].tempo).toBe(150);
+    expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(2);
+    expect(result.current.engine.configDirty).toBe(false);
+  });
+
+  it("applying a pedal-only change recompiles just the pedal", async () => {
+    const { result } = await loadCompiledSong();
+    act(() => result.current.playbackConfig.updateConfig({ pedal_threshold_on: 0.7 }));
+    expect(result.current.engine.configDirty).toBe(true);
+    await act(async () => result.current.engine.applyConfigChanges());
+    expect(tauriMocks.compileNotes).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops a running playback before recompiling", async () => {
+    const { result } = await loadCompiledSong();
+    tauriMocks.startPlayback.mockResolvedValue(undefined);
+    tauriMocks.stopPlayback.mockResolvedValue(undefined);
+    await act(async () => result.current.engine.play());
+    act(() => eventHandlers.get("playback_started")?.(null));
+    act(() => result.current.playbackConfig.updateConfig({ vary_timing: true }));
+    await act(async () => result.current.engine.applyConfigChanges());
+    expect(tauriMocks.compileNotes).toHaveBeenCalledTimes(2);
+  });
+
+  it("discarding puts the compiled settings back and hides the prompt", async () => {
+    const { result } = await loadCompiledSong();
+    act(() => result.current.playbackConfig.updateConfig({ vary_timing: true, pedal_threshold_off: 0.1 }));
+    expect(result.current.engine.configDirty).toBe(true);
+    act(() => result.current.engine.discardConfigChanges());
+    expect(result.current.playbackConfig.config.vary_timing).toBe(false);
+    expect(result.current.playbackConfig.config.pedal_threshold_off).toBe(0.3);
+    expect(result.current.engine.configDirty).toBe(false);
+  });
+
+  it("clearing the song clears the dirty state", async () => {
+    const { result } = await loadCompiledSong();
+    act(() => result.current.playbackConfig.updateConfig({ vary_timing: true }));
+    await act(async () => result.current.engine.clearSong());
+    expect(result.current.engine.configDirty).toBe(false);
   });
 });

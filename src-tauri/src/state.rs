@@ -52,6 +52,8 @@ impl Default for AppState {
     fn default() -> Self {
         let mut config_manager = ConfigManager::new();
         let app_config = config_manager.load();
+        let mut hotkey_manager = HotkeyManager::new();
+        hotkey_manager.restore_from_config(&app_config);
         AppState {
             pedal_model: Mutex::new(None),
             parsed_tracks: Mutex::new(None),
@@ -60,7 +62,7 @@ impl Default for AppState {
             midi_pedal_events: Mutex::new(Vec::new()),
             playback_session: Mutex::new(PlaybackSession::default()),
             playback_handle: Mutex::new(None),
-            hotkey_manager: Mutex::new(HotkeyManager::new()),
+            hotkey_manager: Mutex::new(hotkey_manager),
             config_manager: Mutex::new(config_manager),
             app_config: Mutex::new(app_config),
             theme_manager: Mutex::new(ThemeManager::new()),

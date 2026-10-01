@@ -18,7 +18,9 @@ use crate::core::player::{PlaybackEngine, PlayerEvent};
 use crate::core::section_analyzer::{assign_hands, SectionAnalyzer};
 use crate::core::session_cache;
 use crate::core::translator::VirtualPianoFormat;
-use crate::managers::hotkey_manager::{rdev_key_to_raw, HotkeyEvent};
+use crate::managers::hotkey_manager::{
+    rdev_key_to_raw, HotkeyEvent, PLAYBACK_HOTKEY_CONFIG_KEY, SAVE_HOTKEY_CONFIG_KEY,
+};
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
 use tauri::{path::BaseDirectory, Emitter, Manager, State};
 
@@ -719,13 +721,17 @@ pub fn merge_app_config(current: &Value, patch: &Value) -> Value {
     }
 }
 
-#[tauri::command]
-pub fn save_app_config(state: State<AppState>, patch: Value) -> Result<(), String> {
+pub fn patch_app_config(state: &AppState, patch: &Value) -> Result<(), String> {
     let mut app_config = state.app_config.lock().map_err(|e| e.to_string())?;
-    *app_config = merge_app_config(&app_config, &patch);
+    *app_config = merge_app_config(&app_config, patch);
     let config_manager = state.config_manager.lock().map_err(|e| e.to_string())?;
     config_manager.save(&app_config);
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_app_config(state: State<AppState>, patch: Value) -> Result<(), String> {
+    patch_app_config(&state, &patch)
 }
 
 #[tauri::command]
@@ -1457,6 +1463,20 @@ fn hotkey_event_to_channel_payload(event: &HotkeyEvent) -> (&'static str, serde_
     }
 }
 
+pub fn hotkey_config_patch(event: &HotkeyEvent) -> Option<Value> {
+    match event {
+        HotkeyEvent::BoundUpdated(text) => Some(serde_json::json!({ PLAYBACK_HOTKEY_CONFIG_KEY: text })),
+        HotkeyEvent::BoundSaveUpdated(text) => Some(serde_json::json!({ SAVE_HOTKEY_CONFIG_KEY: text })),
+        _ => None,
+    }
+}
+
+#[tauri::command]
+pub fn get_hotkeys(state: State<AppState>) -> Result<(String, String), String> {
+    let mgr = state.hotkey_manager.lock().map_err(|e| e.to_string())?;
+    Ok((mgr.format_hotkey_string(), mgr.format_save_hotkey_string()))
+}
+
 pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let callback = move |event: rdev::Event| {
@@ -1478,6 +1498,9 @@ pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
                 let events = mgr.on_press(raw);
                 drop(mgr);
                 for ev in events {
+                    if let Some(patch) = hotkey_config_patch(&ev) {
+                        let _ = patch_app_config(&state, &patch);
+                    }
                     let (channel, payload) = hotkey_event_to_channel_payload(&ev);
                     let _ = app.emit(channel, payload);
                 }
@@ -1512,6 +1535,44 @@ pub fn start_save_binding(state: State<AppState>) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod test_hotkey_persistence {
+        use super::*;
+        use crate::managers::hotkey_manager::HotkeyManager;
+
+        #[test]
+        fn test_a_rebound_hotkey_event_becomes_a_config_patch_under_its_own_key() {
+            assert_eq!(
+                hotkey_config_patch(&HotkeyEvent::BoundUpdated("F9".to_string())),
+                Some(serde_json::json!({ "hotkey_playback": "F9" }))
+            );
+            assert_eq!(
+                hotkey_config_patch(&HotkeyEvent::BoundSaveUpdated("Alt+W".to_string())),
+                Some(serde_json::json!({ "hotkey_save": "Alt+W" }))
+            );
+        }
+
+        #[test]
+        fn test_trigger_events_are_not_persisted() {
+            assert_eq!(hotkey_config_patch(&HotkeyEvent::ToggleRequested), None);
+            assert_eq!(hotkey_config_patch(&HotkeyEvent::SaveRequested), None);
+        }
+
+        #[test]
+        fn test_a_patched_config_restores_the_same_bindings_in_a_fresh_manager() {
+            let mut config = serde_json::json!({});
+            for event in [
+                HotkeyEvent::BoundUpdated("Ctrl+K".to_string()),
+                HotkeyEvent::BoundSaveUpdated("Shift+F2".to_string()),
+            ] {
+                config = merge_app_config(&config, &hotkey_config_patch(&event).unwrap());
+            }
+            let mut mgr = HotkeyManager::new();
+            mgr.restore_from_config(&config);
+            assert_eq!(mgr.format_hotkey_string(), "Ctrl+K");
+            assert_eq!(mgr.format_save_hotkey_string(), "Shift+F2");
+        }
+    }
 
     fn pedal_ev(t: f64, direction: &str) -> KeyEvent {
         KeyEvent::new(t, 1, "pedal", direction)

@@ -53,6 +53,38 @@ fn format_combo(mods: &HashSet<Modifier>, k: RawKey) -> String {
     parts.join("+")
 }
 
+const NAMED_KEYS: &[&str] = &[
+    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "Space", "Escape",
+    "Tab", "Enter", "Backspace", "Delete", "Up", "Down", "Left", "Right",
+];
+
+pub const PLAYBACK_HOTKEY_CONFIG_KEY: &str = "hotkey_playback";
+pub const SAVE_HOTKEY_CONFIG_KEY: &str = "hotkey_save";
+
+fn parse_combo(text: &str) -> Option<(HashSet<Modifier>, RawKey)> {
+    let mut parts: Vec<&str> = text.split('+').collect();
+    let key_text = parts.pop()?;
+    let mut mods = HashSet::new();
+    for part in parts {
+        mods.insert(match part {
+            "Ctrl" => Modifier::Ctrl,
+            "Alt" => Modifier::Alt,
+            "Shift" => Modifier::Shift,
+            "Cmd" => Modifier::Cmd,
+            _ => return None,
+        });
+    }
+    if let Some(name) = NAMED_KEYS.iter().find(|name| **name == key_text) {
+        return Some((mods, RawKey::Named(name)));
+    }
+    let mut chars = key_text.chars();
+    let c = chars.next()?;
+    if chars.next().is_some() {
+        return None;
+    }
+    Some((mods, RawKey::Char(c.to_ascii_lowercase())))
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum HotkeyEvent {
     BoundUpdated(String),
@@ -147,6 +179,37 @@ impl HotkeyManager {
         events
     }
 
+    pub fn set_playback_hotkey_from_string(&mut self, text: &str) -> bool {
+        match parse_combo(text) {
+            Some((mods, key)) => {
+                self.current_mods = mods;
+                self.current_key = key;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn set_save_hotkey_from_string(&mut self, text: &str) -> bool {
+        match parse_combo(text) {
+            Some((mods, key)) => {
+                self.save_mods = mods;
+                self.save_key = key;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn restore_from_config(&mut self, config: &serde_json::Value) {
+        if let Some(text) = config.get(PLAYBACK_HOTKEY_CONFIG_KEY).and_then(|v| v.as_str()) {
+            self.set_playback_hotkey_from_string(text);
+        }
+        if let Some(text) = config.get(SAVE_HOTKEY_CONFIG_KEY).and_then(|v| v.as_str()) {
+            self.set_save_hotkey_from_string(text);
+        }
+    }
+
     pub fn start_binding(&mut self) {
         self.listening_for_bind = true;
     }
@@ -238,6 +301,56 @@ pub fn rdev_key_to_raw(key: rdev::Key) -> Option<RawKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod test_hotkey_persistence {
+        use super::*;
+
+        #[test]
+        fn test_every_formatted_hotkey_parses_back_to_the_same_combo() {
+            let mut mgr = HotkeyManager::new();
+            for text in ["F6", "Ctrl+S", "Ctrl+Shift+K", "Alt+F12", "Ctrl+Alt+Shift+Cmd+Space", "Shift+7", "Up"] {
+                assert!(mgr.set_playback_hotkey_from_string(text), "{text}");
+                assert_eq!(mgr.format_hotkey_string(), text);
+            }
+        }
+
+        #[test]
+        fn test_restored_hotkey_actually_triggers_the_toggle() {
+            let mut mgr = HotkeyManager::new();
+            assert!(mgr.set_playback_hotkey_from_string("Ctrl+K"));
+            assert!(mgr.on_press(RawKey::ModLeft(Modifier::Ctrl)).is_empty());
+            let events = mgr.on_press(RawKey::Char('k'));
+            assert_eq!(events, vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_unparseable_text_is_rejected_and_leaves_the_binding_alone() {
+            let mut mgr = HotkeyManager::new();
+            assert!(!mgr.set_playback_hotkey_from_string("Hyper+F6"));
+            assert!(!mgr.set_playback_hotkey_from_string("Ctrl+NotAKey"));
+            assert!(!mgr.set_playback_hotkey_from_string(""));
+            assert_eq!(mgr.format_hotkey_string(), "F6");
+        }
+
+        #[test]
+        fn test_restore_from_config_sets_both_hotkeys_and_ignores_bad_values() {
+            let mut mgr = HotkeyManager::new();
+            mgr.restore_from_config(&serde_json::json!({ "hotkey_playback": "F9", "hotkey_save": "Alt+W" }));
+            assert_eq!(mgr.format_hotkey_string(), "F9");
+            assert_eq!(mgr.format_save_hotkey_string(), "Alt+W");
+            mgr.restore_from_config(&serde_json::json!({ "hotkey_playback": 5, "hotkey_save": "Bogus+W" }));
+            assert_eq!(mgr.format_hotkey_string(), "F9");
+            assert_eq!(mgr.format_save_hotkey_string(), "Alt+W");
+        }
+
+        #[test]
+        fn test_restore_from_an_empty_config_keeps_the_defaults() {
+            let mut mgr = HotkeyManager::new();
+            mgr.restore_from_config(&serde_json::json!({}));
+            assert_eq!(mgr.format_hotkey_string(), "F6");
+            assert_eq!(mgr.format_save_hotkey_string(), "Ctrl+S");
+        }
+    }
 
     mod test_default_hotkey {
         use super::*;

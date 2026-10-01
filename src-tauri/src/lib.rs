@@ -57,6 +57,7 @@ pub fn run() {
             commands::stop_playback,
             commands::seek_playback,
             commands::clear_loaded_song,
+            commands::get_hotkeys,
             commands::set_save_dir,
             commands::get_save_dir,
             commands::set_midi_dir,

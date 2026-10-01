@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { usePersistedState } from "../../state/usePersistedState";
+import { parseOneOf } from "../../state/persistedParsers";
 import { TabPage } from "../../components/TabPage";
 
 const MIT_LICENSE = (year: string, holder: string) => `MIT License
@@ -108,7 +109,9 @@ dirs / rand / chrono
 const NAV_ITEMS = Object.keys(LICENSE_TEXTS);
 
 export function LicenseTab() {
-  const [active, setActive] = useState(0);
+  const [active, setActive] = usePersistedState("ui_license_tab", 0, {
+    parse: parseOneOf(NAV_ITEMS.map((_, index) => index)),
+  });
 
   return (
     <div className="license-tab">

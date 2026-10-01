@@ -18,7 +18,9 @@ import { LicenseTab } from "./pages/license/LicenseTab";
 import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
 import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
 import { useCollapsedWindowSize } from "./lib/useCollapsedWindowSize";
-import type { PageId } from "./pages/pageIds";
+import { PAGE_IDS, type PageId } from "./pages/pageIds";
+import { usePersistedState } from "./state/usePersistedState";
+import { parseBoolean, parseOneOf } from "./state/persistedParsers";
 import "./App.css";
 
 const PAGE_TITLES: Record<PageId, string> = {
@@ -31,8 +33,10 @@ const PAGE_TITLES: Record<PageId, string> = {
 };
 
 function AppShell() {
-  const [activePage, setActivePage] = useState<PageId>("playback");
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activePage, setActivePage] = usePersistedState<PageId>("ui_active_page", "playback", {
+    parse: parseOneOf(PAGE_IDS),
+  });
+  const [isCollapsed, setIsCollapsed] = usePersistedState("ui_collapsed", false, { parse: parseBoolean });
   const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
   const { appendLog } = useLog();

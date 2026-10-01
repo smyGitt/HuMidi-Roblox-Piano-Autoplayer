@@ -1,5 +1,7 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { DEFAULT_CONFIG, type PlaybackConfig } from "../pages/playback/types";
+import { configFromSaved, configToPatch } from "../pages/playback/persistedConfig";
+import { usePersistedPatch } from "./usePersistedState";
 
 interface PlaybackConfigContextValue {
   config: PlaybackConfig;
@@ -10,7 +12,10 @@ interface PlaybackConfigContextValue {
 const PlaybackConfigContext = createContext<PlaybackConfigContextValue | null>(null);
 
 export function PlaybackConfigProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<PlaybackConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = usePersistedPatch<PlaybackConfig>("playback settings", DEFAULT_CONFIG, {
+    fromConfig: configFromSaved,
+    toPatch: configToPatch,
+  });
 
   const value = useMemo(
     () => ({
@@ -18,7 +23,7 @@ export function PlaybackConfigProvider({ children }: { children: ReactNode }) {
       setConfig,
       updateConfig: (patch: Partial<PlaybackConfig>) => setConfig((c) => ({ ...c, ...patch })),
     }),
-    [config],
+    [config, setConfig],
   );
 
   return <PlaybackConfigContext.Provider value={value}>{children}</PlaybackConfigContext.Provider>;

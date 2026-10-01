@@ -16,6 +16,7 @@ import {
   onEvent,
   startBinding,
   startSaveBinding,
+  getHotkeys,
   setSaveDir,
   getSaveDir,
   setMidiDir,
@@ -30,6 +31,8 @@ import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
 import { Select, TextInput } from "../../components/Field";
 import { Label } from "../../components/Label";
+import { usePersistedState } from "../../state/usePersistedState";
+import { parseOneOf } from "../../state/persistedParsers";
 
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
 type SettingsNav = (typeof NAV_ITEMS)[number];
@@ -224,6 +227,12 @@ function HotkeyPage() {
 
   useEffect(() => {
     if (!isTauri()) return;
+    getHotkeys()
+      .then(([playback, save]) => {
+        setPlaybackLabel(playback);
+        setSaveLabel(save);
+      })
+      .catch(() => {});
     const unlisten = [
       onEvent("hotkey_bound_updated", (label) => {
         setPlaybackLabel(label);
@@ -380,7 +389,9 @@ function PrivacyPage() {
 }
 
 export function SettingsTab() {
-  const [nav, setNav] = useState<SettingsNav>("Display");
+  const [nav, setNav] = usePersistedState<SettingsNav>("ui_settings_page", "Display", {
+    parse: parseOneOf(NAV_ITEMS),
+  });
 
   return (
     <div className="settings-tab">

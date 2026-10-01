@@ -8,16 +8,25 @@ import { isTauri, translateSheetToNotes, notesToSheet } from "../../lib/tauri";
 import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
 import { NumberInput, Select, TextArea } from "../../components/Field";
+import { usePersistedState } from "../../state/usePersistedState";
+import { parseBoolean, parseNumberInRange, parseOneOf, parseString } from "../../state/persistedParsers";
 
-const FORMATS = ["Virtual Piano"];
+const FORMATS: readonly string[] = ["Virtual Piano"];
+const DEFAULT_BPM = 120;
+const MIN_BPM = 20;
+const MAX_BPM = 400;
 const MODES = ["Import", "Export"] as const;
 
 export function TranslatorTab() {
-  const [mode, setMode] = useState<"import" | "export">("import");
-  const [format, setFormat] = useState(FORMATS[0]);
-  const [importText, setImportText] = useState("");
-  const [bpm, setBpm] = useState(120);
-  const [humanize, setHumanize] = useState(false);
+  const [mode, setMode] = usePersistedState<"import" | "export">("ui_translator_mode", "import", {
+    parse: parseOneOf(["import", "export"] as const),
+  });
+  const [format, setFormat] = usePersistedState("ui_translator_format", FORMATS[0], { parse: parseOneOf(FORMATS) });
+  const [importText, setImportText] = usePersistedState("ui_translator_import_text", "", { parse: parseString });
+  const [bpm, setBpm] = usePersistedState("ui_translator_bpm", DEFAULT_BPM, {
+    parse: parseNumberInRange(MIN_BPM, MAX_BPM),
+  });
+  const [humanize, setHumanize] = usePersistedState("ui_translator_humanize", false, { parse: parseBoolean });
   const [previewText, setPreviewText] = useState("");
   const [exportText, setExportText] = useState("");
   const [exportStatus, setExportStatus] = useState<string | null>(null);
@@ -99,8 +108,8 @@ export function TranslatorTab() {
             <label className="translator-tab__bpm">
               BPM
               <NumberInput
-                min={20}
-                max={400}
+                min={MIN_BPM}
+                max={MAX_BPM}
                 value={bpm}
                 onChange={(e) => setBpm(Number(e.target.value))}
               />
