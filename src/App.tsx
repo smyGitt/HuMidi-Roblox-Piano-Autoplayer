@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { AppSettingsProvider, useAppSettings } from "./state/AppSettingsContext";
 import { PlaybackConfigProvider, usePlaybackConfig } from "./state/PlaybackConfigContext";
-import { LogProvider } from "./state/LogContext";
+import { LogProvider, useLog } from "./state/LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine } from "./state/PlaybackEngineContext";
 import { Sidebar } from "./components/Sidebar";
 import { TransportBar } from "./components/TransportBar";
@@ -17,6 +17,7 @@ import { DebugTab } from "./pages/debug/DebugTab";
 import { LicenseTab } from "./pages/license/LicenseTab";
 import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
 import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
+import { useCollapsedWindowSize } from "./lib/useCollapsedWindowSize";
 import type { PageId } from "./pages/pageIds";
 import "./App.css";
 
@@ -33,6 +34,9 @@ function AppShell() {
   const [activePage, setActivePage] = useState<PageId>("playback");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
+  const windowRef = useRef<HTMLDivElement>(null);
+  const { appendLog } = useLog();
+  useCollapsedWindowSize(isCollapsed, windowRef, appendLog);
   const {
     opacity,
     showStatusText,
@@ -78,7 +82,7 @@ function AppShell() {
   const statusLabel = { unloaded: "NO MIDI", loaded: "NO PEDAL", loading: "GEN PEDAL", ready: "READY" }[status];
 
   return (
-    <div className={`app-window${isCollapsed ? " app-window--collapsed" : ""}`} style={{ opacity: opacity / 100 }}>
+    <div ref={windowRef} className={`app-window${isCollapsed ? " app-window--collapsed" : ""}`} style={{ opacity: opacity / 100 }}>
       {!isCollapsed && (
         <div className="app-body">
           <Sidebar
@@ -108,6 +112,8 @@ function AppShell() {
           </div>
         </div>
       )}
+
+      {isCollapsed && <FileHeader />}
 
       <TransportBar
         isPlaying={engine.isPlaying && !engine.isPaused}

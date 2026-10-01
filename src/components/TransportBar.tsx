@@ -90,8 +90,8 @@ export function TransportBar({
   onToggleCollapsed,
 }: TransportBarProps) {
   return (
-    <div className="transport-bar">
-      {!isCollapsed && <ScrubberRow clock={clock} totalTime={totalTime} onScrub={onScrub} />}
+    <div className={`transport-bar${isCollapsed ? " transport-bar--collapsed" : ""}`}>
+      <ScrubberRow clock={clock} totalTime={totalTime} onScrub={onScrub} />
 
       <div className="transport-bar__btn-row">
         <div className="transport-bar__side">

@@ -405,6 +405,10 @@ button:disabled {
   gap: var(--space-1);
 }
 
+.transport-bar--collapsed {
+  border-top: none;
+}
+
 .transport-bar__scrubber-row {
   display: flex;
   align-items: center;
