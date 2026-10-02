@@ -531,6 +531,31 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.engine.isPaused).toBe(false);
   });
 
+  it("togglePause after the engine auto-paused at the end of the song seeks to the start before resuming", async () => {
+    tauriMocks.togglePause.mockResolvedValue(undefined);
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("auto_paused")).toBe(true));
+    await act(async () => {
+      eventHandlers.get("auto_paused")?.(null);
+    });
+    expect(result.current.engine.isPaused).toBe(true);
+    await act(async () => result.current.engine.togglePause());
+    expect(tauriMocks.seekPlayback).toHaveBeenCalledWith(0);
+    expect(tauriMocks.togglePause).toHaveBeenCalledTimes(1);
+    expect(result.current.engine.isPaused).toBe(false);
+    await act(async () => result.current.engine.togglePause());
+    await act(async () => result.current.engine.togglePause());
+    expect(tauriMocks.seekPlayback).toHaveBeenCalledTimes(1);
+  });
+
+  it("togglePause during a normal pause does not seek", async () => {
+    tauriMocks.togglePause.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.togglePause());
+    expect(tauriMocks.seekPlayback).not.toHaveBeenCalled();
+  });
+
   it("stop calls the real command and resets the playback clock to the start", async () => {
     tauriMocks.stopPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
@@ -773,6 +798,23 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
 
     await act(async () => eventHandlers.get("hotkey_toggle_requested")!(null));
     expect(tauriMocks.togglePause).toHaveBeenCalledTimes(1);
+  });
+
+  it("the shortcut after the engine auto-paused at the end of the song seeks to the start before resuming", async () => {
+    tauriMocks.togglePause.mockResolvedValue(undefined);
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("hotkey_toggle_requested")).toBe(true));
+    await act(async () => {
+      eventHandlers.get("playback_started")?.(null);
+    });
+    await act(async () => {
+      eventHandlers.get("auto_paused")?.(null);
+    });
+    await act(async () => eventHandlers.get("hotkey_toggle_requested")!(null));
+    expect(tauriMocks.seekPlayback).toHaveBeenCalledWith(0);
+    expect(tauriMocks.togglePause).toHaveBeenCalledTimes(1);
+    expect(result.current.engine.isPaused).toBe(false);
   });
 
   it("resumeSave calls resume_from_save and populates notes/duration, marking both notes and pedal as compiled", async () => {

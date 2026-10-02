@@ -146,6 +146,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const isGeneratingPedalRef = useRef(false);
+  const atEndRef = useRef(false);
   const isSavingRef = useRef(false);
   const songVersionRef = useRef(0);
   const playRef = useRef(play);
@@ -193,15 +194,22 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       onEvent("status_updated", (msg) => appendLog(msg)),
       onEvent("progress_updated", (t) => clock.report(t)),
       onEvent("playback_finished", () => {
+        atEndRef.current = false;
         setIsPlaying(false);
         setIsPaused(false);
         appendLog("Playback finished");
       }),
       onEvent("visualizer_updated", (pitches) => liveKeys.setPitches(pitches)),
       onEvent("pedal_updated", (active) => liveKeys.setPedal(active)),
-      onEvent("auto_paused", () => setIsPaused(true)),
+      onEvent("auto_paused", () => {
+        atEndRef.current = true;
+        setIsPaused(true);
+      }),
       onEvent("error_occurred", (msg) => appendLog(`Error: ${msg}`)),
-      onEvent("playback_started", () => setIsPlaying(true)),
+      onEvent("playback_started", () => {
+        atEndRef.current = false;
+        setIsPlaying(true);
+      }),
       onEvent("hotkey_toggle_requested", () => {
         void (isPlayingRef.current ? togglePauseRef.current() : playRef.current());
       }),
@@ -426,6 +434,11 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setIsPlaying((p) => !p);
       return;
     }
+    if (atEndRef.current) {
+      atEndRef.current = false;
+      clock.jump(0);
+      await invokeSeekPlayback(0);
+    }
     setIsPaused((p) => !p);
     await invokeTogglePause();
   }
@@ -437,6 +450,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       clock.jump(0);
       return;
     }
+    atEndRef.current = false;
     await invokeStopPlayback();
     clock.jump(0);
   }
@@ -446,6 +460,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       clock.jump(time);
       return;
     }
+    atEndRef.current = false;
     if (isPlayingRef.current) clock.jump(time);
     await invokeSeekPlayback(time);
   }
