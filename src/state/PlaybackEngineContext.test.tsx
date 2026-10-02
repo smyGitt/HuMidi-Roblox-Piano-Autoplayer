@@ -219,6 +219,43 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.engine.originalBpm).toBe(142.5);
   });
 
+  it("loadFile stops a song that is playing before loading the new one", async () => {
+    tauriMocks.stopPlayback.mockResolvedValue(undefined);
+    tauriMocks.parseMidiStructure.mockResolvedValue({ tracks: [], initial_bpm: 120 });
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("playback_started")).toBe(true));
+    await act(async () => {
+      eventHandlers.get("playback_started")?.(null);
+    });
+    expect(result.current.engine.isPlaying).toBe(true);
+    await act(async () => result.current.engine.loadFile("/real/path/next.mid", "next.mid"));
+    expect(tauriMocks.stopPlayback).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.stopPlayback.mock.invocationCallOrder[0]).toBeLessThan(
+      tauriMocks.parseMidiStructure.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("loadFile does not call stop when nothing is playing", async () => {
+    tauriMocks.parseMidiStructure.mockResolvedValue({ tracks: [], initial_bpm: 120 });
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/path/next.mid", "next.mid"));
+    expect(tauriMocks.stopPlayback).not.toHaveBeenCalled();
+  });
+
+  it("resumeSave stops a song that is playing before resuming the save", async () => {
+    tauriMocks.stopPlayback.mockResolvedValue(undefined);
+    tauriMocks.resumeFromSave.mockRejectedValue(new Error("no save"));
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("playback_started")).toBe(true));
+    await act(async () => {
+      eventHandlers.get("playback_started")?.(null);
+    });
+    await act(async () => result.current.engine.resumeSave("/saves/x.json", "x"));
+    expect(tauriMocks.stopPlayback.mock.invocationCallOrder[0]).toBeLessThan(
+      tauriMocks.resumeFromSave.mock.invocationCallOrder[0],
+    );
+  });
+
   it("loadFile resets originalBpm to 0 while a new file is loading, discarding the previous file's value", async () => {
     tauriMocks.parseMidiStructure.mockResolvedValue({
       tracks: [{ index: 0, name: "Melody", note_count: 50, instrument_name: "Piano", is_drum: false }],

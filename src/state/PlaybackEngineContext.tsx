@@ -151,6 +151,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const songVersionRef = useRef(0);
   const playRef = useRef(play);
   playRef.current = play;
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
   const togglePauseRef = useRef(togglePause);
   togglePauseRef.current = togglePause;
   const saveRef = useRef(save);
@@ -223,6 +225,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   }, [appendLog, clock, liveKeys]);
 
   const loadFile = useCallback(async (path: string, name: string) => {
+    if (isPlayingRef.current) await stopRef.current();
     const version = ++songVersionRef.current;
     setMidiFilePath(path);
     setFileName(name);
@@ -510,6 +513,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog("Resume unavailable outside the desktop app");
       return;
     }
+    if (isPlayingRef.current) await stop();
     try {
       const result = await invokeResumeFromSave(filepath);
       setFinalNotes(result.final_notes);

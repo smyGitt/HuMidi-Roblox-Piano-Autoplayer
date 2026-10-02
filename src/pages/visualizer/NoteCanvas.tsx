@@ -82,7 +82,9 @@ export function NoteCanvas(props: NoteCanvasProps) {
 
   useEffect(
     () => () => {
-      if (pendingFrameRef.current !== null) window.cancelAnimationFrame(pendingFrameRef.current);
+      if (pendingFrameRef.current === null) return;
+      window.cancelAnimationFrame(pendingFrameRef.current);
+      pendingFrameRef.current = null;
     },
     [],
   );
