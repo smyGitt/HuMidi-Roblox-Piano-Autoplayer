@@ -48,10 +48,11 @@ describe("AppSettingsContext (preview mode, isTauri() = false)", () => {
     expect(result.current.showTimeline).toBe(true);
     expect(result.current.showPiano).toBe(true);
     expect(result.current.showPianoPedal).toBe(true);
-    expect(result.current.visualizerHorizontal).toBe(false);
+    expect(result.current.visualizerHorizontal).toBe(true);
     expect(result.current.pedalPromptThreshold).toBe(8);
     expect(result.current.autoCheckUpdates).toBe(false);
     expect(result.current.showStatusText).toBe(false);
+    expect(result.current.switchToVisualizerOnPlay).toBe(true);
     expect(result.current.maxVisibleSaves).toBe(20);
     expect(tauriMocks.loadAppConfig).not.toHaveBeenCalled();
   });
@@ -80,31 +81,33 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
         show_timeline_visualizer: false,
         show_piano_visualizer: false,
         show_piano_pedal_visualizer: false,
-        visualizer_horizontal: true,
+        visualizer_horizontal: false,
         pedal_prompt_threshold: 42,
         auto_check_updates: false,
         show_status_text: true,
+        switch_to_visualizer_on_play: false,
         max_visible_saves: 7,
       }),
     );
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await waitFor(() => expect(result.current.pedalPromptThreshold).toBe(42));
     expect(result.current.showStatusText).toBe(true);
+    expect(result.current.switchToVisualizerOnPlay).toBe(false);
     expect(result.current.maxVisibleSaves).toBe(7);
     expect(result.current.alwaysOnTop).toBe(true);
     expect(result.current.opacity).toBe(70);
     expect(result.current.showTimeline).toBe(false);
     expect(result.current.showPiano).toBe(false);
     expect(result.current.showPianoPedal).toBe(false);
-    expect(result.current.visualizerHorizontal).toBe(true);
+    expect(result.current.visualizerHorizontal).toBe(false);
     expect(result.current.autoCheckUpdates).toBe(false);
   });
 
   it("setVisualizerHorizontal persists under visualizer_horizontal", async () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
-    await act(async () => result.current.setVisualizerHorizontal(true));
-    expect(result.current.visualizerHorizontal).toBe(true);
-    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: true });
+    await act(async () => result.current.setVisualizerHorizontal(false));
+    expect(result.current.visualizerHorizontal).toBe(false);
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: false });
   });
 
   it("an empty persisted config leaves every field at its default", async () => {
@@ -145,6 +148,12 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await act(async () => result.current.setShowStatusText(true));
     expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ show_status_text: true });
+  });
+
+  it("setSwitchToVisualizerOnPlay persists under switch_to_visualizer_on_play", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await act(async () => result.current.setSwitchToVisualizerOnPlay(false));
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ switch_to_visualizer_on_play: false });
   });
 
   it("setAlwaysOnTop persists to config AND calls the real Tauri window API", async () => {

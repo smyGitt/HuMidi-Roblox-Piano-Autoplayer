@@ -146,12 +146,15 @@ pub async fn parse_midi_structure<R: tauri::Runtime>(
 pub fn extract_pedal_intervals(events: &[KeyEvent]) -> Vec<(f64, f64)> {
     let mut intervals = Vec::new();
     let mut down_time: Option<f64> = None;
-    for ev in events {
-        if ev.action != "pedal" {
-            continue;
-        }
+    let mut pedal_events: Vec<&KeyEvent> = events.iter().filter(|ev| ev.action == "pedal").collect();
+    pedal_events.sort_by(|a, b| a.cmp(b));
+    for ev in pedal_events {
         match ev.key_char.as_str() {
-            "down" => down_time = Some(ev.time),
+            "down" => {
+                if down_time.is_none() {
+                    down_time = Some(ev.time);
+                }
+            }
             "up" => {
                 if let Some(start) = down_time {
                     intervals.push((start, ev.time));
@@ -4035,9 +4038,41 @@ mod tests {
         }
 
         #[test]
-        fn test_consecutive_downs_last_wins() {
+        fn test_consecutive_downs_first_wins() {
             let events = [pedal_ev(1.0, "down"), pedal_ev(1.5, "down"), pedal_ev(2.0, "up")];
-            assert_eq!(extract_pedal_intervals(&events), vec![(1.5, 2.0)]);
+            assert_eq!(extract_pedal_intervals(&events), vec![(1.0, 2.0)]);
+        }
+
+        #[test]
+        fn test_events_out_of_time_order_are_sorted_first() {
+            let events = [
+                pedal_ev(0.0, "down"),
+                pedal_ev(2.0, "up"),
+                pedal_ev(1.0, "down"),
+                pedal_ev(3.0, "up"),
+                pedal_ev(2.0, "down"),
+                pedal_ev(4.0, "up"),
+            ];
+            assert_eq!(extract_pedal_intervals(&events), vec![(0.0, 2.0), (2.0, 3.0)]);
+        }
+
+        #[test]
+        fn test_overlapping_downs_never_produce_overlapping_intervals() {
+            let events = [
+                pedal_ev(0.0, "down"),
+                pedal_ev(10.0, "up"),
+                pedal_ev(1.0, "down"),
+                pedal_ev(2.0, "up"),
+            ];
+            assert_eq!(extract_pedal_intervals(&events), vec![(0.0, 2.0)]);
+        }
+
+        #[test]
+        fn test_same_time_up_before_down_gives_adjacent_intervals_without_a_zero_length_one() {
+            let down = |t: f64| KeyEvent::new(t, 1, "pedal", "down");
+            let up = |t: f64| KeyEvent::new(t, 0, "pedal", "up");
+            let events = [down(0.0), down(0.0), up(0.0), down(1.0), up(1.0), down(1.0), up(2.0)];
+            assert_eq!(extract_pedal_intervals(&events), vec![(0.0, 1.0), (1.0, 2.0)]);
         }
 
         #[test]

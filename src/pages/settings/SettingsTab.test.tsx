@@ -170,15 +170,15 @@ describe("SettingsTab > Display page", () => {
     expect(card.querySelector(".card__title")?.textContent).toBe("Saved Songs");
   });
 
-  it("Horizontal Scrolling sits in the Visualizer card, starts off, and persists under visualizer_horizontal", async () => {
+  it("Horizontal Scrolling sits in the Visualizer card, starts on, and persists under visualizer_horizontal", async () => {
     renderSettings();
     const toggle = screen.getByText("Horizontal Scrolling").closest("[role='switch']") as HTMLElement;
     const card = toggle.closest(".card") as HTMLElement;
     expect(card.querySelector(".card__title")?.textContent).toBe("Visualizer");
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
-    fireEvent.click(toggle);
-    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: true }));
     expect(toggle.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ visualizer_horizontal: false }));
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
   });
 });
 

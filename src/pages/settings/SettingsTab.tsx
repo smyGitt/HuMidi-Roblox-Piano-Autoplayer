@@ -80,6 +80,13 @@ function DisplayPage() {
             label="Show Piano Pedal"
           />
         </div>
+        <div className="control-row">
+          <ToggleSwitch
+            checked={settings.switchToVisualizerOnPlay}
+            onChange={settings.setSwitchToVisualizerOnPlay}
+            label="Switch to Visualizer on Play"
+          />
+        </div>
       </Card>
 
       <Card title="Saved Songs">

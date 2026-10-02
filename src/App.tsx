@@ -46,6 +46,7 @@ function AppShell() {
     showStatusText,
     showTimeline,
     showPiano,
+    switchToVisualizerOnPlay,
     showUpdatePrompt,
     resolveUpdatePrompt,
     updateAvailable,
@@ -64,6 +65,20 @@ function AppShell() {
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
+
+  const playbackRunning = engine.isPlaying && !engine.isPaused;
+  const visualizerAvailableRef = useRef(showTimeline || showPiano);
+  visualizerAvailableRef.current = showTimeline || showPiano;
+  const switchOnPlayRef = useRef(switchToVisualizerOnPlay);
+  switchOnPlayRef.current = switchToVisualizerOnPlay;
+  const wasRunningRef = useRef(false);
+
+  useEffect(() => {
+    if (playbackRunning && !wasRunningRef.current && switchOnPlayRef.current && visualizerAvailableRef.current) {
+      setActivePage("visualizer");
+    }
+    wasRunningRef.current = playbackRunning;
+  }, [playbackRunning, setActivePage]);
 
   useEffect(() => {
     if (engine.tracks.length > 0) setTrackSelectionOpen(true);
