@@ -72,7 +72,7 @@ body,
 }
 
 body {
-  background: var(--bg_primary);
+  background: transparent;
   color: var(--text_primary);
 }
 
@@ -255,6 +255,7 @@ button:disabled {
 
 .app-window {
   height: 100vh;
+  background: var(--bg_primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
