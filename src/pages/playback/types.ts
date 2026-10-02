@@ -22,14 +22,15 @@ export interface PlaybackConfig {
   tempo_sway_intensity: number;
   invert_tempo_sway: boolean;
   use_midi_pedal: boolean;
+  pedal_before_humanize: boolean;
 }
 
 export const PEDAL_MAPPING: Record<string, string> = {
-  "Auto (Default)": "hybrid",
-  PedalAI: "ai",
-  Harmonic: "legato",
-  Rhythmic: "rhythmic",
   None: "none",
+  PedalAI: "ai",
+  Adaptive: "hybrid",
+  Rhythmic: "rhythmic",
+  Harmonic: "legato",
 };
 
 export const DEFAULT_CONFIG: PlaybackConfig = {
@@ -56,4 +57,5 @@ export const DEFAULT_CONFIG: PlaybackConfig = {
   tempo_sway_intensity: 0.015,
   invert_tempo_sway: false,
   use_midi_pedal: false,
+  pedal_before_humanize: true,
 };

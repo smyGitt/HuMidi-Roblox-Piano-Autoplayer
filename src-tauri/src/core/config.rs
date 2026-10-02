@@ -28,6 +28,7 @@ pub struct PlaybackConfig {
     pub invert_tempo_sway: bool,
     pub use_midi_pedal: bool,
     pub use_ai_pedal: bool,
+    pub pedal_before_humanize: bool,
 }
 
 impl Default for PlaybackConfig {
@@ -58,6 +59,7 @@ impl Default for PlaybackConfig {
             invert_tempo_sway: false,
             use_midi_pedal: false,
             use_ai_pedal: true,
+            pedal_before_humanize: true,
         }
     }
 }

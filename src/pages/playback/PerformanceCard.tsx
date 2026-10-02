@@ -44,6 +44,16 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
           ))}
         </Select>
       </div>
+      <span className="performance-card__pedal-note">
+        Prefer PedalAI or Adaptive. The others ignore the musical style.
+      </span>
+      <div className="control-row">
+        <ToggleSwitch
+          checked={config.pedal_before_humanize}
+          onChange={(v) => onChange({ pedal_before_humanize: v })}
+          label="Generate Pedal Events Before Humanizing"
+        />
+      </div>
 
       <div className="control-row">
         <div className="control-row__label">

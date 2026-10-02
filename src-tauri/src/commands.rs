@@ -432,7 +432,14 @@ pub fn compile_pedal_logic(
     let midi_pedal_events = session.midi_pedal_events.clone();
     let total_dur = session.total_dur;
 
-    let sections = SectionAnalyzer::new(final_notes.clone(), &tempo_map).analyze();
+    let pedal_notes = if config.pedal_before_humanize {
+        final_notes.clone()
+    } else {
+        let mut notes = humanized_notes.clone();
+        notes.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+        notes
+    };
+    let sections = SectionAnalyzer::new(pedal_notes.clone(), &tempo_map).analyze();
     let midi_pedal_opt = if midi_pedal_events.is_empty() {
         None
     } else {
@@ -441,7 +448,7 @@ pub fn compile_pedal_logic(
     let (pedal_events, ai_meta) = compile_pedal_events(
         model,
         config,
-        &humanized_notes,
+        &pedal_notes,
         &sections,
         midi_pedal_opt,
     );

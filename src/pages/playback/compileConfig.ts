@@ -23,6 +23,7 @@ export const PEDAL_CONFIG_KEYS: readonly (keyof PlaybackConfig)[] = [
   "pedal_threshold_on",
   "pedal_threshold_off",
   "use_midi_pedal",
+  "pedal_before_humanize",
 ];
 
 export function pickConfig(config: PlaybackConfig, keys: readonly (keyof PlaybackConfig)[]): Partial<PlaybackConfig> {

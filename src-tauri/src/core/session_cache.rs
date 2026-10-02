@@ -30,6 +30,7 @@ pub const PEDAL_CONFIG_KEYS: &[&str] = &[
     "pedal_threshold_on",
     "pedal_threshold_off",
     "use_midi_pedal",
+    "pedal_before_humanize",
 ];
 
 fn extract_keys(config: &PlaybackConfig, keys: &[&str]) -> Value {

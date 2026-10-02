@@ -139,8 +139,13 @@ pub fn compile_events(
     midi_pedal_events: Option<&[(f64, bool)]>,
 ) -> (Vec<KeyEvent>, Option<AiThresholds>) {
     let (note_events, humanized_notes) = compile_note_events(config, notes, sections);
+    let pedal_notes: &[Note] = if config.pedal_before_humanize {
+        notes
+    } else {
+        &humanized_notes
+    };
     let (pedal_events, ai_meta) =
-        compile_pedal_events(model, config, &humanized_notes, sections, midi_pedal_events);
+        compile_pedal_events(model, config, pedal_notes, sections, midi_pedal_events);
     (merge_compiled(&note_events, &pedal_events), ai_meta)
 }
 
@@ -615,6 +620,37 @@ mod tests {
                 compile_events(None, &cfg, &notes, &[], Some(&midi_events));
             let pedal_count = events.iter().filter(|e| e.action == "pedal").count();
             assert_eq!(pedal_count, 2);
+        }
+
+        fn second_pedal_down_time(before_humanize: bool) -> f64 {
+            let mut cfg = base_config();
+            cfg.pedal_style = "hybrid".to_string();
+            cfg.use_ai_pedal = false;
+            cfg.enable_tempo_sway = true;
+            cfg.tempo_sway_intensity = 0.1;
+            cfg.pedal_before_humanize = before_humanize;
+            let notes = vec![
+                note(0, 40, 0.0, 0.5, "left"),
+                note(1, 43, 1.0, 0.5, "left"),
+            ];
+            let section = MusicalSection::new(0.0, 2.0, notes.clone());
+            let (events, _) = compile_events(None, &cfg, &notes, &[section], None);
+            events
+                .iter()
+                .filter(|e| e.action == "pedal" && e.key_char == "down")
+                .map(|e| e.time)
+                .nth(1)
+                .unwrap()
+        }
+
+        #[test]
+        fn test_pedal_follows_the_original_notes_when_generated_before_humanizing() {
+            assert!((second_pedal_down_time(true) - 1.0).abs() < 1e-9);
+        }
+
+        #[test]
+        fn test_pedal_follows_the_humanized_notes_when_the_toggle_is_off() {
+            assert!((second_pedal_down_time(false) - 0.9).abs() < 1e-9);
         }
 
         #[test]

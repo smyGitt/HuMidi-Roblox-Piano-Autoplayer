@@ -29,6 +29,7 @@ export interface BackendPlaybackConfig {
   invert_tempo_sway: boolean;
   use_midi_pedal: boolean;
   use_ai_pedal: boolean;
+  pedal_before_humanize: boolean;
 }
 
 export function toBackendConfig(config: PlaybackConfig, midiFile: string): BackendPlaybackConfig {
@@ -58,6 +59,7 @@ export function toBackendConfig(config: PlaybackConfig, midiFile: string): Backe
     invert_tempo_sway: config.invert_tempo_sway,
     use_midi_pedal: config.use_midi_pedal,
     use_ai_pedal: false,
+    pedal_before_humanize: config.pedal_before_humanize,
   };
 }
 

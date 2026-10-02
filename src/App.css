@@ -890,6 +890,11 @@ button:disabled {
   color: var(--text_muted);
 }
 
+.performance-card__pedal-note {
+  font-size: var(--font-size);
+  color: var(--text_muted);
+}
+
 /* --- Tempo card --- */
 
 .tempo-card__bpm-row {
