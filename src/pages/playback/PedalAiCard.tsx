@@ -76,9 +76,7 @@ export function PedalAiCard({
       {!hasThresholds ? (
         <div className="pedal-ai-card__pre">
           <span className="pedal-ai-card__hint">
-            A trained model reads through your notes, forwards and backwards, and works out when a real player would
-            press and lift the pedal. Afterwards, the On and Off thresholds set the confidence the model needs before the pedal
-            goes down and before it lifts.
+            The On and Off thresholds set how confident the model must be before the pedal goes down and before it lifts.
           </span>
           <Button variant="accent" disabled={!generateEnabled} onClick={onGenerate}>
             Generate pedal events
