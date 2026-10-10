@@ -1,0 +1,191 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example v2.1.6). The tag must already exist in the repository."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "name=$DISPATCH_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=$REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify the tag matches the app version
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+        run: |
+          python3 << 'EOF'
+          import json, os, sys, tomllib
+
+          tag_version = os.environ["TAG_NAME"].removeprefix("v")
+
+          with open("src-tauri/tauri.conf.json", encoding="utf-8") as config_file:
+              config_version = json.load(config_file)["version"]
+          with open("src-tauri/Cargo.toml", "rb") as cargo_file:
+              cargo_version = tomllib.load(cargo_file)["package"]["version"]
+
+          print(f"Tag version        : {tag_version}")
+          print(f"tauri.conf.json    : {config_version}")
+          print(f"Cargo.toml         : {cargo_version}")
+
+          if not tag_version == config_version == cargo_version:
+              print(f"::error::Version mismatch. The tag is 'v{tag_version}', tauri.conf.json says '{config_version}' and Cargo.toml says '{cargo_version}'. Make all three agree before tagging.")
+              sys.exit(1)
+
+          print(f"Versions match: {tag_version}")
+          EOF
+
+      - name: Check the new version is greater than the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.tag.outputs.name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 << 'EOF'
+          import json, os, sys, urllib.request, urllib.error
+
+          REQUEST_TIMEOUT_SECONDS = 10
+
+          new_version = os.environ["NEW_TAG"].removeprefix("v")
+
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPOSITORY']}/releases/latest",
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "User-Agent": "HuMidi-ci",
+                  "Accept": "application/vnd.github+json",
+              },
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                  latest_tag = json.loads(response.read()).get("tag_name", "").removeprefix("v")
+          except urllib.error.HTTPError as error:
+              if error.code == 404:
+                  print("No previous release found, skipping the version order check.")
+                  sys.exit(0)
+              raise
+
+          def parse(version):
+              return tuple(int(part) for part in version.split("."))
+
+          print(f"Latest release : v{latest_tag}")
+          print(f"New tag        : v{new_version}")
+
+          if parse(new_version) <= parse(latest_tag):
+              print(f"::error::v{new_version} is not greater than the latest release v{latest_tag}. Bump the version and use a higher tag.")
+              sys.exit(1)
+
+          print("Version order OK")
+          EOF
+
+  create-release:
+    needs: check-version
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.id }}
+    steps:
+      - name: Create draft release
+        id: create
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.check-version.outputs.tag }}
+          name: 'HuMidi ${{ needs.check-version.outputs.tag }}'
+          draft: true
+          prerelease: false
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: ubuntu-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxkbcommon-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and attach to prerelease
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  publish-release:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: gh api --method PATCH "repos/$REPOSITORY/releases/$RELEASE_ID" -F draft=false
