@@ -25,6 +25,8 @@ HuMidi now uses a trained model from [PedalAI](https://github.com/smyGitt/PedalA
 # How do you run it?
 ### If you downloaded the file from the releases:
   just run the `.exe` or `.dmg`! 
+  
+  Remember that it accepts `.mid` files only. it works best with piano-only `.mid`, but I've seen it work with mixed instruments.
 
 ### Or, if you don't trust me...
 You can build the installer yourself with Tauri. Install what is listed under Dependencies first, then open a command prompt in the project folder and type this.
@@ -35,15 +37,11 @@ You can build the installer yourself with Tauri. Install what is listed under De
 you will find the installer in `src-tauri/target/release/bundle`.
 
 ### ...if you choose to do neither above:
-You need to run this in a command prompt. After you navigate to the project folder, type this.
+  This project USED to be command line only... though that was before I switched it over to tauri for a better front end experience. You can download the python version OR compile your own by using PyInstaller, and downloading the `legacy-python` branch and NOT the main branch!
 
-    npm ci
-    npm run tauri dev
-
-Remember that it accepts `.mid` files only. it works best with piano-only `.mid`, but I've seen it work with mixed instruments.
 
 # Dependencies
-If you chose to not trust me, no judging, and did not want to use the file in the releases, you need to install a few things first. You need Node.js and Rust. Everything else depends on your system and is listed in the [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+If you chose to not trust me (I wouldn't trust it blindly too lol no judging), and did not want to use the file in the releases, you need to install a few things first. You need Node.js and Rust. Everything else depends on your system and is listed in the [Tauri prerequisites](https://tauri.app/start/prerequisites/).
 
 On Debian or Ubuntu, this installs the system libraries.
 
