@@ -17,6 +17,7 @@ import { DebugTab } from "./pages/debug/DebugTab";
 import { LicenseTab } from "./pages/license/LicenseTab";
 import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
 import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
+import { BlockedInputDialog } from "./dialogs/BlockedInputDialog";
 import { useCollapsedWindowSize } from "./lib/useCollapsedWindowSize";
 import { PAGE_IDS, type PageId } from "./pages/pageIds";
 import { usePersistedState } from "./state/usePersistedState";
@@ -168,6 +169,9 @@ function AppShell() {
         />
       )}
 
+      {engine.blockedInput !== null && (
+        <BlockedInputDialog message={engine.blockedInput} onDismiss={engine.dismissBlockedInput} />
+      )}
       {showUpdatePrompt && <UpdateCheckPrompt onChoice={resolveUpdatePrompt} />}
       {updateAvailable && (
         <UpdateAvailableModal

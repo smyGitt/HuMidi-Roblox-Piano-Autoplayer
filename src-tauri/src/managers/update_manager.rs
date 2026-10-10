@@ -1,5 +1,12 @@
+use std::time::Duration;
+
 pub const RELEASES_PAGE: &str =
     "https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/latest";
+const LATEST_RELEASE_API: &str =
+    "https://api.github.com/repos/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/latest";
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const USER_AGENT: &str = "HuMidi-update-check";
+const GITHUB_ACCEPT: &str = "application/vnd.github+json";
 
 pub fn parse_version(tag: &str) -> Vec<i64> {
     let stripped = tag.trim_start_matches('v').trim();
@@ -49,31 +56,38 @@ pub fn auto_check_enabled(config: &serde_json::Value) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn check_for_updates(app: &tauri::AppHandle) -> Result<UpdateCheckOutcome, String> {
-    use tauri_plugin_updater::UpdaterExt;
-    let updater = app.updater().map_err(|e| e.to_string())?;
-    match updater.check().await {
-        Ok(Some(update)) => Ok(UpdateCheckOutcome::UpdateAvailable {
-            tag: update.version.clone(),
-            url: RELEASES_PAGE.to_string(),
-        }),
-        Ok(None) => Ok(UpdateCheckOutcome::NoUpdate),
-        Err(_) => Ok(UpdateCheckOutcome::Indeterminate),
-    }
+pub fn latest_tag_from_release(release: &serde_json::Value) -> String {
+    release
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
-pub async fn download_and_install_update(app: &tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_updater::UpdaterExt;
-    let updater = app.updater().map_err(|e| e.to_string())?;
-    let update = updater
-        .check()
+async fn fetch_latest_release() -> Result<serde_json::Value, String> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = reqwest::Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .user_agent(USER_AGENT)
+        .build()
+        .map_err(|e| e.to_string())?;
+    client
+        .get(LATEST_RELEASE_API)
+        .header(reqwest::header::ACCEPT, GITHUB_ACCEPT)
+        .send()
         .await
+        .and_then(|response| response.error_for_status())
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| "no update available".to_string())?;
-    update
-        .download_and_install(|_, _| {}, || {})
+        .json::<serde_json::Value>()
         .await
         .map_err(|e| e.to_string())
+}
+
+pub async fn check_for_updates(current_version: &str) -> UpdateCheckOutcome {
+    match fetch_latest_release().await {
+        Ok(release) => evaluate_update(current_version, &latest_tag_from_release(&release)),
+        Err(_) => UpdateCheckOutcome::Indeterminate,
+    }
 }
 
 #[cfg(test)]
@@ -200,6 +214,46 @@ mod tests {
             assert_eq!(
                 evaluate_update("garbage", "v1.4"),
                 UpdateCheckOutcome::Indeterminate
+            );
+        }
+    }
+
+    mod test_latest_tag_from_release {
+        use super::*;
+
+        #[test]
+        fn test_reads_tag_name() {
+            assert_eq!(latest_tag_from_release(&json!({"tag_name": "v2.2.0"})), "v2.2.0");
+        }
+
+        #[test]
+        fn test_missing_tag_name_is_empty() {
+            assert_eq!(latest_tag_from_release(&json!({"name": "x"})), "");
+        }
+
+        #[test]
+        fn test_non_string_tag_name_is_empty() {
+            assert_eq!(latest_tag_from_release(&json!({"tag_name": 5})), "");
+        }
+
+        #[test]
+        fn test_a_not_found_body_leads_to_indeterminate() {
+            let body = json!({"message": "Not Found"});
+            assert_eq!(
+                evaluate_update("2.1.6", &latest_tag_from_release(&body)),
+                UpdateCheckOutcome::Indeterminate
+            );
+        }
+
+        #[test]
+        fn test_a_newer_release_body_leads_to_update_available() {
+            let body = json!({"tag_name": "v2.2.0"});
+            assert_eq!(
+                evaluate_update("2.1.6", &latest_tag_from_release(&body)),
+                UpdateCheckOutcome::UpdateAvailable {
+                    tag: "v2.2.0".to_string(),
+                    url: RELEASES_PAGE.to_string()
+                }
             );
         }
     }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PlaybackConfigProvider, usePlaybackConfig } from "./PlaybackConfigContext";
 import { LogProvider, useLog } from "./LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine, type SaveResult } from "./PlaybackEngineContext";
+import { BLOCKED_INPUT_PREFIX } from "../lib/tauri";
 
 const PEDAL_FPS = 50;
 
@@ -367,6 +368,50 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     await act(async () => result.current.engine.play());
     expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
     expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+  });
+
+  it("a blocked-input error while compiling notes stops the load, clears the song and sets the warning", async () => {
+    tauriMocks.parseMidiStructure.mockResolvedValue({
+      tracks: [{ index: 0, name: "Melody", note_count: 50, instrument_name: "Piano", is_drum: false }],
+      initial_bpm: 120,
+    });
+    tauriMocks.compileNotes.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #3 has the unknown action 'shortcut'`);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/song.mid", "song.mid"));
+    await act(async () => result.current.engine.confirmTrackSelection([{ index: 0, role: "Auto-Detect" }]));
+    expect(result.current.engine.blockedInput).toContain("event #3");
+    expect(result.current.engine.hasCompiledNotes).toBe(false);
+    expect(result.current.engine.fileName).toBe("");
+    expect(tauriMocks.clearLoadedSong).toHaveBeenCalledTimes(1);
+  });
+
+  it("a blocked-input error while resuming a save sets the warning and leaves the loaded song alone", async () => {
+    tauriMocks.resumeFromSave.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #0 has the unknown action 'shortcut'`);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.resumeSave("/saves/bad.json", "bad"));
+    expect(result.current.engine.blockedInput).toContain("unknown action 'shortcut'");
+    expect(result.current.engine.hasCompiledNotes).toBe(false);
+    expect(result.current.engine.fileName).toBe("");
+  });
+
+  it("a blocked-input error from start_playback sets the warning", async () => {
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
+    tauriMocks.startPlayback.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #2 sends the unknown pedal command 'enter'`);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.blockedInput).toContain("pedal command 'enter'");
+  });
+
+  it("other load errors do not raise the warning, and dismissBlockedInput clears it", async () => {
+    tauriMocks.resumeFromSave.mockRejectedValue(new Error("Save file has no compiled events."));
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.resumeSave("/saves/empty.json", "empty"));
+    expect(result.current.engine.blockedInput).toBeNull();
+    tauriMocks.resumeFromSave.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #0 x`);
+    await act(async () => result.current.engine.resumeSave("/saves/bad.json", "bad"));
+    expect(result.current.engine.blockedInput).not.toBeNull();
+    act(() => result.current.engine.dismissBlockedInput());
+    expect(result.current.engine.blockedInput).toBeNull();
   });
 
   it("defaultAiThresholds captures only the FIRST generation's thresholds, not later regenerations", async () => {

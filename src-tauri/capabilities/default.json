@@ -9,7 +9,6 @@
     "core:window:allow-set-size",
     "opener:default",
     "dialog:default",
-    "global-shortcut:default",
-    "updater:default"
+    "global-shortcut:default"
   ]
 }

@@ -12,7 +12,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .setup(|app| {
             commands::spawn_hotkey_listener(app.handle().clone());
@@ -26,10 +25,8 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 let current_version = app.package_info().version.to_string();
                 tauri::async_runtime::spawn(async move {
-                    if let Ok(managers::update_manager::UpdateCheckOutcome::UpdateAvailable {
-                        tag,
-                        url,
-                    }) = managers::update_manager::check_for_updates(&app_handle).await
+                    if let managers::update_manager::UpdateCheckOutcome::UpdateAvailable { tag, url } =
+                        managers::update_manager::check_for_updates(&current_version).await
                     {
                         let _ = app_handle.emit(
                             "update-available",
@@ -85,7 +82,6 @@ pub fn run() {
             commands::start_binding,
             commands::start_save_binding,
             commands::check_for_updates_now,
-            commands::download_and_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

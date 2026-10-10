@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::core::atomic_write::write_json_atomic;
 use crate::core::compiler::{compile_note_events_with_played, compile_pedal_events, merge_compiled};
 use crate::core::config::PlaybackConfig;
+use crate::core::input_scan::scan_events;
 use crate::core::keyboard_driver::{EnigoDriver, KeyboardDriver};
 use crate::core::midi::{KeyMapper, MidiParser, TempoMap};
 use crate::core::models::{KeyEvent, MidiTrack, Note};
@@ -297,6 +298,7 @@ pub fn compile_notes_logic(
     let sections = SectionAnalyzer::new(final_notes.clone(), &tempo_map).analyze();
     let (note_events, humanized_notes, played_notes) =
         compile_note_events_with_played(config, &final_notes, &sections);
+    scan_events(&note_events).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let total_dur = compute_total_dur(&final_notes);
     let (tempo_events, time_signatures, measure_boundaries) =
         timeline_tempo_fields(&tempo_map, total_dur);
@@ -600,6 +602,7 @@ fn start_playback_blocking<R: tauri::Runtime>(
             .merged_events
             .clone()
             .ok_or("Pedal must be compiled before playback can start.")?;
+        scan_events(&merged_events)?;
         session
             .tempo_map
             .as_ref()
@@ -816,12 +819,8 @@ pub fn import_theme_file(
 pub async fn check_for_updates_now(
     app: tauri::AppHandle,
 ) -> Result<crate::managers::update_manager::UpdateCheckOutcome, String> {
-    crate::managers::update_manager::check_for_updates(&app).await
-}
-
-#[tauri::command]
-pub async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
-    crate::managers::update_manager::download_and_install_update(&app).await
+    let current_version = app.package_info().version.to_string();
+    Ok(crate::managers::update_manager::check_for_updates(&current_version).await)
 }
 
 pub fn shutdown_playback_now(state: &AppState) {
@@ -1143,6 +1142,7 @@ pub fn resume_from_save_logic(
     for (i, ev) in events_json.iter().enumerate() {
         events.push(deser_save_event(ev).map_err(|e| format!("Save file event #{i}: {e}"))?);
     }
+    scan_events(&events)?;
     events.sort();
 
     let final_notes = reconstruct_notes_for_visualizer(&events);
@@ -3750,12 +3750,19 @@ mod tests {
             })
         }
 
+        fn key_for(pitch: i32) -> String {
+            KeyMapper::new(false)
+                .get_key_data(pitch)
+                .map(|d| d.key.to_string())
+                .unwrap_or_default()
+        }
+
         fn press_v(t: f64, pitch: i32) -> Value {
-            serde_json::json!({"time": t, "priority": 2, "action": "press", "key_char": "a", "pitch": pitch, "velocity": 64})
+            serde_json::json!({"time": t, "priority": 2, "action": "press", "key_char": key_for(pitch), "pitch": pitch, "velocity": 64})
         }
 
         fn release_v(t: f64, pitch: i32) -> Value {
-            serde_json::json!({"time": t, "priority": 4, "action": "release", "key_char": "a", "pitch": pitch, "velocity": null})
+            serde_json::json!({"time": t, "priority": 4, "action": "release", "key_char": key_for(pitch), "pitch": pitch, "velocity": null})
         }
 
         #[test]
@@ -3921,7 +3928,7 @@ mod tests {
         #[test]
         fn test_float_valued_priority_and_pitch_are_coerced_not_rejected() {
             let event = serde_json::json!({
-                "time": 0.0, "priority": 2.0, "action": "press", "key_char": "a", "pitch": 60.0, "velocity": 64.0
+                "time": 0.0, "priority": 2.0, "action": "press", "key_char": key_for(60), "pitch": 60.0, "velocity": 64.0
             });
             let data = events_value(vec![event]);
             let mut session = PlaybackSession::default();
@@ -3931,16 +3938,53 @@ mod tests {
         }
 
         #[test]
-        fn test_out_of_i32_range_pitch_dropped_not_silently_truncated() {
+        fn test_out_of_i32_range_pitch_is_blocked_not_silently_truncated() {
             let event = serde_json::json!({
-                "time": 0.0, "priority": 2, "action": "press", "key_char": "a",
+                "time": 0.0, "priority": 2, "action": "press", "key_char": key_for(60),
                 "pitch": 5_000_000_000i64, "velocity": 64
             });
             let data = events_value(vec![event]);
             let mut session = PlaybackSession::default();
-            resume_from_save_logic(&data, &mut session).unwrap();
-            let merged = session.merged_events.unwrap();
-            assert_eq!(merged[0].pitch, None);
+            let err = resume_from_save_logic(&data, &mut session).unwrap_err();
+            assert!(err.starts_with(crate::core::input_scan::BLOCKED_INPUT_PREFIX));
+            assert!(session.merged_events.is_none());
+        }
+
+        fn assert_blocked_and_session_untouched(events: Vec<Value>) -> String {
+            let data = events_value(events);
+            let mut session = PlaybackSession::default();
+            let err = resume_from_save_logic(&data, &mut session).unwrap_err();
+            assert!(err.starts_with(crate::core::input_scan::BLOCKED_INPUT_PREFIX));
+            assert!(session.merged_events.is_none());
+            assert!(session.final_notes.is_none());
+            err
+        }
+
+        #[test]
+        fn test_unknown_action_in_a_save_is_blocked_before_anything_is_loaded() {
+            let shortcut = serde_json::json!({"time": 0.0, "priority": 2, "action": "shortcut", "key_char": "ctrl+alt+delete"});
+            let err = assert_blocked_and_session_untouched(vec![press_v(0.0, 60), shortcut]);
+            assert!(err.contains("event #1"));
+            assert!(err.contains("unknown action 'shortcut'"));
+        }
+
+        #[test]
+        fn test_press_of_a_non_piano_key_in_a_save_is_blocked() {
+            let enter = serde_json::json!({"time": 0.0, "priority": 2, "action": "press", "key_char": "
+", "pitch": 60, "velocity": 64});
+            assert_blocked_and_session_untouched(vec![enter]);
+        }
+
+        #[test]
+        fn test_press_without_a_note_in_a_save_is_blocked() {
+            let bare = serde_json::json!({"time": 0.0, "priority": 2, "action": "press", "key_char": "r"});
+            assert_blocked_and_session_untouched(vec![bare]);
+        }
+
+        #[test]
+        fn test_unknown_pedal_command_in_a_save_is_blocked() {
+            let pedal = serde_json::json!({"time": 0.0, "priority": 1, "action": "pedal", "key_char": "enter"});
+            assert_blocked_and_session_untouched(vec![pedal]);
         }
     }
 

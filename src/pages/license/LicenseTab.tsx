@@ -66,7 +66,7 @@ URL     : https://github.com/bytedance/GiantMIDI-Piano
   License : MIT OR Apache-2.0
   URL     : https://github.com/tauri-apps/tauri
 
-tauri-plugin-dialog / tauri-plugin-opener / tauri-plugin-updater / tauri-plugin-global-shortcut
+tauri-plugin-dialog / tauri-plugin-opener / tauri-plugin-global-shortcut
   License : MIT OR Apache-2.0
   URL     : https://github.com/tauri-apps/plugins-workspace
 

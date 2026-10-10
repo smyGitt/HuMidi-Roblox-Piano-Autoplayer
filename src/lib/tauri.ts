@@ -174,6 +174,14 @@ export async function compilePedalAndPlay(config: PlaybackConfig, midiFile: stri
   return invoke("compile_pedal_and_play", { config: toBackendConfig(config, midiFile) });
 }
 
+export const BLOCKED_INPUT_PREFIX = "Blocked unsafe input: ";
+
+export function blockedInputMessage(error: unknown): string | null {
+  const text = String(error);
+  const start = text.indexOf(BLOCKED_INPUT_PREFIX);
+  return start === -1 ? null : text.slice(start);
+}
+
 export async function startPlayback(config: PlaybackConfig, midiFile: string): Promise<void> {
   return invoke("start_playback", { config: toBackendConfig(config, midiFile) });
 }
@@ -358,10 +366,6 @@ export async function checkForUpdatesNow(): Promise<UpdateCheckOutcome> {
 
 export async function getAppVersion(): Promise<string> {
   return getVersion();
-}
-
-export async function downloadAndInstallUpdate(): Promise<void> {
-  return invoke("download_and_install_update");
 }
 
 export type PlayerEventMap = {

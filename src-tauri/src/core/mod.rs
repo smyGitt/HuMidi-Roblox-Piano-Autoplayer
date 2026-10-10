@@ -2,6 +2,7 @@ pub mod atomic_write;
 pub mod compiler;
 pub mod config;
 pub mod humanizer;
+pub mod input_scan;
 pub mod keyboard_driver;
 pub mod midi;
 pub mod models;

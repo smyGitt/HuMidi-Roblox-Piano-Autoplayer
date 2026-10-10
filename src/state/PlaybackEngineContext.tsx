@@ -18,6 +18,7 @@ import {
   resumeFromSave as invokeResumeFromSave,
   getSaveDir,
   getMidiDir,
+  blockedInputMessage,
   type TrackSummary,
   type SelectedTrackInfo,
   type PedalData,
@@ -81,6 +82,8 @@ interface PlaybackEngineValue {
   resumeSave: (filepath: string, label: string) => Promise<void>;
   playTranslatedSheet: (sheetText: string, bpm: number) => Promise<void>;
   clearSong: () => Promise<void>;
+  blockedInput: string | null;
+  dismissBlockedInput: () => void;
 }
 
 export type SaveResult = { path: string } | { error: string };
@@ -125,6 +128,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [hasCompiledPedal, setHasCompiledPedal] = useState(false);
   const [isGeneratingPedal, setIsGeneratingPedal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [blockedInput, setBlockedInput] = useState<string | null>(null);
   const [saveCount, setSaveCount] = useState(0);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
@@ -340,6 +344,11 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (version !== songVersionRef.current) return false;
       appendLog(`Failed to compile notes: ${String(e)}`);
+      const blocked = blockedInputMessage(e);
+      if (blocked !== null) {
+        setBlockedInput(blocked);
+        await clearSong();
+      }
       return false;
     }
   }
@@ -429,6 +438,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       await invokeStartPlayback(configRef.current, midiFilePath);
     } catch (e) {
       appendLog(`Failed to start playback: ${String(e)}`);
+      const blocked = blockedInputMessage(e);
+      if (blocked !== null) setBlockedInput(blocked);
     }
   }
 
@@ -544,6 +555,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog(`Resumed save: ${label}`);
     } catch (e) {
       appendLog(`Failed to resume save: ${String(e)}`);
+      const blocked = blockedInputMessage(e);
+      if (blocked !== null) setBlockedInput(blocked);
     }
   }
 
@@ -664,6 +677,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     resumeSave,
     playTranslatedSheet,
     clearSong,
+    blockedInput,
+    dismissBlockedInput: () => setBlockedInput(null),
   };
 
   return <PlaybackEngineContext.Provider value={value}>{children}</PlaybackEngineContext.Provider>;

@@ -180,11 +180,12 @@ fn temp_midi_config(path: &tempfile::TempPath) -> PlaybackConfig {
 
 fn write_valid_save(dir: &Path) -> String {
     let path = dir.join("save.json");
+    let key = KeyMapper::new(false).get_key_data(60).unwrap().key.to_string();
     let data = serde_json::json!({
         "metadata": {"track_details": [], "compiled_pedal_count": 0},
         "compiled_events": [
-            {"time": 0.0, "priority": 2, "action": "press", "key_char": "a", "pitch": 60, "velocity": 64},
-            {"time": 0.5, "priority": 4, "action": "release", "key_char": "a", "pitch": 60, "velocity": null},
+            {"time": 0.0, "priority": 2, "action": "press", "key_char": key, "pitch": 60, "velocity": 64},
+            {"time": 0.5, "priority": 4, "action": "release", "key_char": key, "pitch": 60, "velocity": null},
         ],
     });
     std::fs::write(&path, data.to_string()).unwrap();
