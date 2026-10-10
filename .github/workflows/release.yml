@@ -133,9 +133,7 @@ jobs:
           - platform: ubuntu-latest
             args: ''
           - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
+            args: '--target universal-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -178,6 +176,28 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Package the Linux app as a tar.gz
+        if: matrix.platform == 'ubuntu-latest'
+        continue-on-error: true
+        working-directory: src-tauri/target/release/bundle/appimage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          appimage=$(ls HuMidi_*.AppImage)
+          chmod +x "$appimage"
+          "./$appimage" --appimage-extract
+          mv squashfs-root HuMidi
+          archive="${appimage%.AppImage}.tar.gz"
+          tar -czf "$archive" HuMidi
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/gzip" \
+            --data-binary "@$archive" \
+            "https://uploads.github.com/repos/$REPOSITORY/releases/$RELEASE_ID/assets?name=$archive"
 
   publish-release:
     needs: [create-release, build]
