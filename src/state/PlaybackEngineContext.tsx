@@ -36,7 +36,7 @@ import { PlaybackClock } from "./playbackClock";
 import { LiveKeys } from "./liveKeys";
 import { PREVIEW_CONFIDENCE, PREVIEW_SONG } from "./previewSong";
 import type { PedalConfidence } from "../lib/pedalPreview";
-import type { PlaybackConfig } from "../pages/playback/types";
+import { DEFAULT_CONFIG, type PlaybackConfig } from "../pages/playback/types";
 import { NOTES_CONFIG_KEYS, PEDAL_CONFIG_KEYS, configDiffers, pickConfig } from "../pages/playback/compileConfig";
 
 interface PlaybackEngineValue {
@@ -87,6 +87,11 @@ interface PlaybackEngineValue {
 }
 
 export type SaveResult = { path: string } | { error: string };
+
+const NO_AI_THRESHOLDS = {
+  pedal_threshold_on: DEFAULT_CONFIG.pedal_threshold_on,
+  pedal_threshold_off: DEFAULT_CONFIG.pedal_threshold_off,
+};
 
 const PlaybackEngineContext = createContext<PlaybackEngineValue | null>(null);
 
@@ -409,10 +414,13 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
         ...pickConfig(configUsed, PEDAL_CONFIG_KEYS),
         ...(data.ai_thresholds
           ? { pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] }
-          : {}),
+          : NO_AI_THRESHOLDS),
       });
       if (data.ai_thresholds) {
         updateConfig({ pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] });
+      } else {
+        setDefaultAiThresholds(null);
+        updateConfig(NO_AI_THRESHOLDS);
       }
       updateSnapshot({ pedal: `${data.pedal_intervals.length} presses` });
       appendLog("Pedal compiled successful");

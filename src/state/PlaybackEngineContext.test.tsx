@@ -5,6 +5,7 @@ import { PlaybackConfigProvider, usePlaybackConfig } from "./PlaybackConfigConte
 import { LogProvider, useLog } from "./LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine, type SaveResult } from "./PlaybackEngineContext";
 import { BLOCKED_INPUT_PREFIX } from "../lib/tauri";
+import { DEFAULT_CONFIG } from "../pages/playback/types";
 
 const PEDAL_FPS = 50;
 
@@ -345,6 +346,21 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.engine.aiThresholds).toEqual([0.4, 0.6]);
     expect(result.current.playbackConfig.config.pedal_threshold_on).toBe(0.4);
     expect(result.current.playbackConfig.config.pedal_threshold_off).toBe(0.6);
+  });
+
+  it("a non-AI generatePedal after an AI one clears the thresholds, their default, and the compiled-pedal dirty flag", async () => {
+    tauriMocks.compilePedal
+      .mockResolvedValueOnce({ pedal_intervals: [[0, 1]], ai_thresholds: [0.62, 0.38], confidence: [], confidence_fps: PEDAL_FPS })
+      .mockResolvedValueOnce({ pedal_intervals: [[0, 1]], ai_thresholds: null, confidence: [], confidence_fps: PEDAL_FPS });
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.generatePedal());
+    expect(result.current.playbackConfig.config.pedal_threshold_on).toBe(0.62);
+    await act(async () => result.current.engine.generatePedal());
+    expect(result.current.engine.aiThresholds).toBeNull();
+    expect(result.current.engine.defaultAiThresholds).toBeNull();
+    expect(result.current.playbackConfig.config.pedal_threshold_on).toBe(DEFAULT_CONFIG.pedal_threshold_on);
+    expect(result.current.playbackConfig.config.pedal_threshold_off).toBe(DEFAULT_CONFIG.pedal_threshold_off);
+    expect(result.current.engine.configDirty).toBe(false);
   });
 
   it("generatePedal keeps the confidence curve from the backend for the threshold chart, and null when there is none", async () => {
