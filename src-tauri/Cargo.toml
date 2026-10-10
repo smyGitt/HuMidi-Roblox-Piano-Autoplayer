@@ -23,7 +23,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip"] }
 candle-core = "0.11"
 enigo = { version = "0.6", features = ["libei_tokio"] }
 midly = "0.5"
