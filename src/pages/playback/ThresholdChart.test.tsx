@@ -76,10 +76,14 @@ function yOf(value: number): number {
   return HEIGHT - value * HEIGHT;
 }
 
-function renderChart(curves: ThresholdCurves, onCurvesChange?: (curves: ThresholdCurves) => void) {
+function renderChart(
+  curves: ThresholdCurves,
+  onCurvesChange?: (curves: ThresholdCurves) => void,
+  showValues = false,
+) {
   const ui = (c: ThresholdCurves) => (
     <ThemeProvider>
-      <ThresholdChart confidence={CONFIDENCE} curves={c} onCurvesChange={onCurvesChange} />
+      <ThresholdChart confidence={CONFIDENCE} curves={c} onCurvesChange={onCurvesChange} showValues={showValues} />
     </ThemeProvider>
   );
   const view = render(ui(curves));
@@ -130,7 +134,7 @@ describe("ThresholdChart drawing", () => {
   });
 
   it("draws a square handle on every node of both lines", () => {
-    renderChart(SLOPED);
+    renderChart(SLOPED, vi.fn());
     const centres = nodeCentres();
     expect(centres).toHaveLength(SLOPED.on.length + SLOPED.off.length);
     expect(centres).toContainEqual([xOf(5), yOf(0.8)]);
@@ -234,13 +238,120 @@ describe("ThresholdChart editing", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("without a change handler the chart is read only", () => {
+});
+
+describe("ThresholdChart without a change handler", () => {
+  it("draws only the lines and the shading, with no node handles", () => {
+    renderChart(SLOPED);
+    expect(nodeCentres()).toEqual([]);
+    expect(lineStroke(ON_INDEX)).toEqual([
+      [0, yOf(0.6)],
+      [xOf(5), yOf(0.8)],
+      [WIDTH, yOf(0.6)],
+    ]);
+    expect(fillRects.filter((call) => call.alpha === SHADE_OPACITY).length).toBeGreaterThan(0);
+  });
+
+  it("is a plain picture: the wheel is left to scroll the page and nothing zooms", () => {
     const { container } = renderChart(SLOPED);
-    fireEvent.mouseDown(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
-    fireEvent.mouseMove(window, { clientX: xOf(6), clientY: yOf(0.9) });
+    const event = new WheelEvent("wheel", { deltaY: -1000, clientX: WIDTH / 2, cancelable: true, bubbles: true });
+    act(() => {
+      canvasOf(container).dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
+  });
+
+  it("does not react to the mouse over or on a node", () => {
+    const { container } = renderChart(SLOPED, undefined, true);
+    const canvas = canvasOf(container);
+    fireEvent.mouseMove(canvas, { clientX: xOf(5), clientY: yOf(0.8) });
+    fireEvent.mouseDown(canvas, { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
+    expect(canvas.dataset.cursor ?? "").toBe("");
+    expect(container.querySelector(".pedal-ai-card__chart-readout")).toBeNull();
     fireEvent.mouseUp(window);
-    fireEvent.contextMenu(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8) });
-    expect(nodeCentres().length).toBeGreaterThan(0);
+  });
+});
+
+describe("ThresholdChart value readout", () => {
+  function pressNode(container: HTMLElement, time: number, value: number) {
+    fireEvent.mouseDown(canvasOf(container), { clientX: xOf(time), clientY: yOf(value), button: 0 });
+  }
+
+  function readoutOf(container: HTMLElement): HTMLElement | null {
+    return container.querySelector(".pedal-ai-card__chart-readout");
+  }
+
+  it("shows nothing while a node is held when the numbers are off", () => {
+    const { container } = renderChart(SLOPED, vi.fn());
+    pressNode(container, 5, 0.8);
+    expect(readoutOf(container)).toBeNull();
+    fireEvent.mouseUp(window);
+  });
+
+  it("shows the exact time and value of a held node when the numbers are on", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 5, 0.8);
+    expect(screen.getByText("5.00 s")).toBeInTheDocument();
+    expect(screen.getByText("0.800")).toBeInTheDocument();
+    fireEvent.mouseUp(window);
+  });
+
+  it("follows the node to its new time and value while it is dragged", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 5, 0.8);
+    fireEvent.mouseMove(window, { clientX: xOf(6), clientY: yOf(0.9) });
+    expect(screen.getByText("6.00 s")).toBeInTheDocument();
+    expect(screen.getByText("0.900")).toBeInTheDocument();
+    fireEvent.mouseUp(window);
+  });
+
+  it("shows the value the node actually stopped at when the other line blocks it", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 5, 0.8);
+    fireEvent.mouseMove(window, { clientX: xOf(5), clientY: yOf(0.05) });
+    expect(screen.getByText("0.400")).toBeInTheDocument();
+    fireEvent.mouseUp(window);
+  });
+
+  it("disappears when the mouse is released", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 5, 0.8);
+    fireEvent.mouseUp(window);
+    expect(readoutOf(container)).toBeNull();
+  });
+
+  it("is not shown when the background is dragged instead of a node", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 2, 0.05);
+    expect(readoutOf(container)).toBeNull();
+    fireEvent.mouseUp(window);
+  });
+
+  it("is coloured by the line of the held node", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 5, 0.8);
+    expect(readoutOf(container)).toHaveClass("pedal-ai-card__chart-readout--on");
+    fireEvent.mouseUp(window);
+    pressNode(container, 5, 0.4);
+    expect(readoutOf(container)).toHaveClass("pedal-ai-card__chart-readout--off");
+    fireEvent.mouseUp(window);
+  });
+
+  it("sits to the left of nodes in the right half and below nodes in the upper half", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 10, 0.6);
+    expect(readoutOf(container)).toHaveClass("pedal-ai-card__chart-readout--left");
+    expect(readoutOf(container)).toHaveClass("pedal-ai-card__chart-readout--below");
+    fireEvent.mouseUp(window);
+  });
+
+  it("sits to the right of nodes in the left half and above nodes in the lower half", () => {
+    const { container } = renderChart(SLOPED, vi.fn(), true);
+    pressNode(container, 0, 0.3);
+    expect(readoutOf(container)).not.toHaveClass("pedal-ai-card__chart-readout--left");
+    expect(readoutOf(container)).not.toHaveClass("pedal-ai-card__chart-readout--below");
+    fireEvent.mouseUp(window);
   });
 });
 
@@ -252,12 +363,12 @@ describe("ThresholdChart zoom", () => {
   }
 
   it("shows no reset button until the chart is zoomed", () => {
-    renderChart(SLOPED);
+    renderChart(SLOPED, vi.fn());
     expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
   });
 
   it("scrolling the wheel up zooms in around the pointer and offers a reset", () => {
-    const { container } = renderChart(SLOPED);
+    const { container } = renderChart(SLOPED, vi.fn());
     fillRects = [];
     wheel(canvasOf(container), -1000, WIDTH / 2);
     expect(screen.getByTitle("Reset zoom")).toBeInTheDocument();
@@ -267,7 +378,7 @@ describe("ThresholdChart zoom", () => {
   });
 
   it("prevents the page from scrolling while zooming", () => {
-    const { container } = renderChart(SLOPED);
+    const { container } = renderChart(SLOPED, vi.fn());
     const event = new WheelEvent("wheel", { deltaY: -100, clientX: 0, cancelable: true, bubbles: true });
     act(() => {
       canvasOf(container).dispatchEvent(event);
@@ -276,14 +387,14 @@ describe("ThresholdChart zoom", () => {
   });
 
   it("scrolling the wheel down zooms back out", () => {
-    const { container } = renderChart(SLOPED);
+    const { container } = renderChart(SLOPED, vi.fn());
     wheel(canvasOf(container), -1000, WIDTH / 2);
     wheel(canvasOf(container), 5000, WIDTH / 2);
     expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
   });
 
   it("the reset button returns to the whole song", () => {
-    const { container } = renderChart(SLOPED);
+    const { container } = renderChart(SLOPED, vi.fn());
     wheel(canvasOf(container), -1000, WIDTH / 2);
     fillRects = [];
     fireEvent.click(screen.getByTitle("Reset zoom"));

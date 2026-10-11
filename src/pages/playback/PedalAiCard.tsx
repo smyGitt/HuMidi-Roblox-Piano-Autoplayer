@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Card } from "../../components/Card";
-import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, PencilSimpleIcon } from "@phosphor-icons/react";
 import { Button } from "../../components/Button";
+import { ThresholdEditorDialog } from "../../dialogs/ThresholdEditorDialog";
 import type { PedalConfidence } from "../../lib/pedalPreview";
 import type { ThresholdCurves } from "../../lib/thresholdCurve";
 import { ThresholdChart } from "./ThresholdChart";
@@ -55,57 +57,77 @@ export function PedalAiCard({
   onReset,
 }: PedalAiCardProps) {
   const warning = stats ? diagnose(stats) : null;
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  useEffect(() => {
+    if (!confidence) setEditorOpen(false);
+  }, [confidence]);
 
   return (
-    <Card
-      title="PEDAL AI THRESHOLDS"
-      titleButtons={
-        hasThresholds && (
-          <>
-            {warning && <span className="pedal-ai-card__warning">{warning}</span>}
-            <Button variant="icon" subtle danger onClick={onReset} title="Reset">
-              <ArrowCounterClockwiseIcon weight="duotone" />
-            </Button>
-          </>
-        )
-      }
-      className="pedal-ai-card"
-    >
-      {!hasThresholds ? (
-        <div className="pedal-ai-card__pre">
-          <span className="pedal-ai-card__hint">
-            The On and Off thresholds set how confident the model must be before the pedal goes down and before it lifts.
-          </span>
-          <Button variant="accent" disabled={!generateEnabled} onClick={onGenerate}>
-            Generate pedal events
-          </Button>
-        </div>
-      ) : (
-        <div className="pedal-ai-card__post">
-          <div className="pedal-ai-card__controls">
-            <div className="pedal-ai-card__side">
-              {stats && (
-                <div className="pedal-ai-card__stats">
-                  <span>Avg hold: {stats.avgDur.toFixed(2)}s</span>
-                  <span>Min hold: {stats.minDur.toFixed(2)}s</span>
-                  <span>Max hold: {stats.maxDur.toFixed(2)}s</span>
-                  <span>Presses/min: {stats.pressesPerMin.toFixed(1)}</span>
-                </div>
-              )}
-              <Button className="pedal-ai-card__regen" onClick={onGenerate}>
-                <ArrowClockwiseIcon weight="duotone" />
-                Regenerate
-              </Button>
-            </div>
-          </div>
-          {confidence && (
+    <>
+      <Card
+        title="PEDAL AI THRESHOLDS"
+        titleButtons={
+          hasThresholds && (
             <>
-              <ThresholdChart confidence={confidence} curves={curves} onCurvesChange={onCurvesChange} />
-              <ThresholdLegend />
+              {warning && <span className="pedal-ai-card__warning">{warning}</span>}
+              {confidence && (
+                <Button variant="icon" subtle onClick={() => setEditorOpen(true)} title="Edit curves">
+                  <PencilSimpleIcon weight="duotone" />
+                </Button>
+              )}
+              <Button variant="icon" subtle danger onClick={onReset} title="Reset">
+                <ArrowCounterClockwiseIcon weight="duotone" />
+              </Button>
             </>
-          )}
-        </div>
+          )
+        }
+        className="pedal-ai-card"
+      >
+        {!hasThresholds ? (
+          <div className="pedal-ai-card__pre">
+            <span className="pedal-ai-card__hint">
+              The On and Off thresholds set how confident the model must be before the pedal goes down and before it lifts.
+            </span>
+            <Button variant="accent" disabled={!generateEnabled} onClick={onGenerate}>
+              Generate pedal events
+            </Button>
+          </div>
+        ) : (
+          <div className="pedal-ai-card__post">
+            <div className="pedal-ai-card__controls">
+              <div className="pedal-ai-card__side">
+                {stats && (
+                  <div className="pedal-ai-card__stats">
+                    <span>Avg hold: {stats.avgDur.toFixed(2)}s</span>
+                    <span>Min hold: {stats.minDur.toFixed(2)}s</span>
+                    <span>Max hold: {stats.maxDur.toFixed(2)}s</span>
+                    <span>Presses/min: {stats.pressesPerMin.toFixed(1)}</span>
+                  </div>
+                )}
+                <Button className="pedal-ai-card__regen" onClick={onGenerate}>
+                  <ArrowClockwiseIcon weight="duotone" />
+                  Regenerate
+                </Button>
+              </div>
+            </div>
+            {confidence && (
+              <>
+                <ThresholdChart confidence={confidence} curves={curves} />
+                <ThresholdLegend />
+              </>
+            )}
+          </div>
+        )}
+      </Card>
+      {editorOpen && confidence && (
+        <ThresholdEditorDialog
+          confidence={confidence}
+          curves={curves}
+          onCurvesChange={onCurvesChange}
+          onClose={() => setEditorOpen(false)}
+        />
       )}
-    </Card>
+    </>
   );
 }

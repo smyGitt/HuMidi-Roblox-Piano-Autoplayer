@@ -31,11 +31,13 @@
   --space-30: 240px;
   --space-33: 264px;
   --space-34: 272px;
+  --space-40: 320px;
   --space-58: 464px;
   --sidebar-width: var(--space-7);
   --humanize-card-min-height: var(--space-25);
   --pedal-square-size: var(--space-16);
   --pedal-chart-height: var(--space-25);
+  --pedal-editor-chart-height: var(--space-40);
   --pedal-node-size: var(--space-1);
   --pedal-node-hit-radius: var(--space-2);
   --pedal-chart-shade-opacity: 0.25;
@@ -992,6 +994,52 @@ button:disabled {
   position: absolute;
   top: var(--space-1);
   right: var(--space-1);
+}
+
+.pedal-ai-card__chart-readout {
+  --readout-shift-x: var(--space-1);
+  --readout-shift-y: calc(-100% - var(--space-1));
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  background: var(--bg_surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--font-size);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(var(--readout-shift-x), var(--readout-shift-y));
+}
+
+.pedal-ai-card__chart-readout--left {
+  --readout-shift-x: calc(-100% - var(--space-1));
+}
+
+.pedal-ai-card__chart-readout--below {
+  --readout-shift-y: var(--space-1);
+}
+
+.pedal-ai-card__chart-readout--on {
+  color: var(--accent_play);
+}
+
+.pedal-ai-card__chart-readout--off {
+  color: var(--accent_stop);
+}
+
+.threshold-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.threshold-editor .pedal-ai-card__chart {
+  height: var(--pedal-editor-chart-height);
+}
+
+.threshold-editor .toggle-switch {
+  align-self: flex-start;
 }
 
 .pedal-ai-card__legend {

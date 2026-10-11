@@ -24,6 +24,7 @@ import {
   removeNode,
   type CurveKind,
   type ThresholdCurves,
+  type ThresholdNode,
 } from "../../lib/thresholdCurve";
 import { useTheme } from "../../theme/ThemeProvider";
 import { readThresholdChartStyle } from "./thresholdChartStyle";
@@ -32,28 +33,48 @@ const MIN_CONFIDENCE = 0;
 const MAX_CONFIDENCE = 1;
 const PRIMARY_BUTTON = 0;
 const HALF = 2;
+const TIME_DECIMALS = 2;
+const VALUE_DECIMALS = 3;
 const CURVE_KINDS: readonly CurveKind[] = ["on", "off"];
 
 type Drag = { type: "node"; kind: CurveKind; index: number } | { type: "pan"; lastX: number };
 type NodeHit = { kind: CurveKind; index: number };
 
+interface Readout {
+  kind: CurveKind;
+  time: number;
+  value: number;
+  x: number;
+  y: number;
+  flipX: boolean;
+  flipY: boolean;
+}
+
 interface ThresholdChartProps {
   confidence: PedalConfidence;
   curves: ThresholdCurves;
   onCurvesChange?: (curves: ThresholdCurves) => void;
+  showValues?: boolean;
 }
 
 function clampConfidence(value: number): number {
   return Math.min(MAX_CONFIDENCE, Math.max(MIN_CONFIDENCE, value));
 }
 
-export function ThresholdChart({ confidence, curves, onCurvesChange }: ThresholdChartProps) {
+function readoutFor(kind: CurveKind, node: ThresholdNode, view: ChartView, width: number, height: number): Readout {
+  const x = timeToX(node.time, view, width);
+  const y = height - clampConfidence(node.value) * height;
+  return { kind, time: node.time, value: node.value, x, y, flipX: x > width / HALF, flipY: y < height / HALF };
+}
+
+export function ThresholdChart({ confidence, curves, onCurvesChange, showValues = false }: ThresholdChartProps) {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<Drag | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const duration = confidenceDuration(confidence);
   const [view, setView] = useState<ChartView>(() => fullView(duration));
+  const [readout, setReadout] = useState<Readout | null>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
   const curvesRef = useRef(curves);
@@ -62,6 +83,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
   onChangeRef.current = onCurvesChange;
   const durationRef = useRef(duration);
   durationRef.current = duration;
+  const editable = onCurvesChange !== undefined;
 
   useEffect(() => {
     setView((current) => (current.start === 0 && current.end === duration ? current : fullView(duration)));
@@ -123,6 +145,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
       ctx.lineTo(width, yOf(curveValueAt(nodes, view.end) as number));
       ctx.stroke();
 
+      if (!editable) continue;
       ctx.fillStyle = color;
       for (const node of nodes) {
         if (node.time < view.start || node.time > view.end) continue;
@@ -134,7 +157,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
         );
       }
     }
-  }, [confidence, curves, duration, intervals, view]);
+  }, [confidence, curves, duration, editable, intervals, view]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -154,7 +177,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !editable) return;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const x = event.clientX - canvas.getBoundingClientRect().left;
@@ -164,7 +187,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [editable]);
 
   const pointerOf = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current as HTMLCanvasElement;
@@ -206,7 +229,10 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
         const time = xToTime(x, viewRef.current, width);
         const value = MAX_CONFIDENCE - y / height;
         const next = moveNode(curvesRef.current, drag.kind, drag.index, time, value, durationRef.current);
-        if (next !== curvesRef.current) onChangeRef.current?.(next);
+        if (next !== curvesRef.current) {
+          onChangeRef.current?.(next);
+          setReadout(readoutFor(drag.kind, next[drag.kind][drag.index], viewRef.current, width, height));
+        }
         return;
       }
       const span = viewRef.current.end - viewRef.current.start;
@@ -223,11 +249,16 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
     const hit = onChangeRef.current ? hitNode(x, y, width, height) : null;
     dragRef.current = hit ? { type: "node", kind: hit.kind, index: hit.index } : { type: "pan", lastX: x };
     setCursor(hit ? "node" : "grabbing");
+    if (hit) {
+      const node = curvesRef.current[hit.kind][hit.index];
+      setReadout(readoutFor(hit.kind, node, viewRef.current, width, height));
+    }
     const onMove = (moveEvent: MouseEvent) => applyDrag(moveEvent.clientX, moveEvent.clientY);
     const onUp = () => {
       dragRef.current = null;
       dragCleanupRef.current = null;
       setCursor("");
+      setReadout(null);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -276,11 +307,22 @@ export function ThresholdChart({ confidence, curves, onCurvesChange }: Threshold
       <canvas
         ref={canvasRef}
         className="pedal-ai-card__chart"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onContextMenu={handleContextMenu}
-        onDoubleClick={handleDoubleClick}
+        onMouseDown={editable ? handleMouseDown : undefined}
+        onMouseMove={editable ? handleMouseMove : undefined}
+        onContextMenu={editable ? handleContextMenu : undefined}
+        onDoubleClick={editable ? handleDoubleClick : undefined}
       />
+      {showValues && readout && (
+        <div
+          className={`pedal-ai-card__chart-readout pedal-ai-card__chart-readout--${readout.kind}${
+            readout.flipX ? " pedal-ai-card__chart-readout--left" : ""
+          }${readout.flipY ? " pedal-ai-card__chart-readout--below" : ""}`}
+          style={{ left: readout.x, top: readout.y }}
+        >
+          <span>{readout.time.toFixed(TIME_DECIMALS)} s</span>
+          <span>{readout.value.toFixed(VALUE_DECIMALS)}</span>
+        </div>
+      )}
       {!isFullView(view, duration) && (
         <Button
           variant="icon"

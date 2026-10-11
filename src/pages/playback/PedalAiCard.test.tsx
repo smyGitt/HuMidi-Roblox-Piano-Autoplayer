@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flatCurves } from "../../lib/thresholdCurve";
 import { ThemeProvider } from "../../theme/ThemeProvider";
 import { PedalAiCard, type PedalAiStats } from "./PedalAiCard";
@@ -104,5 +104,76 @@ describe("PedalAiCard", () => {
     render(<PedalAiCard {...baseProps({ onReset })} />);
     fireEvent.click(screen.getByTitle("Reset"));
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+});
+
+const EDIT_WIDTH = 200;
+const EDIT_HEIGHT = 100;
+const EDIT_HIT_RADIUS = 16;
+const EDIT_FPS = 10;
+const EDIT_FRAMES = 100;
+const EDIT_ON_VALUE = 0.6;
+
+describe("PedalAiCard curve editor", () => {
+  const confidence = { values: [0, 0.5, 0.8], fps: 50 };
+
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("offers the Edit curves button only when there is a chart to edit", () => {
+    const { rerender } = render(<PedalAiCard {...baseProps({ confidence })} />, { wrapper: ThemeProvider });
+    expect(screen.getByTitle("Edit curves")).toBeInTheDocument();
+    rerender(<PedalAiCard {...baseProps({ confidence: null })} />);
+    expect(screen.queryByTitle("Edit curves")).not.toBeInTheDocument();
+    rerender(<PedalAiCard {...baseProps({ hasThresholds: false, confidence })} />);
+    expect(screen.queryByTitle("Edit curves")).not.toBeInTheDocument();
+  });
+
+  it("opens the editor window from that button and closes it again", () => {
+    render(<PedalAiCard {...baseProps({ confidence })} />, { wrapper: ThemeProvider });
+    expect(screen.queryByText("Edit threshold curves")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTitle("Edit curves"));
+    expect(screen.getByText("Edit threshold curves")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("×"));
+    expect(screen.queryByText("Edit threshold curves")).not.toBeInTheDocument();
+  });
+
+  it("closes the editor when the chart goes away and does not bring it back with the next chart", () => {
+    const { rerender } = render(<PedalAiCard {...baseProps({ confidence })} />, { wrapper: ThemeProvider });
+    fireEvent.click(screen.getByTitle("Edit curves"));
+    rerender(<PedalAiCard {...baseProps({ confidence: null })} />);
+    expect(screen.queryByText("Edit threshold curves")).not.toBeInTheDocument();
+    rerender(<PedalAiCard {...baseProps({ confidence })} />);
+    expect(screen.queryByText("Edit threshold curves")).not.toBeInTheDocument();
+  });
+
+  it("keeps the chart in the card as a plain picture that leaves the wheel to the page", () => {
+    const { container } = render(<PedalAiCard {...baseProps({ confidence })} />, { wrapper: ThemeProvider });
+    const event = new WheelEvent("wheel", { deltaY: -1000, cancelable: true, bubbles: true });
+    act(() => {
+      (container.querySelector(".pedal-ai-card__chart") as HTMLCanvasElement).dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("passes curve edits made in the window on to onCurvesChange", () => {
+    const onCurvesChange = vi.fn();
+    const longConfidence = { values: new Array(EDIT_FRAMES).fill(0.1), fps: EDIT_FPS };
+    vi.spyOn(HTMLCanvasElement.prototype, "clientWidth", "get").mockReturnValue(EDIT_WIDTH);
+    vi.spyOn(HTMLCanvasElement.prototype, "clientHeight", "get").mockReturnValue(EDIT_HEIGHT);
+    document.documentElement.style.setProperty("--pedal-node-hit-radius", `${EDIT_HIT_RADIUS}px`);
+    render(<PedalAiCard {...baseProps({ confidence: longConfidence, onCurvesChange })} />, { wrapper: ThemeProvider });
+    fireEvent.click(screen.getByTitle("Edit curves"));
+    const canvases = document.querySelectorAll(".pedal-ai-card__chart");
+    fireEvent.doubleClick(canvases[canvases.length - 1], {
+      clientX: EDIT_WIDTH / 2,
+      clientY: EDIT_HEIGHT - EDIT_ON_VALUE * EDIT_HEIGHT,
+    });
+    expect(onCurvesChange).toHaveBeenCalledTimes(1);
   });
 });
