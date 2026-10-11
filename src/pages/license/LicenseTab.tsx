@@ -60,6 +60,19 @@ License : Creative Commons Attribution 4.0 International (CC BY 4.0)
   appropriate credit is given.
 
 URL     : https://github.com/bytedance/GiantMIDI-Piano
+
+----------------
+Saarland Music Data
+----------------
+
+Citation:
+  Müller, M., Konz, V., Arifi-Müller, V., Bogler, W., & Zeitler, J. (2024).
+  Saarland Music Data: MIDI-Audio Piano Music (Version v2) [Dataset].
+  Zenodo. 12th International Conference on Music Information Retrieval
+  (ISMIR), Miami, USA. https://doi.org/10.5281/zenodo.13753319
+
+License : Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+URL     : https://zenodo.org/records/13753319
 `,
 
   "Third-Party Libraries": `tauri

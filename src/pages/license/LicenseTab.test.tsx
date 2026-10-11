@@ -16,6 +16,8 @@ describe("LicenseTab", () => {
     expect(screen.getByText(/POP909/)).toBeInTheDocument();
     expect(screen.getByText(/GiantMIDI-Piano/)).toBeInTheDocument();
     expect(screen.getByText(/CC BY 4.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Saarland Music Data/)).toBeInTheDocument();
+    expect(screen.getByText(/CC BY 3.0/)).toBeInTheDocument();
   });
 
   it("Third-Party Libraries lists the actual Rust/npm stack, not the old Python one", () => {
