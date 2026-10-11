@@ -1,7 +1,7 @@
 # HuMidi
 
-[![Static Badge](https://img.shields.io/badge/SourceForge-HuMidi_v2.0-orange?logo=sourceforge)](https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/)
-[![Static Badge](https://img.shields.io/badge/Releases-HuMidi_v2.0-blue?logo=github)](https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases)
+[![Static Badge](https://img.shields.io/badge/SourceForge-HuMidi_v2.1.1-orange?logo=sourceforge)](https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/)
+[![Static Badge](https://img.shields.io/badge/Releases-HuMidi_v2.1.1-blue?logo=github)](https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases)
 ![GitHub Repo stars](https://img.shields.io/github/stars/smyGitt/HuMidi-Roblox-Piano-Autoplayer?style=flat)
 [![Download HuMidi](https://img.shields.io/sourceforge/dt/humidi-roblox-piano-autoplayer.svg)](https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/files/latest/download)
 [![Download HuMidi](https://img.shields.io/sourceforge/dw/humidi-roblox-piano-autoplayer.svg)](https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/files/latest/download)
@@ -14,10 +14,7 @@
 ## About HuMidi
 HuMidi includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
 
-
-<img width="326" height="396" alt="HuMidi v2.0 Expanded view with all Humanization and related options in playback" src="https://github.com/user-attachments/assets/e253ae9e-9280-4cb9-97bb-4ad6ac302237" />
-<img width="326" height="396" alt="A minimized, compact view of HuMidi v2.0. Only necessary buttons are shown." src="https://github.com/user-attachments/assets/11065766-a107-461a-a46f-84f8119098cf" />
-<img width="180" height="326" alt="HuMidi v2.0 with a new Light mode theme, showing a settings page with option to change color theme." src="https://github.com/user-attachments/assets/344cf20a-ffe2-482c-bc71-53c4c378a5ad" />
+<img width="408" height="454" alt="image" src="https://github.com/user-attachments/assets/d879a4cb-f3ca-494c-928e-40633103e234" />
 
 ## Note on ML Components
 HuMidi now uses a trained model from [PedalAI](https://github.com/smyGitt/PedalAI) for sustain pedal generation. For information on training data sources, licensing, and related legal considerations, refer to [PedalAI's README](https://github.com/smyGitt/PedalAI#copyright--intended-use).
