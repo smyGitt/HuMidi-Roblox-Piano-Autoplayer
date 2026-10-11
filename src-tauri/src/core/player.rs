@@ -130,6 +130,11 @@ impl PlaybackEngine {
         self.pedal_net_down = false;
     }
 
+    pub fn release_pedal(&mut self, driver: &mut dyn KeyboardDriver) {
+        let _ = driver.release(kb::Key::Space);
+        self.pedal_is_down = false;
+    }
+
     pub fn is_stopped(&self) -> bool {
         self.stopped
     }
@@ -955,6 +960,42 @@ mod tests {
             engine.shutdown(&mut driver);
             assert!(driver.log.contains(&Action::Release(kb::Key::Space)));
             assert!(!engine.pedal_is_down);
+        }
+
+        #[test]
+        fn test_release_pedal_releases_space_even_when_the_engine_thinks_it_is_up() {
+            let mut driver = RecordingDriver::new();
+            let mut engine = PlaybackEngine::new(config(), vec![]);
+            assert!(!engine.pedal_is_down);
+            engine.release_pedal(&mut driver);
+            assert_eq!(driver.log, vec![Action::Release(kb::Key::Space)]);
+            assert!(!engine.pedal_is_down);
+        }
+
+        #[test]
+        fn test_release_pedal_clears_a_pedal_the_engine_thinks_is_down() {
+            let mut driver = RecordingDriver::new();
+            let mut engine = PlaybackEngine::new(config(), vec![]);
+            engine.load_compiled_events(vec![pedal(0.0, true)], 1.0);
+            engine.start(0.0);
+            engine.tick(&mut driver, 0.05);
+            assert!(engine.pedal_is_down);
+            engine.release_pedal(&mut driver);
+            assert!(!engine.pedal_is_down);
+        }
+
+        #[test]
+        fn test_pedal_down_after_release_pedal_presses_space_again() {
+            let mut driver = RecordingDriver::new();
+            let mut engine = PlaybackEngine::new(config(), vec![]);
+            engine.load_compiled_events(vec![pedal(0.0, true)], 1.0);
+            engine.release_pedal(&mut driver);
+            engine.start(0.0);
+            engine.tick(&mut driver, 0.05);
+            assert_eq!(
+                driver.log,
+                vec![Action::Release(kb::Key::Space), Action::Press(kb::Key::Space)]
+            );
         }
 
         #[test]

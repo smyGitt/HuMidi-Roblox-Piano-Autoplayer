@@ -15,6 +15,7 @@ use humidi_tauri_lib::core::midi::KeyMapper;
 use humidi_tauri_lib::core::pedal::model::PedalModel;
 use humidi_tauri_lib::managers::config_manager::ConfigManager;
 use humidi_tauri_lib::managers::hotkey_manager::HotkeyManager;
+use humidi_tauri_lib::managers::injected_echo::InjectedEchoes;
 use humidi_tauri_lib::managers::theme_manager::ThemeManager;
 use humidi_tauri_lib::state::{AppState, PlaybackSession};
 use tauri::test::{mock_app, MockRuntime};
@@ -45,6 +46,7 @@ fn hermetic_state(dir: &Path) -> AppState {
         playback_session: Mutex::new(PlaybackSession::default()),
         playback_handle: Mutex::new(None),
         hotkey_manager: Mutex::new(HotkeyManager::new()),
+        injected_echoes: Arc::new(InjectedEchoes::new()),
         config_manager: Mutex::new(ConfigManager {
             save_dir: dir.join("saves"),
             midi_dir: std::path::PathBuf::new(),

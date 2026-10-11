@@ -3,6 +3,7 @@ use crate::core::models::{KeyEvent, MidiTrack, Note};
 use crate::core::pedal::model::PedalModel;
 use crate::managers::config_manager::ConfigManager;
 use crate::managers::hotkey_manager::HotkeyManager;
+use crate::managers::injected_echo::InjectedEchoes;
 use crate::managers::theme_manager::ThemeManager;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -43,6 +44,7 @@ pub struct AppState {
     pub playback_session: Mutex<PlaybackSession>,
     pub playback_handle: Mutex<Option<PlaybackHandle>>,
     pub hotkey_manager: Mutex<HotkeyManager>,
+    pub injected_echoes: Arc<InjectedEchoes>,
     pub config_manager: Mutex<ConfigManager>,
     pub app_config: Mutex<serde_json::Value>,
     pub theme_manager: Mutex<ThemeManager>,
@@ -63,6 +65,7 @@ impl Default for AppState {
             playback_session: Mutex::new(PlaybackSession::default()),
             playback_handle: Mutex::new(None),
             hotkey_manager: Mutex::new(hotkey_manager),
+            injected_echoes: Arc::new(InjectedEchoes::new()),
             config_manager: Mutex::new(config_manager),
             app_config: Mutex::new(app_config),
             theme_manager: Mutex::new(ThemeManager::new()),

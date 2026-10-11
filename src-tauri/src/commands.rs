@@ -22,6 +22,7 @@ use crate::core::translator::VirtualPianoFormat;
 use crate::managers::hotkey_manager::{
     rdev_key_to_raw, HotkeyEvent, PLAYBACK_HOTKEY_CONFIG_KEY, SAVE_HOTKEY_CONFIG_KEY,
 };
+use crate::managers::injected_echo::EchoTrackingDriver;
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
 use tauri::{path::BaseDirectory, Emitter, Manager, State};
 
@@ -546,6 +547,7 @@ pub fn run_playback_loop(
         }
     }
 
+    engine.release_pedal(driver);
     engine.start(now_fn());
     let mut finished_emitted = false;
 
@@ -614,7 +616,10 @@ fn start_playback_blocking<R: tauri::Runtime>(
         (merged_events, total_dur)
     };
 
-    let mut driver = EnigoDriver::new().map_err(|e| e.to_string())?;
+    let mut driver = EchoTrackingDriver::new(
+        EnigoDriver::new().map_err(|e| e.to_string())?,
+        Arc::clone(&state.injected_echoes),
+    );
     let mut engine = PlaybackEngine::new(config, Vec::new());
     engine.load_compiled_events(merged_events, total_dur);
 
@@ -1500,6 +1505,9 @@ pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
             };
 
             let state = app.state::<AppState>();
+            if state.injected_echoes.consume(raw, is_press) {
+                return;
+            }
             let Ok(mut mgr) = state.hotkey_manager.lock() else {
                 return;
             };
@@ -2309,6 +2317,35 @@ mod tests {
             fn release(&mut self, _key: Key) -> KeyActionResult {
                 Ok(())
             }
+        }
+
+        struct LoggingDriver {
+            log: Vec<(Key, bool)>,
+        }
+        impl KeyboardDriver for LoggingDriver {
+            fn press(&mut self, key: Key) -> KeyActionResult {
+                self.log.push((key, true));
+                Ok(())
+            }
+            fn release(&mut self, key: Key) -> KeyActionResult {
+                self.log.push((key, false));
+                Ok(())
+            }
+        }
+
+        #[test]
+        fn test_the_pedal_key_is_released_before_any_event_plays() {
+            let mut config = PlaybackConfig::default();
+            config.countdown = false;
+            let mut engine = PlaybackEngine::new(config, Vec::new());
+            engine.load_compiled_events(vec![KeyEvent::new(0.0, 1, "pedal", "down")], 1.0);
+            let mut driver = LoggingDriver { log: Vec::new() };
+            let (tx, rx) = mpsc::channel();
+            tx.send(PlaybackCommand::Shutdown).unwrap();
+
+            run_playback_loop(engine, &mut driver, &rx, |_| {}, || 0.0, |_| {});
+
+            assert_eq!(driver.log.first(), Some(&(Key::Space, false)));
         }
 
         #[test]
@@ -4340,6 +4377,7 @@ mod tests {
             playback_session: Mutex::new(PlaybackSession::default()),
             playback_handle: Mutex::new(None),
             hotkey_manager: Mutex::new(HotkeyManager::new()),
+            injected_echoes: std::sync::Arc::new(crate::managers::injected_echo::InjectedEchoes::new()),
             config_manager: Mutex::new(ConfigManager {
                 save_dir: dir.join("saves"),
                 midi_dir: std::path::PathBuf::new(),
