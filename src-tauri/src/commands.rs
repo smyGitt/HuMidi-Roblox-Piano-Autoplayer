@@ -14,7 +14,9 @@ use crate::core::keyboard_driver::{EnigoDriver, KeyboardDriver};
 use crate::core::midi::{KeyMapper, MidiParser, TempoMap};
 use crate::core::models::{KeyEvent, MidiTrack, Note};
 use crate::core::pedal::model::{PedalModel, FEATURES};
-use crate::core::pedal::{AiThresholds, FPS as PEDAL_CONFIDENCE_FPS};
+use crate::core::pedal::curve::ThresholdNode;
+use crate::core::pedal::legacy::saved_pedal_curves;
+use crate::core::pedal::FPS as PEDAL_CONFIDENCE_FPS;
 use crate::core::player::{PlaybackEngine, PlayerEvent};
 use crate::core::section_analyzer::{assign_hands, SectionAnalyzer};
 use crate::core::session_cache;
@@ -274,7 +276,8 @@ fn timeline_tempo_fields(tempo_map: &TempoMap, total_dur: f64) -> TempoFields {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PedalData {
     pub pedal_intervals: Vec<(f64, f64)>,
-    pub ai_thresholds: Option<(f32, f32)>,
+    pub curve_on: Vec<ThresholdNode>,
+    pub curve_off: Vec<ThresholdNode>,
     pub confidence: Vec<f32>,
     pub confidence_fps: f64,
 }
@@ -476,12 +479,15 @@ pub fn compile_pedal_logic(
         total_dur,
     );
 
-    let ai_thresholds = ai_meta.as_ref().map(|t: &AiThresholds| (t.threshold_on, t.threshold_off));
-    let confidence = ai_meta.map(|t| t.confidence).unwrap_or_default();
+    let (curve_on, curve_off, confidence) = match ai_meta {
+        Some(t) => (t.curves.on, t.curves.off, t.confidence),
+        None => (Vec::new(), Vec::new(), Vec::new()),
+    };
 
     Ok(PedalData {
         pedal_intervals,
-        ai_thresholds,
+        curve_on,
+        curve_off,
         confidence,
         confidence_fps: PEDAL_CONFIDENCE_FPS,
     })
@@ -1047,6 +1053,9 @@ pub struct ResumedSession {
     pub measure_boundaries: Vec<(f64, f64)>,
     pub track_count: usize,
     pub pedal_count: i64,
+    pub pedal_curve_on: Vec<ThresholdNode>,
+    pub pedal_curve_off: Vec<ThresholdNode>,
+    pub legacy_pedal_thresholds: bool,
 }
 
 fn json_number_as_i32(v: &Value) -> Option<i32> {
@@ -1171,6 +1180,7 @@ pub fn resume_from_save_logic(
         .and_then(|m| m.get("compiled_pedal_count"))
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
+    let saved_curves = saved_pedal_curves(metadata.and_then(|m| m.get("playback_settings")));
 
     session.final_notes = Some(final_notes.clone());
     session.humanized_notes = None;
@@ -1192,6 +1202,9 @@ pub fn resume_from_save_logic(
         measure_boundaries,
         track_count,
         pedal_count,
+        pedal_curve_on: saved_curves.on,
+        pedal_curve_off: saved_curves.off,
+        legacy_pedal_thresholds: saved_curves.legacy,
     })
 }
 
@@ -2199,7 +2212,7 @@ mod tests {
         fn test_without_a_model_there_is_no_confidence_curve_but_the_rate_is_reported() {
             let (config, mut session) = compiled_session();
             let result = compile_pedal_logic(&config, None, &mut session).unwrap();
-            assert!(result.ai_thresholds.is_none());
+            assert!(result.curve_on.is_empty() && result.curve_off.is_empty());
             assert!(result.confidence.is_empty());
             assert_eq!(result.confidence_fps, crate::core::pedal::FPS);
         }
@@ -3834,6 +3847,45 @@ mod tests {
 
             assert_eq!(result.track_count, 2);
             assert_eq!(result.pedal_count, 7);
+        }
+
+        #[test]
+        fn test_a_save_with_the_old_single_thresholds_resumes_as_flat_lines_and_is_flagged() {
+            let mut data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
+            data["metadata"]["playback_settings"] =
+                serde_json::json!({"pedal_threshold_on": 0.57, "pedal_threshold_off": 0.54});
+            let mut session = PlaybackSession::default();
+            let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+            assert!(result.legacy_pedal_thresholds);
+            assert_eq!(result.pedal_curve_on.len(), 1);
+            assert_eq!(result.pedal_curve_on[0].value, 0.57);
+            assert_eq!(result.pedal_curve_off[0].value, 0.54);
+        }
+
+        #[test]
+        fn test_a_save_with_curves_resumes_them_without_the_legacy_flag() {
+            let mut data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
+            data["metadata"]["playback_settings"] = serde_json::json!({
+                "pedal_curve_on": [{"time": 0.0, "value": 0.6}, {"time": 5.0, "value": 0.4}],
+                "pedal_curve_off": [{"time": 0.0, "value": 0.5}, {"time": 5.0, "value": 0.3}],
+            });
+            let mut session = PlaybackSession::default();
+            let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+            assert!(!result.legacy_pedal_thresholds);
+            assert_eq!(result.pedal_curve_on.len(), 2);
+            assert_eq!(result.pedal_curve_off[1].value, 0.3);
+        }
+
+        #[test]
+        fn test_a_save_without_pedal_settings_resumes_with_empty_curves() {
+            let data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
+            let mut session = PlaybackSession::default();
+            let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+            assert!(!result.legacy_pedal_thresholds);
+            assert!(result.pedal_curve_on.is_empty() && result.pedal_curve_off.is_empty());
         }
 
         #[test]

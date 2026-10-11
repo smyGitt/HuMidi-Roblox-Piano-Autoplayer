@@ -38,9 +38,12 @@ describe("toBackendConfig", () => {
     expect(backend.tempo_sway_intensity).toBe(0.05);
   });
 
-  it("passes pedal thresholds through unconverted, including the -1 sentinel", () => {
-    expect(toBackendConfig(config({ pedal_threshold_on: -1 }), "song.mid").pedal_threshold_on).toBe(-1);
-    expect(toBackendConfig(config({ pedal_threshold_on: 0.62 }), "song.mid").pedal_threshold_on).toBe(0.62);
+  it("passes the pedal threshold curves through unconverted, including empty meaning automatic", () => {
+    expect(toBackendConfig(config({ pedal_curve_on: [] }), "song.mid").pedal_curve_on).toEqual([]);
+    const nodes = [{ time: 0, value: 0.62 }, { time: 5, value: 0.4 }];
+    const backend = toBackendConfig(config({ pedal_curve_on: nodes, pedal_curve_off: nodes }), "song.mid");
+    expect(backend.pedal_curve_on).toEqual(nodes);
+    expect(backend.pedal_curve_off).toEqual(nodes);
   });
 
   it("passes transpose and boolean fields through unconverted", () => {

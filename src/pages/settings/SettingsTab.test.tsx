@@ -183,15 +183,15 @@ describe("SettingsTab > Display page", () => {
 });
 
 describe("SettingsTab > System page", () => {
-  it("Reset All Settings restores DEFAULT_CONFIG but preserves the current pedal AI thresholds", async () => {
+  it("Reset All Settings restores DEFAULT_CONFIG but preserves the current pedal AI threshold curves", async () => {
     renderSettings();
     act(() => {
       capturedConfig.current!.setConfig({
         ...DEFAULT_CONFIG,
         tempo: 250,
         simulate_hands: true,
-        pedal_threshold_on: 0.71,
-        pedal_threshold_off: 0.22,
+        pedal_curve_on: [{ time: 0, value: 0.71 }],
+        pedal_curve_off: [{ time: 0, value: 0.22 }],
       });
     });
     fireEvent.click(screen.getByText("System"));
@@ -199,8 +199,8 @@ describe("SettingsTab > System page", () => {
 
     expect(capturedConfig.current!.config.tempo).toBe(DEFAULT_CONFIG.tempo);
     expect(capturedConfig.current!.config.simulate_hands).toBe(false);
-    expect(capturedConfig.current!.config.pedal_threshold_on).toBe(0.71);
-    expect(capturedConfig.current!.config.pedal_threshold_off).toBe(0.22);
+    expect(capturedConfig.current!.config.pedal_curve_on).toEqual([{ time: 0, value: 0.71 }]);
+    expect(capturedConfig.current!.config.pedal_curve_off).toEqual([{ time: 0, value: 0.22 }]);
   });
 
   it("pedal prompt threshold spinbox reflects and updates the shared setting", async () => {

@@ -126,10 +126,10 @@ describe("usePlaybackConfig persistence (desktop app)", () => {
     });
   });
 
-  it("does not save the per-song fields: the loaded file and the pedal thresholds", async () => {
+  it("does not save the per-song fields: the loaded file and the pedal threshold curves", async () => {
     const { result } = renderHook(() => usePlaybackConfig(), { wrapper });
     await flush();
-    act(() => result.current.updateConfig({ midi_file: "song.mid", pedal_threshold_on: 0.7, pedal_threshold_off: 0.2 }));
+    act(() => result.current.updateConfig({ midi_file: "song.mid", pedal_curve_on: [{ time: 0, value: 0.7 }], pedal_curve_off: [{ time: 0, value: 0.2 }] }));
     act(() => void vi.advanceTimersByTime(SAVE_DELAY_MS * 2));
     expect(tauriMocks.saveAppConfig).not.toHaveBeenCalled();
   });

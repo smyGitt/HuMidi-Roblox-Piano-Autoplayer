@@ -217,7 +217,7 @@ fn parse_compile_notes_and_compile_pedal_round_trip_through_the_async_commands()
     assert_eq!(timeline.final_notes.len(), 1);
 
     let pedal = tauri::async_runtime::block_on(compile_pedal(harness.handle(), config)).unwrap();
-    assert!(pedal.ai_thresholds.is_none());
+    assert!(pedal.curve_on.is_empty() && pedal.curve_off.is_empty());
     assert!(harness.with_state(|s| s.playback_session.lock().unwrap().merged_events.is_some()));
 }
 

@@ -35,7 +35,9 @@
   --sidebar-width: var(--space-7);
   --humanize-card-min-height: var(--space-25);
   --pedal-square-size: var(--space-16);
-  --pedal-chart-height: var(--space-16);
+  --pedal-chart-height: var(--space-25);
+  --pedal-node-size: var(--space-1);
+  --pedal-node-hit-radius: var(--space-2);
   --pedal-chart-shade-opacity: 0.25;
   --sidebar-width-expanded: var(--space-16);
   --duration: 200ms;
@@ -633,6 +635,10 @@ button:disabled {
   padding-right: calc(var(--space-2) - var(--scrollbar-width));
 }
 
+.playback-tab:has(.apply-toast--visible) .tab-page__page {
+  padding-bottom: calc(var(--space-2) + var(--space-7));
+}
+
 .tab-page__page--with-overlay {
   margin-right: calc(var(--space-5) + var(--border-width));
 }
@@ -945,32 +951,6 @@ button:disabled {
 .pedal-ai-card__side {
   display: flex;
   gap: var(--space-2);
-  margin-left: auto;
-}
-
-.pedal-ai-card__thresholds {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: var(--pedal-square-size);
-}
-
-.pedal-ai-card__threshold {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  color: var(--text_muted);
-  font-size: var(--font-size);
-}
-
-.pedal-ai-card__stepper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.pedal-ai-card__step {
-  padding: var(--space-1);
 }
 
 .pedal-ai-card__stats {
@@ -986,10 +966,32 @@ button:disabled {
   font-size: var(--font-size);
 }
 
+.pedal-ai-card__chart-frame {
+  position: relative;
+}
+
 .pedal-ai-card__chart {
   display: block;
   width: 100%;
   height: var(--pedal-chart-height);
+}
+
+.pedal-ai-card__chart[data-cursor="node"] {
+  cursor: pointer;
+}
+
+.pedal-ai-card__chart[data-cursor="grab"] {
+  cursor: grab;
+}
+
+.pedal-ai-card__chart[data-cursor="grabbing"] {
+  cursor: grabbing;
+}
+
+.pedal-ai-card__chart-reset {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
 }
 
 .pedal-ai-card__legend {

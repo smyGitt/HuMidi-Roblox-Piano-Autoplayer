@@ -20,8 +20,8 @@ export const NOTES_CONFIG_KEYS: readonly (keyof PlaybackConfig)[] = [
 
 export const PEDAL_CONFIG_KEYS: readonly (keyof PlaybackConfig)[] = [
   "pedal_style",
-  "pedal_threshold_on",
-  "pedal_threshold_off",
+  "pedal_curve_on",
+  "pedal_curve_off",
   "use_midi_pedal",
   "pedal_before_humanize",
 ];
@@ -32,11 +32,17 @@ export function pickConfig(config: PlaybackConfig, keys: readonly (keyof Playbac
   return picked as Partial<PlaybackConfig>;
 }
 
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function configDiffers(
   config: PlaybackConfig,
   compiled: Partial<PlaybackConfig> | null,
   keys: readonly (keyof PlaybackConfig)[],
 ): boolean {
   if (compiled === null) return false;
-  return keys.some((key) => config[key] !== compiled[key]);
+  return keys.some((key) => !sameValue(config[key], compiled[key]));
 }

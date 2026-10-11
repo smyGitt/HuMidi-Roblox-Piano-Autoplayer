@@ -1,25 +1,37 @@
-import { render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../../theme/ThemeProvider";
 import type { PedalConfidence } from "../../lib/pedalPreview";
+import { flatCurves, type ThresholdCurves } from "../../lib/thresholdCurve";
 import { ThresholdChart } from "./ThresholdChart";
 
 const WIDTH = 200;
 const HEIGHT = 100;
 const LINE_WIDTH = 2;
 const SHADE_OPACITY = 0.25;
+const NODE_SIZE = 8;
+const HIT_RADIUS = 16;
 const FPS = 10;
-const CONFIDENCE: PedalConfidence = { values: [0, 0.2, 0.9, 0.9, 0.1, 0.1, 0.9, 0.9, 0.1, 0.1], fps: FPS };
+const DURATION = 10;
+const VALUES = [0, 0.2, 0.9, 0.9, 0.1, 0.1, 0.9, 0.9, 0.1, 0.1];
+const CONFIDENCE: PedalConfidence = { values: [...VALUES, ...new Array(90).fill(0.1)], fps: FPS };
+const ON_INDEX = 1;
+const OFF_INDEX = 2;
 
 interface FillRectCall {
-  style: string;
   alpha: number;
   rect: number[];
 }
 
-let calls: FillRectCall[];
+interface StrokeCall {
+  points: number[][];
+}
+
+let fillRects: FillRectCall[];
+let strokes: StrokeCall[];
 
 function fakeContext() {
+  let current: number[][] = [];
   const ctx = {
     fillStyle: "",
     strokeStyle: "",
@@ -27,17 +39,20 @@ function fakeContext() {
     globalAlpha: 1,
     setTransform: vi.fn(),
     clearRect: vi.fn(),
-    beginPath: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    stroke: vi.fn(),
-    fillRect: (...rect: number[]) => calls.push({ style: ctx.fillStyle, alpha: ctx.globalAlpha, rect }),
+    beginPath: () => {
+      current = [];
+    },
+    moveTo: (x: number, y: number) => current.push([x, y]),
+    lineTo: (x: number, y: number) => current.push([x, y]),
+    stroke: () => strokes.push({ points: current }),
+    fillRect: (...rect: number[]) => fillRects.push({ alpha: ctx.globalAlpha, rect }),
   };
   return ctx;
 }
 
 beforeEach(() => {
-  calls = [];
+  fillRects = [];
+  strokes = [];
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
     () => fakeContext() as unknown as CanvasRenderingContext2D,
   );
@@ -45,40 +60,91 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "clientHeight", "get").mockReturnValue(HEIGHT);
   document.documentElement.style.setProperty("--border-width", `${LINE_WIDTH}px`);
   document.documentElement.style.setProperty("--pedal-chart-shade-opacity", String(SHADE_OPACITY));
+  document.documentElement.style.setProperty("--pedal-node-size", `${NODE_SIZE}px`);
+  document.documentElement.style.setProperty("--pedal-node-hit-radius", `${HIT_RADIUS}px`);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderChart(thresholdOn: number, thresholdOff: number) {
-  const ui = (on: number, off: number) => (
+function xOf(time: number): number {
+  return (time / DURATION) * WIDTH;
+}
+
+function yOf(value: number): number {
+  return HEIGHT - value * HEIGHT;
+}
+
+function renderChart(curves: ThresholdCurves, onCurvesChange?: (curves: ThresholdCurves) => void) {
+  const ui = (c: ThresholdCurves) => (
     <ThemeProvider>
-      <ThresholdChart confidence={CONFIDENCE} thresholdOn={on} thresholdOff={off} />
+      <ThresholdChart confidence={CONFIDENCE} curves={c} onCurvesChange={onCurvesChange} />
     </ThemeProvider>
   );
-  const view = render(ui(thresholdOn, thresholdOff));
-  return { ...view, update: (on: number, off: number) => view.rerender(ui(on, off)) };
+  const view = render(ui(curves));
+  return { ...view, update: (c: ThresholdCurves) => view.rerender(ui(c)) };
 }
 
-function lineRects() {
-  return calls.filter((call) => call.rect[2] === WIDTH && call.rect[3] === LINE_WIDTH).map((call) => call.rect);
+function canvasOf(container: HTMLElement): HTMLCanvasElement {
+  return container.querySelector("canvas") as HTMLCanvasElement;
 }
 
-describe("ThresholdChart", () => {
-  it("draws the On and Off lines at the heights of their thresholds", () => {
-    renderChart(0.6, 0.3);
-    const lines = lineRects();
-    expect(lines).toContainEqual([0, HEIGHT - 0.6 * HEIGHT - LINE_WIDTH / 2, WIDTH, LINE_WIDTH]);
-    expect(lines).toContainEqual([0, HEIGHT - 0.3 * HEIGHT - LINE_WIDTH / 2, WIDTH, LINE_WIDTH]);
+function nodeCentres(): number[][] {
+  return fillRects
+    .filter((call) => call.alpha === 1 && call.rect[2] === NODE_SIZE && call.rect[3] === NODE_SIZE)
+    .map((call) => [call.rect[0] + NODE_SIZE / 2, call.rect[1] + NODE_SIZE / 2]);
+}
+
+function lineStroke(index: number): number[][] {
+  return strokes[index].points;
+}
+
+const SLOPED: ThresholdCurves = {
+  on: [
+    { time: 0, value: 0.6 },
+    { time: 5, value: 0.8 },
+    { time: 10, value: 0.6 },
+  ],
+  off: [
+    { time: 0, value: 0.3 },
+    { time: 5, value: 0.4 },
+    { time: 10, value: 0.3 },
+  ],
+};
+
+describe("ThresholdChart drawing", () => {
+  it("draws a flat On and Off line at the heights of their values", () => {
+    renderChart(flatCurves(0.6, 0.3));
+    expect(lineStroke(ON_INDEX)).toEqual([[0, yOf(0.6)], [WIDTH, yOf(0.6)]]);
+    expect(lineStroke(OFF_INDEX)).toEqual([[0, yOf(0.3)], [WIDTH, yOf(0.3)]]);
   });
 
-  it("shades the stretches where the pedal would be down for the current thresholds", () => {
-    renderChart(0.6, 0.3);
-    const shaded = calls
+  it("bends the lines through their nodes", () => {
+    renderChart(SLOPED);
+    expect(lineStroke(ON_INDEX)).toEqual([
+      [0, yOf(0.6)],
+      [xOf(5), yOf(0.8)],
+      [WIDTH, yOf(0.6)],
+    ]);
+  });
+
+  it("draws a square handle on every node of both lines", () => {
+    renderChart(SLOPED);
+    const centres = nodeCentres();
+    expect(centres).toHaveLength(SLOPED.on.length + SLOPED.off.length);
+    expect(centres).toContainEqual([xOf(5), yOf(0.8)]);
+    expect(centres).toContainEqual([xOf(5), yOf(0.4)]);
+    const handles = fillRects.filter((call) => call.alpha === 1 && call.rect[2] === NODE_SIZE);
+    expect(handles.every((call) => call.rect[2] === call.rect[3])).toBe(true);
+  });
+
+  it("shades the stretches where the pedal would be down for the current curves", () => {
+    renderChart(flatCurves(0.6, 0.3));
+    const shaded = fillRects
       .filter((call) => call.alpha === SHADE_OPACITY)
       .map((call) => call.rect.map((value) => Math.round(value)));
-    const secondWidth = WIDTH / (CONFIDENCE.values.length / FPS);
+    const secondWidth = WIDTH / DURATION;
     const pedalStart = (seconds: number) => Math.round(seconds * secondWidth);
     expect(shaded).toEqual([
       [pedalStart(0.2), 0, pedalStart(0.2), HEIGHT],
@@ -86,11 +152,155 @@ describe("ThresholdChart", () => {
     ]);
   });
 
-  it("redraws with the new lines and shading as soon as a threshold changes", () => {
-    const { update } = renderChart(0.6, 0.3);
-    calls = [];
-    update(0.95, 0.3);
-    expect(lineRects()).toContainEqual([0, HEIGHT - 0.95 * HEIGHT - LINE_WIDTH / 2, WIDTH, LINE_WIDTH]);
-    expect(calls.filter((call) => call.alpha === SHADE_OPACITY)).toEqual([]);
+  it("redraws with the new lines and shading as soon as the curves change", () => {
+    const { update } = renderChart(flatCurves(0.6, 0.3));
+    strokes = [];
+    fillRects = [];
+    update(flatCurves(0.95, 0.3));
+    expect(lineStroke(ON_INDEX)).toEqual([[0, yOf(0.95)], [WIDTH, yOf(0.95)]]);
+    expect(fillRects.filter((call) => call.alpha === SHADE_OPACITY)).toEqual([]);
+  });
+});
+
+describe("ThresholdChart editing", () => {
+  it("dragging a node reports the curves with that node moved", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    const canvas = canvasOf(container);
+    fireEvent.mouseDown(canvas, { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
+    fireEvent.mouseMove(window, { clientX: xOf(6), clientY: yOf(0.9) });
+    fireEvent.mouseUp(window);
+    const next = onChange.mock.calls[onChange.mock.calls.length - 1][0] as ThresholdCurves;
+    expect(next.on[1].time).toBeCloseTo(6);
+    expect(next.on[1].value).toBeCloseTo(0.9);
+    expect(next.off).toEqual(SLOPED.off);
+  });
+
+  it("a dragged press node stops at the lift line instead of crossing it", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.mouseDown(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
+    fireEvent.mouseMove(window, { clientX: xOf(5), clientY: yOf(0.05) });
+    fireEvent.mouseUp(window);
+    const next = onChange.mock.calls[onChange.mock.calls.length - 1][0] as ThresholdCurves;
+    expect(next.on[1].value).toBeCloseTo(0.4, 4);
+  });
+
+  it("stops following the pointer after the mouse is released", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.mouseDown(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
+    fireEvent.mouseUp(window);
+    onChange.mockClear();
+    fireEvent.mouseMove(window, { clientX: xOf(6), clientY: yOf(0.9) });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("right clicking a node removes it", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.contextMenu(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8) });
+    const next = onChange.mock.calls[0][0] as ThresholdCurves;
+    expect(next.on.map((node) => node.time)).toEqual([0, 10]);
+  });
+
+  it("right clicking empty space does nothing", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.contextMenu(canvasOf(container), { clientX: xOf(2), clientY: yOf(0.1) });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("double clicking a line adds a node on it without changing its shape", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.doubleClick(canvasOf(container), { clientX: xOf(2.5), clientY: yOf(0.7) });
+    const next = onChange.mock.calls[0][0] as ThresholdCurves;
+    expect(next.on.map((node) => node.time)).toEqual([0, 2.5, 5, 10]);
+    expect(next.on[1].value).toBeCloseTo(0.7);
+  });
+
+  it("double clicking away from both lines adds nothing", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.doubleClick(canvasOf(container), { clientX: xOf(2.5), clientY: yOf(0.05) });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("double clicking an existing node does not add another", () => {
+    const onChange = vi.fn();
+    const { container } = renderChart(SLOPED, onChange);
+    fireEvent.doubleClick(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8) });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("without a change handler the chart is read only", () => {
+    const { container } = renderChart(SLOPED);
+    fireEvent.mouseDown(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8), button: 0 });
+    fireEvent.mouseMove(window, { clientX: xOf(6), clientY: yOf(0.9) });
+    fireEvent.mouseUp(window);
+    fireEvent.contextMenu(canvasOf(container), { clientX: xOf(5), clientY: yOf(0.8) });
+    expect(nodeCentres().length).toBeGreaterThan(0);
+  });
+});
+
+describe("ThresholdChart zoom", () => {
+  function wheel(canvas: HTMLCanvasElement, deltaY: number, clientX: number) {
+    act(() => {
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX, cancelable: true, bubbles: true }));
+    });
+  }
+
+  it("shows no reset button until the chart is zoomed", () => {
+    renderChart(SLOPED);
+    expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
+  });
+
+  it("scrolling the wheel up zooms in around the pointer and offers a reset", () => {
+    const { container } = renderChart(SLOPED);
+    fillRects = [];
+    wheel(canvasOf(container), -1000, WIDTH / 2);
+    expect(screen.getByTitle("Reset zoom")).toBeInTheDocument();
+    expect(nodeCentres().length).toBeLessThan(SLOPED.on.length + SLOPED.off.length + 1);
+    const centreNodes = nodeCentres().filter(([x]) => Math.abs(x - WIDTH / 2) < 1);
+    expect(centreNodes).toHaveLength(2);
+  });
+
+  it("prevents the page from scrolling while zooming", () => {
+    const { container } = renderChart(SLOPED);
+    const event = new WheelEvent("wheel", { deltaY: -100, clientX: 0, cancelable: true, bubbles: true });
+    act(() => {
+      canvasOf(container).dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("scrolling the wheel down zooms back out", () => {
+    const { container } = renderChart(SLOPED);
+    wheel(canvasOf(container), -1000, WIDTH / 2);
+    wheel(canvasOf(container), 5000, WIDTH / 2);
+    expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
+  });
+
+  it("the reset button returns to the whole song", () => {
+    const { container } = renderChart(SLOPED);
+    wheel(canvasOf(container), -1000, WIDTH / 2);
+    fillRects = [];
+    fireEvent.click(screen.getByTitle("Reset zoom"));
+    expect(screen.queryByTitle("Reset zoom")).not.toBeInTheDocument();
+    expect(nodeCentres()).toContainEqual([xOf(0), yOf(0.6)]);
+    expect(nodeCentres()).toContainEqual([xOf(10), yOf(0.6)]);
+  });
+
+  it("dragging the background while zoomed moves the view", () => {
+    const { container } = renderChart(SLOPED, vi.fn());
+    const canvas = canvasOf(container);
+    wheel(canvas, -1000, WIDTH / 2);
+    fireEvent.mouseDown(canvas, { clientX: xOf(1), clientY: yOf(0.02), button: 0 });
+    fillRects = [];
+    fireEvent.mouseMove(window, { clientX: xOf(1) + 20, clientY: yOf(0.02) });
+    fireEvent.mouseUp(window);
+    const centreAfter = nodeCentres().filter(([x]) => Math.abs(x - (WIDTH / 2 + 20)) < 1);
+    expect(centreAfter).toHaveLength(2);
   });
 });

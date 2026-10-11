@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::core::pedal::curve::ThresholdNode;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PlaybackConfig {
@@ -9,8 +11,8 @@ pub struct PlaybackConfig {
     pub countdown: bool,
     pub use_88_key_layout: bool,
     pub pedal_style: String,
-    pub pedal_threshold_on: f64,
-    pub pedal_threshold_off: f64,
+    pub pedal_curve_on: Vec<ThresholdNode>,
+    pub pedal_curve_off: Vec<ThresholdNode>,
     pub debug_mode: bool,
     pub simulate_hands: bool,
     pub vary_velocity: bool,
@@ -40,8 +42,8 @@ impl Default for PlaybackConfig {
             countdown: true,
             use_88_key_layout: false,
             pedal_style: "none".to_string(),
-            pedal_threshold_on: -1.0,
-            pedal_threshold_off: -1.0,
+            pedal_curve_on: Vec::new(),
+            pedal_curve_off: Vec::new(),
             debug_mode: false,
             simulate_hands: false,
             vary_velocity: false,

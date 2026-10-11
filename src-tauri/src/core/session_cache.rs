@@ -27,8 +27,8 @@ pub const NOTES_CONFIG_KEYS: &[&str] = &[
 pub const PEDAL_CONFIG_KEYS: &[&str] = &[
     "pedal_style",
     "use_ai_pedal",
-    "pedal_threshold_on",
-    "pedal_threshold_off",
+    "pedal_curve_on",
+    "pedal_curve_off",
     "use_midi_pedal",
     "pedal_before_humanize",
 ];
@@ -202,6 +202,7 @@ pub fn clear_cache() {
 mod tests {
     use super::*;
     use crate::core::models::Note;
+    use crate::core::pedal::curve::flat_curve;
     use serde_json::json;
 
     fn sample_config() -> PlaybackConfig {
@@ -209,8 +210,8 @@ mod tests {
             tempo: 1.5,
             simulate_hands: true,
             pedal_style: "harmonic".to_string(),
-            pedal_threshold_on: 0.3,
-            pedal_threshold_off: 0.1,
+            pedal_curve_on: flat_curve(0.3),
+            pedal_curve_off: flat_curve(0.1),
             use_midi_pedal: true,
             ..PlaybackConfig::default()
         }
@@ -329,7 +330,7 @@ mod tests {
             let config = sample_config();
             let snapshot = extract_pedal_config(&config);
             let mut other = config.clone();
-            other.pedal_threshold_on = 0.9;
+            other.pedal_curve_on = flat_curve(0.9);
             assert!(!pedal_config_matches(Some(&snapshot), &other));
         }
 

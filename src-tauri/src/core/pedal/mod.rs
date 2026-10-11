@@ -1,19 +1,25 @@
+pub mod auto_curve;
+pub mod curve;
+pub mod legacy;
 pub mod model;
 
 use crate::core::config::PlaybackConfig;
 use crate::core::midi::get_time_groups;
 use crate::core::models::{KeyEvent, MusicalSection, Note};
+use auto_curve::auto_curves;
+use curve::ThresholdCurves;
 use model::{PedalModel, FEATURES};
 
 pub const FPS: f64 = 50.0;
 const MIN_CONFIDENCE_GATE: f32 = 0.3;
 const PEDAL_LAG: f64 = 0.05;
+const SILENCE_TAIL_SECONDS: f64 = 0.35;
+const MIN_EVENTS_EXCLUSIVE: usize = 2;
 const UNSAFE_INTERVALS: [i32; 2] = [1, 6];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiThresholds {
-    pub threshold_on: f32,
-    pub threshold_off: f32,
+    pub curves: ThresholdCurves,
     pub confidence: Vec<f32>,
 }
 
@@ -288,15 +294,14 @@ fn process_ai_predictions(
     notes: &[Note],
     max_time: f64,
     fps: f64,
-    threshold_on: Option<f32>,
-    threshold_off: Option<f32>,
+    custom: Option<&ThresholdCurves>,
 ) -> (Vec<KeyEvent>, Option<AiThresholds>) {
     let total_steps = preds.len();
 
     let mut is_silent = vec![true; total_steps];
     for note in notes {
         let s_idx = (note.start_time * fps) as usize;
-        let e_idx = (((note.end_time() + 0.35) * fps) as usize).min(total_steps);
+        let e_idx = (((note.end_time() + SILENCE_TAIL_SECONDS) * fps) as usize).min(total_steps);
         for t in s_idx..e_idx {
             is_silent[t] = false;
         }
@@ -316,65 +321,12 @@ fn process_ai_predictions(
         return (Vec::new(), None);
     }
 
-    let ap_min = active_preds.iter().copied().fold(f32::MAX, f32::min);
-    let ap_max = active_preds.iter().copied().fold(f32::MIN, f32::max);
-    let ap_range = ap_max - ap_min;
-    if ap_range < 1e-6 {
+    let Some(auto) = auto_curves(&preds, fps) else {
         return (Vec::new(), None);
-    }
-    let normed: Vec<f32> = active_preds
-        .iter()
-        .map(|&p| (p - ap_min) / ap_range)
-        .collect();
-
-    let otsu_split = otsu_threshold(&normed);
-    let on_group = sorted_copy(
-        &normed
-            .iter()
-            .copied()
-            .filter(|&v| v > otsu_split)
-            .collect::<Vec<f32>>(),
-    );
-    let off_group = sorted_copy(
-        &normed
-            .iter()
-            .copied()
-            .filter(|&v| v <= otsu_split)
-            .collect::<Vec<f32>>(),
-    );
-
-    let using_custom = threshold_on.is_some() && threshold_off.is_some();
-    let (final_threshold_on, final_threshold_off) = if using_custom {
-        (threshold_on.unwrap(), threshold_off.unwrap())
-    } else if !on_group.is_empty() && !off_group.is_empty() {
-        let on_min = on_group[0];
-        let on_max = *on_group.last().unwrap();
-        let on_median = median(&on_group);
-        let on_spread = on_max - on_min;
-        let on_ratio = if on_spread > 0.0 {
-            (on_median - on_min) / on_spread
-        } else {
-            0.0
-        };
-        let on_pct = on_ratio as f64 * 10.45;
-
-        let off_min = off_group[0];
-        let off_max = *off_group.last().unwrap();
-        let off_median = median(&off_group);
-        let off_spread = off_max - off_min;
-        let off_ratio = if off_spread > 0.0 {
-            (off_median - off_min) / off_spread
-        } else {
-            0.0
-        };
-        let off_pct = 100.0 - off_ratio as f64 * 6.0;
-
-        let norm_on = percentile(&on_group, on_pct);
-        let norm_off = percentile(&off_group, off_pct);
-        (norm_on * ap_range + ap_min, norm_off * ap_range + ap_min)
-    } else {
-        let t = otsu_split * ap_range + ap_min;
-        (t, t)
+    };
+    let curves = match custom {
+        Some(c) => c.clone(),
+        None => auto,
     };
 
     let mut events = Vec::new();
@@ -384,10 +336,14 @@ fn process_ai_predictions(
             continue;
         }
         let curr_time = i as f64 / fps;
-        if !pedal_is_down && curr_val > final_threshold_on {
+        let Some((threshold_on, threshold_off)) = curves.at(curr_time) else {
+            continue;
+        };
+        let value = f64::from(curr_val);
+        if !pedal_is_down && value > threshold_on {
             pedal_is_down = true;
             events.push(KeyEvent::new(curr_time, 1, "pedal", "down"));
-        } else if pedal_is_down && curr_val <= final_threshold_off {
+        } else if pedal_is_down && value <= threshold_off {
             pedal_is_down = false;
             events.push(KeyEvent::new(curr_time, 0, "pedal", "up"));
         }
@@ -396,15 +352,14 @@ fn process_ai_predictions(
         events.push(KeyEvent::new(max_time, 0, "pedal", "up"));
     }
 
-    if events.len() <= 2 {
+    if events.len() <= MIN_EVENTS_EXCLUSIVE {
         return (Vec::new(), None);
     }
 
     (
         events,
         Some(AiThresholds {
-            threshold_on: final_threshold_on,
-            threshold_off: final_threshold_off,
+            curves,
             confidence: preds,
         }),
     )
@@ -413,8 +368,7 @@ fn process_ai_predictions(
 pub fn generate_ai_pedal(
     model: &PedalModel,
     notes: &[Note],
-    threshold_on: Option<f32>,
-    threshold_off: Option<f32>,
+    custom: Option<&ThresholdCurves>,
 ) -> (Vec<KeyEvent>, Option<AiThresholds>) {
     if notes.is_empty() {
         return (Vec::new(), None);
@@ -433,18 +387,15 @@ pub fn generate_ai_pedal(
         Err(_) => return (Vec::new(), None),
     };
 
-    process_ai_predictions(preds, notes, max_time, FPS, threshold_on, threshold_off)
+    process_ai_predictions(preds, notes, max_time, FPS, custom)
 }
 
-fn resolve_custom_thresholds(config: &PlaybackConfig) -> (Option<f32>, Option<f32>) {
-    if config.pedal_threshold_on >= 0.0 && config.pedal_threshold_off >= 0.0 {
-        (
-            Some(config.pedal_threshold_on as f32),
-            Some(config.pedal_threshold_off as f32),
-        )
-    } else {
-        (None, None)
+fn resolve_custom_curves(config: &PlaybackConfig) -> Option<ThresholdCurves> {
+    ThresholdCurves {
+        on: config.pedal_curve_on.clone(),
+        off: config.pedal_curve_off.clone(),
     }
+    .sanitized()
 }
 
 fn adaptive_fallback(notes: &[Note]) -> Vec<KeyEvent> {
@@ -465,8 +416,8 @@ fn ai_strategy(
     notes: &[Note],
 ) -> (Vec<KeyEvent>, Option<AiThresholds>) {
     if let Some(model) = model {
-        let (t_on, t_off) = resolve_custom_thresholds(config);
-        let (events, thresholds) = generate_ai_pedal(model, notes, t_on, t_off);
+        let custom = resolve_custom_curves(config);
+        let (events, thresholds) = generate_ai_pedal(model, notes, custom.as_ref());
         if !events.is_empty() {
             return (events, thresholds);
         }
@@ -481,8 +432,8 @@ fn hybrid_strategy(
 ) -> (Vec<KeyEvent>, Option<AiThresholds>) {
     if config.use_ai_pedal {
         if let Some(model) = model {
-            let (t_on, t_off) = resolve_custom_thresholds(config);
-            let (events, thresholds) = generate_ai_pedal(model, notes, t_on, t_off);
+            let custom = resolve_custom_curves(config);
+            let (events, thresholds) = generate_ai_pedal(model, notes, custom.as_ref());
             if !events.is_empty() {
                 return (events, thresholds);
             }
@@ -867,7 +818,7 @@ mod tests {
         fn test_all_silence_masked_rejects() {
             let preds = vec![0.9; 20];
             let notes: Vec<Note> = vec![];
-            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None);
             assert!(events.is_empty());
             assert!(meta.is_none());
         }
@@ -879,7 +830,7 @@ mod tests {
                 *p = 0.1;
             }
             let notes = vec![note(0, 40, 0.0, 0.2, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None);
             assert!(events.is_empty());
             assert!(meta.is_none());
         }
@@ -891,7 +842,7 @@ mod tests {
                 *p = 0.5;
             }
             let notes = vec![note(0, 40, 0.0, 0.2, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, None);
             assert!(events.is_empty());
             assert!(meta.is_none());
         }
@@ -903,24 +854,120 @@ mod tests {
                 *p = 0.5 + (i as f32) * 0.01;
             }
             let notes = vec![note(0, 40, 0.0, 0.4, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 0.8, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 0.8, FPS, None);
             assert!(events.is_empty() || events.len() > 2);
             let _ = meta;
         }
 
         #[test]
-        fn test_custom_thresholds_bypass_otsu_computation() {
+        fn test_custom_curves_replace_the_automatic_ones() {
             let mut preds = vec![0.0; 40];
             for (i, p) in preds.iter_mut().enumerate().take(30) {
                 *p = 0.2 + (i as f32 % 10.0) * 0.06;
             }
             let notes = vec![note(0, 40, 0.0, 0.6, "left")];
-            let (_, meta) =
-                process_ai_predictions(preds, &notes, 0.8, FPS, Some(0.4), Some(0.3));
-            if let Some(m) = meta {
-                assert_eq!(m.threshold_on, 0.4);
-                assert_eq!(m.threshold_off, 0.3);
+            let custom = ThresholdCurves {
+                on: curve::flat_curve(0.4),
+                off: curve::flat_curve(0.3),
+            };
+            let (_, meta) = process_ai_predictions(preds, &notes, 0.8, FPS, Some(&custom));
+            let m = meta.expect("a custom curve over a swinging confidence must be accepted");
+            assert_eq!(m.curves, custom);
+        }
+
+        #[test]
+        fn test_a_time_varying_custom_curve_is_followed_frame_by_frame() {
+            let mut preds = vec![0.0; 200];
+            for (i, p) in preds.iter_mut().enumerate().take(180) {
+                *p = 0.5 + 0.4 * ((i as f32) * 0.3).sin();
             }
+            let notes = vec![note(0, 40, 0.0, 3.6, "left")];
+            let custom = ThresholdCurves {
+                on: vec![
+                    curve::ThresholdNode { time: 0.0, value: 0.3 },
+                    curve::ThresholdNode { time: 4.0, value: 0.8 },
+                ],
+                off: vec![
+                    curve::ThresholdNode { time: 0.0, value: 0.2 },
+                    curve::ThresholdNode { time: 4.0, value: 0.7 },
+                ],
+            };
+            let (events, meta) = process_ai_predictions(preds, &notes, 4.0, FPS, Some(&custom));
+            let meta = meta.unwrap();
+            let mut replayed = Vec::new();
+            let mut down = false;
+            for (i, &value) in meta.confidence.iter().enumerate().skip(1) {
+                if value == 0.0 {
+                    continue;
+                }
+                let time = i as f64 / FPS;
+                let (on, off) = meta.curves.at(time).unwrap();
+                if !down && f64::from(value) > on {
+                    down = true;
+                    replayed.push((time, "down"));
+                } else if down && f64::from(value) <= off {
+                    down = false;
+                    replayed.push((time, "up"));
+                }
+            }
+            if down {
+                replayed.push((4.0, "up"));
+            }
+            let produced: Vec<(f64, &str)> = events.iter().map(|e| (e.time, e.key_char.as_str())).collect();
+            assert_eq!(replayed, produced);
+        }
+
+        #[test]
+        fn test_custom_off_above_on_is_capped_so_the_pedal_cannot_chatter() {
+            let mut preds = vec![0.0; 100];
+            for (i, p) in preds.iter_mut().enumerate().take(80) {
+                *p = 0.5 + 0.45 * ((i as f32) * 0.3).sin();
+            }
+            let notes = vec![note(0, 40, 0.0, 1.6, "left")];
+            let crossed = ThresholdCurves {
+                on: curve::flat_curve(0.4),
+                off: curve::flat_curve(0.9),
+            };
+            let capped = ThresholdCurves {
+                on: curve::flat_curve(0.4),
+                off: curve::flat_curve(0.4),
+            };
+            let (crossed_events, _) = process_ai_predictions(preds.clone(), &notes, 1.6, FPS, Some(&crossed));
+            let (capped_events, _) = process_ai_predictions(preds, &notes, 1.6, FPS, Some(&capped));
+            let times = |events: &[KeyEvent]| -> Vec<(f64, String)> {
+                events.iter().map(|e| (e.time, e.key_char.clone())).collect()
+            };
+            assert_eq!(times(&crossed_events), times(&capped_events));
+        }
+
+        #[test]
+        fn test_a_flat_confidence_is_rejected_even_with_a_custom_curve() {
+            let mut preds = vec![0.0; 20];
+            for p in preds.iter_mut().take(10) {
+                *p = 0.5;
+            }
+            let notes = vec![note(0, 40, 0.0, 0.2, "left")];
+            let custom = ThresholdCurves {
+                on: curve::flat_curve(0.4),
+                off: curve::flat_curve(0.3),
+            };
+            let (events, meta) = process_ai_predictions(preds, &notes, 0.4, FPS, Some(&custom));
+            assert!(events.is_empty());
+            assert!(meta.is_none());
+        }
+
+        #[test]
+        fn test_automatic_curves_are_returned_when_there_is_no_custom_curve() {
+            let mut preds = vec![0.0; 100];
+            for (i, p) in preds.iter_mut().enumerate().take(80) {
+                *p = 0.5 + 0.45 * ((i as f32) * 0.3).sin();
+            }
+            let notes = vec![note(0, 40, 0.0, 1.6, "left")];
+            let (_, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None);
+            let curves = meta.unwrap().curves;
+            assert!(!curves.on.is_empty());
+            assert_eq!(curves.on.len(), curves.off.len());
+            assert!(curves.is_ordered());
         }
 
         #[test]
@@ -931,7 +978,7 @@ mod tests {
                 *p = 0.5 + 0.45 * phase.sin();
             }
             let notes = vec![note(0, 40, 0.0, 1.0, "left")];
-            let (events, meta) = process_ai_predictions(preds.clone(), &notes, 1.6, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds.clone(), &notes, 1.6, FPS, None);
             assert!(!events.is_empty());
             let curve = meta.unwrap().confidence;
             assert_eq!(curve.len(), preds.len());
@@ -948,7 +995,7 @@ mod tests {
                 *p = 0.5 + 0.45 * phase.sin();
             }
             let notes = vec![note(0, 40, 0.0, 1.6, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None);
             let meta = meta.unwrap();
             let mut replayed = Vec::new();
             let mut down = false;
@@ -956,12 +1003,14 @@ mod tests {
                 if value == 0.0 {
                     continue;
                 }
-                if !down && value > meta.threshold_on {
+                let time = i as f64 / FPS;
+                let (on, off) = meta.curves.at(time).unwrap();
+                if !down && f64::from(value) > on {
                     down = true;
-                    replayed.push((i as f64 / FPS, "down"));
-                } else if down && value <= meta.threshold_off {
+                    replayed.push((time, "down"));
+                } else if down && f64::from(value) <= off {
                     down = false;
-                    replayed.push((i as f64 / FPS, "up"));
+                    replayed.push((time, "up"));
                 }
             }
             if down {
@@ -979,7 +1028,7 @@ mod tests {
                 *p = 0.5 + 0.45 * phase.sin();
             }
             let notes = vec![note(0, 40, 0.0, 1.6, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None, None);
+            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None);
             if !events.is_empty() {
                 assert!(meta.is_some());
                 assert!(events.len() > 2);
@@ -994,6 +1043,35 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    mod test_resolve_custom_curves {
+        use super::*;
+
+        #[test]
+        fn test_empty_config_curves_mean_automatic() {
+            assert!(resolve_custom_curves(&PlaybackConfig::default()).is_none());
+        }
+
+        #[test]
+        fn test_one_empty_curve_means_automatic() {
+            let mut cfg = PlaybackConfig::default();
+            cfg.pedal_curve_on = curve::flat_curve(0.5);
+            assert!(resolve_custom_curves(&cfg).is_none());
+        }
+
+        #[test]
+        fn test_both_curves_are_used_and_cleaned() {
+            let mut cfg = PlaybackConfig::default();
+            cfg.pedal_curve_on = vec![
+                curve::ThresholdNode { time: 4.0, value: 1.4 },
+                curve::ThresholdNode { time: 1.0, value: 0.5 },
+            ];
+            cfg.pedal_curve_off = curve::flat_curve(0.3);
+            let resolved = resolve_custom_curves(&cfg).unwrap();
+            assert_eq!(resolved.on[0].time, 1.0);
+            assert_eq!(resolved.on[1].value, 1.0);
         }
     }
 
@@ -1056,7 +1134,7 @@ mod tests {
                 note(3, 65, 1.5, 0.5, "left"),
                 note(4, 67, 2.0, 0.5, "left"),
             ];
-            let (events, meta) = generate_ai_pedal(&model, &notes, None, None);
+            let (events, meta) = generate_ai_pedal(&model, &notes, None);
             if events.is_empty() {
                 assert!(meta.is_none());
             } else {

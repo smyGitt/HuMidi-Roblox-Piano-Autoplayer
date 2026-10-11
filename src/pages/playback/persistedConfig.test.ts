@@ -3,7 +3,7 @@ import { configFromSaved, configToPatch, PERSISTED_NAMES } from "./persistedConf
 import { DEFAULT_CONFIG } from "./types";
 
 const SAVED_TEMPO = 140;
-const SAVED_THRESHOLD = 0.62;
+const SAVED_CURVE = [{ time: 0, value: 0.62 }];
 const SAVED_VARIANCE = 0.05;
 
 describe("configToPatch", () => {
@@ -13,8 +13,8 @@ describe("configToPatch", () => {
       midi_file: "song.mid",
       tempo: SAVED_TEMPO,
       vary_timing: true,
-      pedal_threshold_on: SAVED_THRESHOLD,
-      pedal_threshold_off: SAVED_THRESHOLD,
+      pedal_curve_on: SAVED_CURVE,
+      pedal_curve_off: SAVED_CURVE,
     });
     expect(patch.tempo).toBe(SAVED_TEMPO);
     expect(patch.enable_vary_timing).toBe(true);
@@ -22,15 +22,15 @@ describe("configToPatch", () => {
     expect(patch.enable_hand_drift).toBe(false);
     expect(patch.value_hand_drift_decay).toBe(DEFAULT_CONFIG.drift_decay_factor);
     expect(patch).not.toHaveProperty("midi_file");
-    expect(patch).not.toHaveProperty("pedal_threshold_on");
-    expect(patch).not.toHaveProperty("pedal_threshold_off");
+    expect(patch).not.toHaveProperty("pedal_curve_on");
+    expect(patch).not.toHaveProperty("pedal_curve_off");
     expect(Object.keys(patch).sort()).toEqual(Object.values(PERSISTED_NAMES).sort());
   });
 
   it("covers every config field except the per-song ones", () => {
     const covered = new Set(Object.keys(PERSISTED_NAMES));
     const missing = Object.keys(DEFAULT_CONFIG).filter((key) => !covered.has(key));
-    expect(missing.sort()).toEqual(["midi_file", "pedal_threshold_off", "pedal_threshold_on"]);
+    expect(missing.sort()).toEqual(["midi_file", "pedal_curve_off", "pedal_curve_on"]);
   });
 });
 
@@ -73,12 +73,12 @@ describe("configFromSaved", () => {
     const restored = configFromSaved({
       tempo: SAVED_TEMPO,
       midi_file: "old.mid",
-      pedal_threshold_on: SAVED_THRESHOLD,
-      pedal_threshold_off: SAVED_THRESHOLD,
+      pedal_curve_on: SAVED_CURVE,
+      pedal_curve_off: SAVED_CURVE,
     });
     expect(restored?.midi_file).toBe("");
-    expect(restored?.pedal_threshold_on).toBe(DEFAULT_CONFIG.pedal_threshold_on);
-    expect(restored?.pedal_threshold_off).toBe(DEFAULT_CONFIG.pedal_threshold_off);
+    expect(restored?.pedal_curve_on).toEqual(DEFAULT_CONFIG.pedal_curve_on);
+    expect(restored?.pedal_curve_off).toEqual(DEFAULT_CONFIG.pedal_curve_off);
   });
 
   it("returns undefined when nothing usable is stored", () => {

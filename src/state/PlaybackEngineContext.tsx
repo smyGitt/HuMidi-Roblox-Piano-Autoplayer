@@ -34,8 +34,9 @@ import type { TrackPart } from "../pages/playback/LoadedParts";
 import type { PedalAiStats } from "../pages/playback/PedalAiCard";
 import { PlaybackClock } from "./playbackClock";
 import { LiveKeys } from "./liveKeys";
-import { PREVIEW_CONFIDENCE, PREVIEW_SONG } from "./previewSong";
+import { PREVIEW_CONFIDENCE, PREVIEW_CURVES, PREVIEW_SONG } from "./previewSong";
 import type { PedalConfidence } from "../lib/pedalPreview";
+import { hasCurves, type ThresholdCurves } from "../lib/thresholdCurve";
 import { DEFAULT_CONFIG, type PlaybackConfig } from "../pages/playback/types";
 import { NOTES_CONFIG_KEYS, PEDAL_CONFIG_KEYS, configDiffers, pickConfig } from "../pages/playback/compileConfig";
 
@@ -55,10 +56,10 @@ interface PlaybackEngineValue {
   hasCompiledPedal: boolean;
   isGeneratingPedal: boolean;
   pedalIntervals: [number, number][];
-  aiThresholds: [number, number] | null;
+  aiCurves: ThresholdCurves | null;
   pedalConfidence: PedalConfidence | null;
   configDirty: boolean;
-  defaultAiThresholds: [number, number] | null;
+  defaultAiCurves: ThresholdCurves | null;
   aiStats: PedalAiStats | null;
   isPlaying: boolean;
   isPaused: boolean;
@@ -84,13 +85,15 @@ interface PlaybackEngineValue {
   clearSong: () => Promise<void>;
   blockedInput: string | null;
   dismissBlockedInput: () => void;
+  legacyThresholdNotice: boolean;
+  dismissLegacyThresholdNotice: () => void;
 }
 
 export type SaveResult = { path: string } | { error: string };
 
-const NO_AI_THRESHOLDS = {
-  pedal_threshold_on: DEFAULT_CONFIG.pedal_threshold_on,
-  pedal_threshold_off: DEFAULT_CONFIG.pedal_threshold_off,
+const NO_AI_CURVES = {
+  pedal_curve_on: DEFAULT_CONFIG.pedal_curve_on,
+  pedal_curve_off: DEFAULT_CONFIG.pedal_curve_off,
 };
 
 const PlaybackEngineContext = createContext<PlaybackEngineValue | null>(null);
@@ -134,15 +137,16 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [isGeneratingPedal, setIsGeneratingPedal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [blockedInput, setBlockedInput] = useState<string | null>(null);
+  const [legacyThresholdNotice, setLegacyThresholdNotice] = useState(false);
   const [saveCount, setSaveCount] = useState(0);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
-  const [aiThresholds, setAiThresholds] = useState<[number, number] | null>(null);
+  const [aiCurves, setAiCurves] = useState<ThresholdCurves | null>(null);
   const [pedalConfidence, setPedalConfidence] = useState<PedalConfidence | null>(null);
   const [compiledNotesConfig, setCompiledNotesConfig] = useState<Partial<PlaybackConfig> | null>(null);
   const [compiledPedalConfig, setCompiledPedalConfig] = useState<Partial<PlaybackConfig> | null>(null);
-  const [defaultAiThresholds, setDefaultAiThresholds] = useState<[number, number] | null>(null);
-  const defaultAiThresholdsRef = useRef(defaultAiThresholds);
-  defaultAiThresholdsRef.current = defaultAiThresholds;
+  const [defaultAiCurves, setDefaultAiCurves] = useState<ThresholdCurves | null>(null);
+  const defaultAiCurvesRef = useRef(defaultAiCurves);
+  defaultAiCurvesRef.current = defaultAiCurves;
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [clock] = useState(() => new PlaybackClock({ selfTimed: !isTauri() }));
@@ -152,6 +156,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
 
   const configRef = useRef(config);
   configRef.current = config;
+  const updateConfigRef = useRef(updateConfig);
+  updateConfigRef.current = updateConfig;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const isGeneratingPedalRef = useRef(false);
@@ -241,11 +247,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setHasCompiledNotes(false);
     setHasCompiledPedal(false);
     setPedalIntervals([]);
-    setAiThresholds(null);
+    setAiCurves(null);
     setPedalConfidence(null);
     setCompiledNotesConfig(null);
     setCompiledPedalConfig(null);
-    setDefaultAiThresholds(null);
+    setDefaultAiCurves(null);
+    updateConfigRef.current(NO_AI_CURVES);
     setParts([]);
     setSelectedTracksInfo([]);
     setFinalNotes([]);
@@ -323,6 +330,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setHasCompiledPedal(false);
       setCompiledNotesConfig(pickConfig(configUsed, NOTES_CONFIG_KEYS));
       setCompiledPedalConfig(null);
+      setDefaultAiCurves(null);
+      updateConfig(NO_AI_CURVES);
       appendLog("Notes compiled successful (preview mode)");
       return true;
     }
@@ -344,6 +353,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       });
       setCompiledNotesConfig(pickConfig(configUsed, NOTES_CONFIG_KEYS));
       setCompiledPedalConfig(null);
+      setDefaultAiCurves(null);
+      updateConfig(NO_AI_CURVES);
       appendLog("Notes compiled successful");
       return true;
     } catch (e) {
@@ -358,9 +369,9 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function captureDefaultThresholds(thresholds: [number, number]) {
-    if (defaultAiThresholdsRef.current === null) {
-      setDefaultAiThresholds(thresholds);
+  function captureDefaultCurves(curves: ThresholdCurves) {
+    if (defaultAiCurvesRef.current === null) {
+      setDefaultAiCurves(curves);
     }
   }
 
@@ -376,7 +387,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     if (isPlayingRef.current) await stop();
     if (notesDirty) {
       const compiled = await compileNotesNow(selectedTracksInfo);
-      if (compiled) await compilePedalNow();
+      if (compiled) await compilePedalNow({ ...configRef.current, ...NO_AI_CURVES });
     } else if (pedalDirty) {
       await compilePedalNow();
     }
@@ -386,13 +397,16 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     updateConfig({ ...compiledNotesConfig, ...compiledPedalConfig });
   }
 
-  async function compilePedalNow(): Promise<PedalData | null> {
+  async function compilePedalNow(configOverride?: PlaybackConfig): Promise<PedalData | null> {
     if (!isTauri()) {
+      const previewCurves = { on: PREVIEW_CURVES.on, off: PREVIEW_CURVES.off };
+      const previewCurveConfig = { pedal_curve_on: previewCurves.on, pedal_curve_off: previewCurves.off };
       setPedalIntervals(PREVIEW_SONG.pedalIntervals);
-      setAiThresholds([0.5, 0.5]);
+      setAiCurves(previewCurves);
       setPedalConfidence(PREVIEW_CONFIDENCE);
-      setCompiledPedalConfig(pickConfig(configRef.current, PEDAL_CONFIG_KEYS));
-      captureDefaultThresholds([0.5, 0.5]);
+      setCompiledPedalConfig({ ...pickConfig(configOverride ?? configRef.current, PEDAL_CONFIG_KEYS), ...previewCurveConfig });
+      captureDefaultCurves(previewCurves);
+      updateConfig(previewCurveConfig);
       setHasCompiledPedal(true);
       appendLog("Pedal compiled successful (preview mode)");
       return null;
@@ -401,27 +415,23 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     isGeneratingPedalRef.current = true;
     setIsGeneratingPedal(true);
     try {
-      const configUsed = configRef.current;
+      const configUsed = configOverride ?? configRef.current;
       const data = await invokeCompilePedal(configUsed, midiFilePath);
+      const curves: ThresholdCurves = { on: data.curve_on, off: data.curve_off };
+      const hasAiCurves = hasCurves(curves);
+      const curveConfig = hasAiCurves
+        ? { pedal_curve_on: curves.on, pedal_curve_off: curves.off }
+        : NO_AI_CURVES;
       setPedalIntervals(data.pedal_intervals);
-      setAiThresholds(data.ai_thresholds);
+      setAiCurves(hasAiCurves ? curves : null);
       setPedalConfidence(
         data.confidence.length > 0 ? { values: data.confidence, fps: data.confidence_fps } : null,
       );
-      if (data.ai_thresholds) captureDefaultThresholds(data.ai_thresholds);
+      if (hasAiCurves) captureDefaultCurves(curves);
       setHasCompiledPedal(true);
-      setCompiledPedalConfig({
-        ...pickConfig(configUsed, PEDAL_CONFIG_KEYS),
-        ...(data.ai_thresholds
-          ? { pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] }
-          : NO_AI_THRESHOLDS),
-      });
-      if (data.ai_thresholds) {
-        updateConfig({ pedal_threshold_on: data.ai_thresholds[0], pedal_threshold_off: data.ai_thresholds[1] });
-      } else {
-        setDefaultAiThresholds(null);
-        updateConfig(NO_AI_THRESHOLDS);
-      }
+      setCompiledPedalConfig({ ...pickConfig(configUsed, PEDAL_CONFIG_KEYS), ...curveConfig });
+      if (!hasAiCurves) setDefaultAiCurves(null);
+      updateConfig(curveConfig);
       updateSnapshot({ pedal: `${data.pedal_intervals.length} presses` });
       appendLog("Pedal compiled successful");
       return data;
@@ -500,11 +510,11 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       let saveConfig = configRef.current;
       if (!hasCompiledPedal) {
         const data = await compilePedalNow();
-        if (data?.ai_thresholds) {
+        if (data && data.curve_on.length > 0 && data.curve_off.length > 0) {
           saveConfig = {
             ...saveConfig,
-            pedal_threshold_on: data.ai_thresholds[0],
-            pedal_threshold_off: data.ai_thresholds[1],
+            pedal_curve_on: data.curve_on,
+            pedal_curve_off: data.curve_off,
           };
         }
       }
@@ -544,11 +554,13 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setHasCompiledNotes(true);
       setHasCompiledPedal(true);
       setPedalIntervals([]);
-      setAiThresholds(null);
+      setAiCurves(null);
       setPedalConfidence(null);
       setCompiledNotesConfig(null);
       setCompiledPedalConfig(null);
-      setDefaultAiThresholds(null);
+      setDefaultAiCurves(null);
+      updateConfig({ pedal_curve_on: result.pedal_curve_on, pedal_curve_off: result.pedal_curve_off });
+      setLegacyThresholdNotice(result.legacy_pedal_thresholds);
       setFileName(label);
       setMidiFilePath("");
       setParts([]);
@@ -585,6 +597,9 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setHasCompiledPedal(false);
       setCompiledNotesConfig(null);
       setCompiledPedalConfig(null);
+      setAiCurves(null);
+      setDefaultAiCurves(null);
+      updateConfig(NO_AI_CURVES);
       setFileName("Translated sheet");
       setMidiFilePath("");
       setParts([]);
@@ -592,7 +607,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       clearSnapshot();
       updateSnapshot({ file: "(pasted sheet)", source: "Virtual Piano import", tempo: `${bpm} BPM` });
       appendLog(`Sheet compiled successful: ${timeline.final_notes.length} note(s)`);
-      await generatePedal();
+      await compilePedalNow({ ...configRef.current, ...NO_AI_CURVES });
       setIsPaused(false);
       await invokeStartPlayback(configRef.current, "");
     } catch (e) {
@@ -630,11 +645,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setHasCompiledNotes(false);
     setHasCompiledPedal(false);
     setPedalIntervals([]);
-    setAiThresholds(null);
+    setAiCurves(null);
     setPedalConfidence(null);
     setCompiledNotesConfig(null);
     setCompiledPedalConfig(null);
-    setDefaultAiThresholds(null);
+    setDefaultAiCurves(null);
+    updateConfig(NO_AI_CURVES);
     clock.jump(0);
     liveKeys.clear();
     clearSnapshot();
@@ -661,10 +677,10 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     isSaving,
     saveCount,
     pedalIntervals,
-    aiThresholds,
+    aiCurves,
     pedalConfidence,
     configDirty,
-    defaultAiThresholds,
+    defaultAiCurves,
     aiStats,
     isPlaying,
     isPaused,
@@ -687,6 +703,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     clearSong,
     blockedInput,
     dismissBlockedInput: () => setBlockedInput(null),
+    legacyThresholdNotice,
+    dismissLegacyThresholdNotice: () => setLegacyThresholdNotice(false),
   };
 
   return <PlaybackEngineContext.Provider value={value}>{children}</PlaybackEngineContext.Provider>;

@@ -1,3 +1,5 @@
+import type { ThresholdNode } from "../../lib/thresholdCurve";
+
 export interface PlaybackConfig {
   midi_file: string;
   tempo: number;
@@ -5,8 +7,8 @@ export interface PlaybackConfig {
   countdown: boolean;
   use_88_key_layout: boolean;
   pedal_style: string;
-  pedal_threshold_on: number;
-  pedal_threshold_off: number;
+  pedal_curve_on: ThresholdNode[];
+  pedal_curve_off: ThresholdNode[];
   debug_mode: boolean;
   simulate_hands: boolean;
   enable_chord_roll: boolean;
@@ -40,8 +42,8 @@ export const DEFAULT_CONFIG: PlaybackConfig = {
   countdown: true,
   use_88_key_layout: false,
   pedal_style: "ai",
-  pedal_threshold_on: -1,
-  pedal_threshold_off: -1,
+  pedal_curve_on: [],
+  pedal_curve_off: [],
   debug_mode: false,
   simulate_hands: false,
   enable_chord_roll: false,

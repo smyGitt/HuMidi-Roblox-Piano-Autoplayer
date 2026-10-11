@@ -1,3 +1,5 @@
+import { thresholdsAt, type ThresholdCurves } from "./thresholdCurve";
+
 export interface PedalConfidence {
   values: readonly number[];
   fps: number;
@@ -11,8 +13,7 @@ export function confidenceDuration(confidence: PedalConfidence): number {
 
 export function pedalIntervalsFromConfidence(
   confidence: PedalConfidence,
-  thresholdOn: number,
-  thresholdOff: number,
+  curves: ThresholdCurves,
   endTime: number,
 ): PedalInterval[] {
   const intervals: PedalInterval[] = [];
@@ -21,9 +22,11 @@ export function pedalIntervalsFromConfidence(
     const value = confidence.values[index];
     if (value === 0) continue;
     const time = index / confidence.fps;
-    if (downAt === null && value > thresholdOn) {
+    const thresholds = thresholdsAt(curves, time);
+    if (thresholds === null) continue;
+    if (downAt === null && value > thresholds.on) {
       downAt = time;
-    } else if (downAt !== null && value <= thresholdOff) {
+    } else if (downAt !== null && value <= thresholds.off) {
       intervals.push([downAt, time]);
       downAt = null;
     }

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { flatCurves } from "../../lib/thresholdCurve";
 import { ThemeProvider } from "../../theme/ThemeProvider";
 import { PedalAiCard, type PedalAiStats } from "./PedalAiCard";
 
@@ -7,11 +8,10 @@ function baseProps(overrides: Partial<Parameters<typeof PedalAiCard>[0]> = {}) {
   return {
     hasThresholds: true,
     generateEnabled: true,
-    thresholdOn: 0.6,
-    thresholdOff: 0.4,
+    curves: flatCurves(0.6, 0.4),
     stats: null as PedalAiStats | null,
     onGenerate: vi.fn(),
-    onThresholdChange: vi.fn(),
+    onCurvesChange: vi.fn(),
     onReset: vi.fn(),
     ...overrides,
   };
@@ -93,32 +93,16 @@ describe("PedalAiCard", () => {
     vi.restoreAllMocks();
   });
 
+  it("has no threshold number fields or step buttons any more", () => {
+    render(<PedalAiCard {...baseProps()} />);
+    expect(screen.queryByLabelText(/On threshold/)).not.toBeInTheDocument();
+    expect(screen.queryByTitle("On threshold +0.005")).not.toBeInTheDocument();
+  });
+
   it("Reset button calls onReset when thresholds exist", () => {
     const onReset = vi.fn();
     render(<PedalAiCard {...baseProps({ onReset })} />);
     fireEvent.click(screen.getByTitle("Reset"));
     expect(onReset).toHaveBeenCalledTimes(1);
-  });
-
-  it("editing the On/Off inputs preserves the other threshold's current value", () => {
-    const onThresholdChange = vi.fn();
-    render(<PedalAiCard {...baseProps({ thresholdOn: 0.6, thresholdOff: 0.4, onThresholdChange })} />);
-    fireEvent.change(screen.getByLabelText(/On threshold/), { target: { value: "0.7" } });
-    expect(onThresholdChange).toHaveBeenCalledWith(0.7, 0.4);
-    fireEvent.change(screen.getByLabelText(/Off threshold/), { target: { value: "0.3" } });
-    expect(onThresholdChange).toHaveBeenCalledWith(0.6, 0.3);
-  });
-
-  it("the step buttons next to each threshold change only that threshold", () => {
-    const onThresholdChange = vi.fn();
-    render(<PedalAiCard {...baseProps({ thresholdOn: 0.6, thresholdOff: 0.4, onThresholdChange })} />);
-    fireEvent.click(screen.getByTitle("On threshold +0.005"));
-    expect(onThresholdChange).toHaveBeenLastCalledWith(0.605, 0.4);
-    fireEvent.click(screen.getByTitle("On threshold -0.05"));
-    expect(onThresholdChange).toHaveBeenLastCalledWith(0.55, 0.4);
-    fireEvent.click(screen.getByTitle("Off threshold +0.05"));
-    expect(onThresholdChange).toHaveBeenLastCalledWith(0.6, 0.45);
-    fireEvent.click(screen.getByTitle("Off threshold -0.005"));
-    expect(onThresholdChange).toHaveBeenLastCalledWith(0.6, 0.395);
   });
 });

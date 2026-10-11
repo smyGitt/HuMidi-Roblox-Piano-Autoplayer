@@ -1,6 +1,6 @@
 import { DEFAULT_CONFIG, PEDAL_MAPPING, type PlaybackConfig } from "./types";
 
-type ConfigKey = Exclude<keyof PlaybackConfig, "midi_file" | "pedal_threshold_on" | "pedal_threshold_off">;
+type ConfigKey = Exclude<keyof PlaybackConfig, "midi_file" | "pedal_curve_on" | "pedal_curve_off">;
 
 export const PERSISTED_NAMES: Record<ConfigKey, string> = {
   tempo: "tempo",

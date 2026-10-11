@@ -1,5 +1,6 @@
 import type { BackendNote, MeasureBoundary, TempoEvent } from "../lib/tauri";
 import type { PedalConfidence } from "../lib/pedalPreview";
+import type { ThresholdCurves } from "../lib/thresholdCurve";
 
 const LEFT_PATTERN = [48, 52, 55, 48, 53, 57, 48, 55, 59];
 const RIGHT_PATTERN = [72, 74, 76, 77, 76, 74, 72, 71, 69, 71, 72, 74];
@@ -18,6 +19,9 @@ const CONFIDENCE_PRESSED = 0.8;
 const CONFIDENCE_RELEASED = 0.2;
 const CONFIDENCE_RIPPLE = 0.12;
 const CONFIDENCE_RIPPLE_RATE = 0.9;
+const PREVIEW_NODE_SPACING_SECONDS = 10;
+const PREVIEW_ON_VALUES = [0.55, 0.6, 0.5];
+const PREVIEW_OFF_VALUES = [0.4, 0.45, 0.35];
 const TEMPO_US_PER_BEAT = 500_000;
 const VELOCITY = 64;
 const NO_TRACK = -1;
@@ -86,3 +90,10 @@ function buildPreviewConfidence(song: PreviewSong): PedalConfidence {
 }
 
 export const PREVIEW_CONFIDENCE = buildPreviewConfidence(PREVIEW_SONG);
+
+function buildPreviewCurves(): ThresholdCurves {
+  const toNodes = (values: number[]) => values.map((value, index) => ({ time: index * PREVIEW_NODE_SPACING_SECONDS, value }));
+  return { on: toNodes(PREVIEW_ON_VALUES), off: toNodes(PREVIEW_OFF_VALUES) };
+}
+
+export const PREVIEW_CURVES = buildPreviewCurves();

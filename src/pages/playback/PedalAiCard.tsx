@@ -2,9 +2,9 @@ import { Card } from "../../components/Card";
 import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { Button } from "../../components/Button";
 import type { PedalConfidence } from "../../lib/pedalPreview";
+import type { ThresholdCurves } from "../../lib/thresholdCurve";
 import { ThresholdChart } from "./ThresholdChart";
 import { ThresholdLegend } from "./ThresholdLegend";
-import { ThresholdStepper } from "./ThresholdStepper";
 
 export interface PedalAiStats {
   avgDur: number;
@@ -16,12 +16,11 @@ export interface PedalAiStats {
 interface PedalAiCardProps {
   hasThresholds: boolean;
   generateEnabled: boolean;
-  thresholdOn: number;
-  thresholdOff: number;
+  curves: ThresholdCurves;
   stats: PedalAiStats | null;
   confidence?: PedalConfidence | null;
   onGenerate: () => void;
-  onThresholdChange: (on: number, off: number) => void;
+  onCurvesChange: (curves: ThresholdCurves) => void;
   onReset: () => void;
 }
 
@@ -48,12 +47,11 @@ function diagnose(stats: PedalAiStats): string | null {
 export function PedalAiCard({
   hasThresholds,
   generateEnabled,
-  thresholdOn,
-  thresholdOff,
+  curves,
   stats,
   confidence = null,
   onGenerate,
-  onThresholdChange,
+  onCurvesChange,
   onReset,
 }: PedalAiCardProps) {
   const warning = stats ? diagnose(stats) : null;
@@ -85,18 +83,6 @@ export function PedalAiCard({
       ) : (
         <div className="pedal-ai-card__post">
           <div className="pedal-ai-card__controls">
-            <div className="pedal-ai-card__thresholds">
-              <ThresholdStepper
-                label="On threshold"
-                value={thresholdOn}
-                onChange={(value) => onThresholdChange(value, thresholdOff)}
-              />
-              <ThresholdStepper
-                label="Off threshold"
-                value={thresholdOff}
-                onChange={(value) => onThresholdChange(thresholdOn, value)}
-              />
-            </div>
             <div className="pedal-ai-card__side">
               {stats && (
                 <div className="pedal-ai-card__stats">
@@ -114,7 +100,7 @@ export function PedalAiCard({
           </div>
           {confidence && (
             <>
-              <ThresholdChart confidence={confidence} thresholdOn={thresholdOn} thresholdOff={thresholdOff} />
+              <ThresholdChart confidence={confidence} curves={curves} onCurvesChange={onCurvesChange} />
               <ThresholdLegend />
             </>
           )}

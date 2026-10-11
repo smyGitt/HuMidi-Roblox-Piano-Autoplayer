@@ -365,8 +365,8 @@ function SystemPage() {
           onClick={() =>
             setConfig((c) => ({
               ...DEFAULT_CONFIG,
-              pedal_threshold_on: c.pedal_threshold_on,
-              pedal_threshold_off: c.pedal_threshold_off,
+              pedal_curve_on: c.pedal_curve_on,
+              pedal_curve_off: c.pedal_curve_off,
             }))
           }
         >

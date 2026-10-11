@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PlaybackConfig } from "../pages/playback/types";
+import type { ThresholdNode } from "./thresholdCurve";
 
 export interface BackendPlaybackConfig {
   midi_file: string;
@@ -10,8 +11,8 @@ export interface BackendPlaybackConfig {
   countdown: boolean;
   use_88_key_layout: boolean;
   pedal_style: string;
-  pedal_threshold_on: number;
-  pedal_threshold_off: number;
+  pedal_curve_on: ThresholdNode[];
+  pedal_curve_off: ThresholdNode[];
   debug_mode: boolean;
   simulate_hands: boolean;
   vary_velocity: boolean;
@@ -40,8 +41,8 @@ export function toBackendConfig(config: PlaybackConfig, midiFile: string): Backe
     countdown: config.countdown,
     use_88_key_layout: config.use_88_key_layout,
     pedal_style: config.pedal_style,
-    pedal_threshold_on: config.pedal_threshold_on,
-    pedal_threshold_off: config.pedal_threshold_off,
+    pedal_curve_on: config.pedal_curve_on,
+    pedal_curve_off: config.pedal_curve_off,
     debug_mode: config.debug_mode,
     simulate_hands: config.simulate_hands,
     vary_velocity: false,
@@ -115,6 +116,9 @@ export interface ResumedSession {
   measure_boundaries: MeasureBoundary[];
   track_count: number;
   pedal_count: number;
+  pedal_curve_on: ThresholdNode[];
+  pedal_curve_off: ThresholdNode[];
+  legacy_pedal_thresholds: boolean;
 }
 
 export interface TimelineData {
@@ -128,7 +132,8 @@ export interface TimelineData {
 
 export interface PedalData {
   pedal_intervals: [number, number][];
-  ai_thresholds: [number, number] | null;
+  curve_on: ThresholdNode[];
+  curve_off: ThresholdNode[];
   confidence: number[];
   confidence_fps: number;
 }
