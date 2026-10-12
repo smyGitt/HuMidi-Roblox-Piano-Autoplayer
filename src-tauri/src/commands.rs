@@ -22,7 +22,8 @@ use crate::core::section_analyzer::{assign_hands, SectionAnalyzer};
 use crate::core::session_cache;
 use crate::core::translator::VirtualPianoFormat;
 use crate::managers::hotkey_manager::{
-    rdev_key_to_raw, HotkeyEvent, PLAYBACK_HOTKEY_CONFIG_KEY, SAVE_HOTKEY_CONFIG_KEY,
+    dom_code_to_raw, rdev_key_to_raw, HotkeyEvent, RawKey, PLAYBACK_HOTKEY_CONFIG_KEY,
+    SAVE_HOTKEY_CONFIG_KEY,
 };
 use crate::managers::injected_echo::EchoTrackingDriver;
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
@@ -73,7 +74,10 @@ fn pedal_model_for(
 }
 
 #[tauri::command]
-pub fn run_pedal_smoketest(state: State<AppState>, app: tauri::AppHandle) -> Result<Vec<f32>, String> {
+pub fn run_pedal_smoketest<R: tauri::Runtime>(
+    state: State<AppState>,
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<f32>, String> {
     let model = load_pedal_model(&state, || pedal_resource_path(&app))?;
 
     let t_len = 50usize;
@@ -829,8 +833,8 @@ pub fn import_theme_file(
 }
 
 #[tauri::command]
-pub async fn check_for_updates_now(
-    app: tauri::AppHandle,
+pub async fn check_for_updates_now<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
 ) -> Result<crate::managers::update_manager::UpdateCheckOutcome, String> {
     let current_version = app.package_info().version.to_string();
     Ok(crate::managers::update_manager::check_for_updates(&current_version).await)
@@ -1501,47 +1505,105 @@ pub fn hotkey_config_patch(event: &HotkeyEvent) -> Option<Value> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeySource {
+    GlobalHook,
+    Page,
+}
+
+pub fn key_from_rdev_event(event_type: &rdev::EventType) -> Option<(RawKey, bool)> {
+    match event_type {
+        rdev::EventType::KeyPress(k) => rdev_key_to_raw(*k).map(|r| (r, true)),
+        rdev::EventType::KeyRelease(k) => rdev_key_to_raw(*k).map(|r| (r, false)),
+        _ => None,
+    }
+}
+
+pub fn deliver_key(
+    state: &AppState,
+    raw: RawKey,
+    is_press: bool,
+    source: KeySource,
+) -> Vec<HotkeyEvent> {
+    match source {
+        KeySource::GlobalHook => state.hook_seen.record(raw, is_press),
+        KeySource::Page => {
+            if state.hook_seen.is_duplicate(raw, is_press) {
+                return if state.hook_seen.take_suppressed_save(raw, is_press) {
+                    vec![HotkeyEvent::SaveRequested]
+                } else {
+                    Vec::new()
+                };
+            }
+        }
+    }
+    if state.injected_echoes.consume(raw, is_press) {
+        return Vec::new();
+    }
+    let Ok(mut mgr) = state.hotkey_manager.lock() else {
+        return Vec::new();
+    };
+    if !is_press {
+        mgr.on_release(raw);
+        return Vec::new();
+    }
+    let mut events = mgr.on_press(raw);
+    drop(mgr);
+    if source == KeySource::GlobalHook && events.contains(&HotkeyEvent::SaveRequested) {
+        events.retain(|event| *event != HotkeyEvent::SaveRequested);
+        state.hook_seen.mark_save_suppressed(raw, is_press);
+    }
+    for event in &events {
+        if let Some(patch) = hotkey_config_patch(event) {
+            let _ = patch_app_config(state, &patch);
+        }
+    }
+    events
+}
+
+pub fn emit_hotkey_events<R: tauri::Runtime>(app: &tauri::AppHandle<R>, events: &[HotkeyEvent]) {
+    for event in events {
+        let (channel, payload) = hotkey_event_to_channel_payload(event);
+        let _ = app.emit(channel, payload);
+    }
+}
+
+#[tauri::command]
+pub fn forward_key<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<AppState>,
+    code: String,
+    pressed: bool,
+) -> Result<(), String> {
+    let Some(raw) = dom_code_to_raw(&code) else {
+        return Ok(());
+    };
+    let events = deliver_key(&state, raw, pressed, KeySource::Page);
+    emit_hotkey_events(&app, &events);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_hotkeys(state: State<AppState>) -> Result<(String, String), String> {
     let mgr = state.hotkey_manager.lock().map_err(|e| e.to_string())?;
     Ok((mgr.format_hotkey_string(), mgr.format_save_hotkey_string()))
 }
 
+pub fn handle_hook_event<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    event_type: &rdev::EventType,
+) {
+    let Some((raw, is_press)) = key_from_rdev_event(event_type) else {
+        return;
+    };
+    let state = app.state::<AppState>();
+    let events = deliver_key(&state, raw, is_press, KeySource::GlobalHook);
+    emit_hotkey_events(app, &events);
+}
+
 pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
     std::thread::spawn(move || {
-        let callback = move |event: rdev::Event| {
-            let mapped = match event.event_type {
-                rdev::EventType::KeyPress(k) => rdev_key_to_raw(k).map(|r| (r, true)),
-                rdev::EventType::KeyRelease(k) => rdev_key_to_raw(k).map(|r| (r, false)),
-                _ => None,
-            };
-            let Some((raw, is_press)) = mapped else {
-                return;
-            };
-
-            let state = app.state::<AppState>();
-            if state.injected_echoes.consume(raw, is_press) {
-                return;
-            }
-            let Ok(mut mgr) = state.hotkey_manager.lock() else {
-                return;
-            };
-
-            if is_press {
-                let events = mgr.on_press(raw);
-                drop(mgr);
-                for ev in events {
-                    if let Some(patch) = hotkey_config_patch(&ev) {
-                        let _ = patch_app_config(&state, &patch);
-                    }
-                    let (channel, payload) = hotkey_event_to_channel_payload(&ev);
-                    let _ = app.emit(channel, payload);
-                }
-            } else {
-                mgr.on_release(raw);
-            }
-        };
-        let _ = rdev::listen(callback);
+        let _ = rdev::listen(move |event| handle_hook_event(&app, &event.event_type));
     });
 }
 
@@ -3669,6 +3731,327 @@ mod tests {
         }
     }
 
+    mod test_deliver_key {
+        use super::*;
+        use crate::core::keyboard_driver::Key;
+        use crate::managers::hotkey_manager::{dom_code_to_raw, RawKey};
+
+        fn raw(code: &str) -> RawKey {
+            dom_code_to_raw(code).unwrap()
+        }
+
+        fn press(state: &AppState, code: &str, source: KeySource) -> Vec<HotkeyEvent> {
+            deliver_key(state, raw(code), true, source)
+        }
+
+        fn release(state: &AppState, code: &str, source: KeySource) -> Vec<HotkeyEvent> {
+            deliver_key(state, raw(code), false, source)
+        }
+
+        fn state_in(dir: &tempfile::TempDir) -> AppState {
+            hermetic_state(dir.path())
+        }
+
+        fn held(state: &AppState) -> usize {
+            state.hotkey_manager.lock().unwrap().held_modifiers().len()
+        }
+
+        #[test]
+        fn test_a_global_hook_press_while_listening_binds_and_saves_the_hotkey() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            state.hotkey_manager.lock().unwrap().start_binding();
+            let events = press(&state, "KeyG", KeySource::GlobalHook);
+            assert_eq!(events, vec![HotkeyEvent::BoundUpdated("G".to_string())]);
+            assert_eq!(state.app_config.lock().unwrap()[PLAYBACK_HOTKEY_CONFIG_KEY], "G");
+        }
+
+        #[test]
+        fn test_a_page_press_while_listening_binds_and_saves_the_hotkey_when_the_hook_heard_nothing() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            state.hotkey_manager.lock().unwrap().start_binding();
+            let events = press(&state, "KeyG", KeySource::Page);
+            assert_eq!(events, vec![HotkeyEvent::BoundUpdated("G".to_string())]);
+            assert_eq!(state.app_config.lock().unwrap()[PLAYBACK_HOTKEY_CONFIG_KEY], "G");
+        }
+
+        #[test]
+        fn test_a_page_press_while_listening_for_save_saves_it_under_the_save_key() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            state.hotkey_manager.lock().unwrap().start_save_binding();
+            let events = press(&state, "KeyD", KeySource::Page);
+            assert_eq!(events, vec![HotkeyEvent::BoundSaveUpdated("D".to_string())]);
+            assert_eq!(state.app_config.lock().unwrap()[SAVE_HOTKEY_CONFIG_KEY], "D");
+        }
+
+        #[test]
+        fn test_a_trigger_is_not_saved_to_the_config() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+            assert_eq!(*state.app_config.lock().unwrap(), serde_json::json!({}));
+        }
+
+        #[test]
+        fn test_a_page_press_with_no_hook_press_before_it_triggers() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::Page), vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_a_page_press_right_after_the_hook_delivered_the_same_key_is_dropped() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+            assert!(press(&state, "F6", KeySource::Page).is_empty());
+        }
+
+        #[test]
+        fn test_a_duplicate_does_not_swallow_the_next_real_press() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+            assert!(press(&state, "F6", KeySource::Page).is_empty());
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+            assert!(press(&state, "F6", KeySource::Page).is_empty());
+        }
+
+        #[test]
+        fn test_page_only_presses_each_count_when_the_hook_is_deaf() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::Page), vec![HotkeyEvent::ToggleRequested]);
+            assert_eq!(press(&state, "F6", KeySource::Page), vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_a_different_key_from_the_page_is_not_mistaken_for_the_hooks_key() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "F7", KeySource::GlobalHook);
+            assert_eq!(press(&state, "F6", KeySource::Page), vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_a_modifier_pressed_and_released_through_both_sources_ends_up_released() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            press(&state, "ControlLeft", KeySource::Page);
+            assert_eq!(held(&state), 1);
+            release(&state, "ControlLeft", KeySource::GlobalHook);
+            release(&state, "ControlLeft", KeySource::Page);
+            assert_eq!(held(&state), 0);
+        }
+
+        #[test]
+        fn test_a_page_release_clears_a_modifier_the_page_pressed() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ShiftRight", KeySource::Page);
+            assert_eq!(held(&state), 1);
+            assert!(release(&state, "ShiftRight", KeySource::Page).is_empty());
+            assert_eq!(held(&state), 0);
+        }
+
+        #[test]
+        fn test_a_page_release_the_hook_already_delivered_is_dropped_and_harmless() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::Page);
+            release(&state, "ControlLeft", KeySource::GlobalHook);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            release(&state, "ControlLeft", KeySource::Page);
+            assert_eq!(held(&state), 0);
+        }
+
+        #[test]
+        fn test_a_combo_started_through_the_hook_finishes_through_the_page() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            assert_eq!(press(&state, "KeyS", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_a_save_combo_pressed_outside_the_window_does_not_request_a_save() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+        }
+
+        #[test]
+        fn test_a_save_combo_started_in_the_window_and_finished_outside_does_not_request_a_save() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::Page);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+        }
+
+        #[test]
+        fn test_the_playback_hotkey_pressed_outside_the_window_still_toggles() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_a_plain_key_save_hotkey_does_nothing_outside_the_window_and_saves_inside() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert!(state.hotkey_manager.lock().unwrap().set_save_hotkey_from_string("D"));
+            assert!(press(&state, "KeyD", KeySource::GlobalHook).is_empty());
+            assert_eq!(press(&state, "KeyD", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_a_save_the_hook_heard_is_requested_once_when_the_window_reports_the_same_key() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+            assert!(press(&state, "ControlLeft", KeySource::Page).is_empty());
+            assert_eq!(press(&state, "KeyS", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_the_window_confirming_a_save_does_not_confirm_the_next_one() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+            assert_eq!(press(&state, "KeyS", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+            release(&state, "KeyS", KeySource::GlobalHook);
+            release(&state, "KeyS", KeySource::Page);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+        }
+
+        #[test]
+        fn test_a_save_heard_only_by_the_hook_is_never_requested_later() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+            release(&state, "KeyS", KeySource::GlobalHook);
+            assert!(press(&state, "KeyF", KeySource::Page).is_empty());
+        }
+
+        #[test]
+        fn test_the_same_key_for_both_hotkeys_toggles_once_and_saves_only_inside_the_window() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert!(state.hotkey_manager.lock().unwrap().set_save_hotkey_from_string("F6"));
+            assert_eq!(press(&state, "F6", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+            assert_eq!(press(&state, "F6", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_binding_the_save_hotkey_still_works_from_outside_the_window() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            state.hotkey_manager.lock().unwrap().start_save_binding();
+            assert_eq!(
+                press(&state, "KeyD", KeySource::GlobalHook),
+                vec![HotkeyEvent::BoundSaveUpdated("D".to_string())]
+            );
+            assert!(press(&state, "KeyD", KeySource::Page).is_empty());
+        }
+
+        #[test]
+        fn test_a_playback_combo_started_through_the_page_finishes_through_the_hook() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            assert!(state.hotkey_manager.lock().unwrap().set_playback_hotkey_from_string("Ctrl+K"));
+            press(&state, "ControlLeft", KeySource::Page);
+            assert_eq!(press(&state, "KeyK", KeySource::GlobalHook), vec![HotkeyEvent::ToggleRequested]);
+        }
+
+        #[test]
+        fn test_the_apps_own_key_is_dropped_when_it_arrives_from_the_page() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::Page);
+            state.injected_echoes.expect(Key::Char('s'), true);
+            assert!(press(&state, "KeyS", KeySource::Page).is_empty());
+            assert_eq!(press(&state, "KeyS", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_the_apps_own_key_is_dropped_from_the_hook_and_from_its_page_copy() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            press(&state, "ControlLeft", KeySource::GlobalHook);
+            state.injected_echoes.expect(Key::Char('s'), true);
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+            assert!(press(&state, "KeyS", KeySource::Page).is_empty());
+            assert!(press(&state, "KeyS", KeySource::GlobalHook).is_empty());
+            assert_eq!(press(&state, "KeyS", KeySource::Page), vec![HotkeyEvent::SaveRequested]);
+        }
+
+        #[test]
+        fn test_the_apps_own_modifier_never_reaches_the_held_set_from_either_source() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            state.injected_echoes.expect(Key::Ctrl, true);
+            assert!(press(&state, "ControlLeft", KeySource::Page).is_empty());
+            assert_eq!(held(&state), 0);
+        }
+
+        #[test]
+        fn test_a_poisoned_hotkey_manager_yields_no_events() {
+            let dir = tempfile::tempdir().unwrap();
+            let state = state_in(&dir);
+            std::thread::scope(|scope| {
+                let poisoner = scope.spawn(|| {
+                    let _guard = state.hotkey_manager.lock().unwrap();
+                    panic!("poison the hotkey manager");
+                });
+                let _ = poisoner.join();
+            });
+            assert!(press(&state, "F6", KeySource::GlobalHook).is_empty());
+            assert!(release(&state, "F6", KeySource::Page).is_empty());
+        }
+    }
+
+    mod test_key_from_rdev_event {
+        use super::*;
+        use crate::managers::hotkey_manager::{Modifier, RawKey};
+
+        #[test]
+        fn test_a_mapped_key_press_is_a_press() {
+            assert_eq!(
+                key_from_rdev_event(&rdev::EventType::KeyPress(rdev::Key::KeyG)),
+                Some((RawKey::Char('g'), true))
+            );
+        }
+
+        #[test]
+        fn test_a_mapped_key_release_is_a_release() {
+            assert_eq!(
+                key_from_rdev_event(&rdev::EventType::KeyRelease(rdev::Key::ControlLeft)),
+                Some((RawKey::ModLeft(Modifier::Ctrl), false))
+            );
+        }
+
+        #[test]
+        fn test_an_unmapped_key_is_ignored_in_both_directions() {
+            assert_eq!(key_from_rdev_event(&rdev::EventType::KeyPress(rdev::Key::Unknown(0))), None);
+            assert_eq!(key_from_rdev_event(&rdev::EventType::KeyRelease(rdev::Key::Unknown(0))), None);
+        }
+
+        #[test]
+        fn test_mouse_events_are_ignored() {
+            assert_eq!(key_from_rdev_event(&rdev::EventType::ButtonPress(rdev::Button::Left)), None);
+            assert_eq!(key_from_rdev_event(&rdev::EventType::ButtonRelease(rdev::Button::Left)), None);
+            assert_eq!(key_from_rdev_event(&rdev::EventType::MouseMove { x: 0.0, y: 0.0 }), None);
+            assert_eq!(key_from_rdev_event(&rdev::EventType::Wheel { delta_x: 0, delta_y: 0 }), None);
+        }
+    }
+
     mod test_hotkey_event_to_channel_payload {
         use super::*;
 
@@ -4448,6 +4831,7 @@ mod tests {
             playback_handle: Mutex::new(None),
             hotkey_manager: Mutex::new(HotkeyManager::new()),
             injected_echoes: std::sync::Arc::new(crate::managers::injected_echo::InjectedEchoes::new()),
+            hook_seen: crate::managers::hook_seen::HookSeen::new(),
             config_manager: Mutex::new(ConfigManager {
                 save_dir: dir.join("saves"),
                 midi_dir: std::path::PathBuf::new(),

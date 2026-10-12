@@ -20,6 +20,7 @@ import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
 import { BlockedInputDialog } from "./dialogs/BlockedInputDialog";
 import { LegacyThresholdsDialog } from "./dialogs/LegacyThresholdsDialog";
 import { useCollapsedWindowSize } from "./lib/useCollapsedWindowSize";
+import { useKeyForwarding } from "./lib/useKeyForwarding";
 import { PAGE_IDS, type PageId } from "./pages/pageIds";
 import { usePersistedState } from "./state/usePersistedState";
 import { parseBoolean, parseOneOf } from "./state/persistedParsers";
@@ -43,6 +44,7 @@ function AppShell() {
   const windowRef = useRef<HTMLDivElement>(null);
   const { appendLog } = useLog();
   useCollapsedWindowSize(isCollapsed, windowRef, appendLog);
+  useKeyForwarding();
   const {
     opacity,
     showStatusText,

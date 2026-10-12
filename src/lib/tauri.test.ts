@@ -1,6 +1,34 @@
-import { describe, expect, it } from "vitest";
-import { toBackendConfig } from "./tauri";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { forwardKey, toBackendConfig } from "./tauri";
 import { DEFAULT_CONFIG, type PlaybackConfig } from "../pages/playback/types";
+
+const coreMocks = vi.hoisted(() => ({
+  invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
+}));
+
+vi.mock("@tauri-apps/api/core", () => coreMocks);
+
+beforeEach(() => {
+  coreMocks.invoke.mockReset().mockResolvedValue(undefined);
+});
+
+describe("forwardKey", () => {
+  it("sends the key code and direction to the forward_key command", async () => {
+    await forwardKey("KeyG", true);
+    expect(coreMocks.invoke).toHaveBeenCalledTimes(1);
+    expect(coreMocks.invoke).toHaveBeenCalledWith("forward_key", { code: "KeyG", pressed: true });
+  });
+
+  it("sends a release as pressed false", async () => {
+    await forwardKey("ControlLeft", false);
+    expect(coreMocks.invoke).toHaveBeenCalledWith("forward_key", { code: "ControlLeft", pressed: false });
+  });
+
+  it("passes a backend failure on to the caller", async () => {
+    coreMocks.invoke.mockRejectedValue(new Error("no backend"));
+    await expect(forwardKey("KeyG", true)).rejects.toThrow("no backend");
+  });
+});
 
 function config(patch: Partial<PlaybackConfig> = {}): PlaybackConfig {
   return { ...DEFAULT_CONFIG, ...patch };

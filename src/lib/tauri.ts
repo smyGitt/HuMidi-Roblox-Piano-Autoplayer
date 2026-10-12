@@ -358,6 +358,10 @@ export async function startSaveBinding(): Promise<void> {
   return invoke("start_save_binding");
 }
 
+export async function forwardKey(code: string, pressed: boolean): Promise<void> {
+  return invoke("forward_key", { code, pressed });
+}
+
 export async function getHotkeys(): Promise<[string, string]> {
   return invoke("get_hotkeys");
 }
