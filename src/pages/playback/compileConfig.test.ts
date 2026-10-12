@@ -7,7 +7,7 @@ describe("compile config keys", () => {
     const covered = new Set<string>([...NOTES_CONFIG_KEYS, ...PEDAL_CONFIG_KEYS]);
     const uncovered = Object.keys(DEFAULT_CONFIG).filter((key) => !covered.has(key));
     expect(uncovered.sort()).toEqual(
-      ["countdown", "debug_mode", "midi_file", "transpose"].sort(),
+      ["countdown", "debug_mode", "midi_file", "release_pedal_on_start", "transpose"].sort(),
     );
   });
 

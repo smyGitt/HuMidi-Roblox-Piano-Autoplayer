@@ -553,7 +553,9 @@ pub fn run_playback_loop(
         }
     }
 
-    engine.release_pedal(driver);
+    if engine.should_release_pedal_on_start() {
+        engine.release_pedal(driver);
+    }
     engine.start(now_fn());
     let mut finished_emitted = false;
 
@@ -2347,9 +2349,25 @@ mod tests {
         }
 
         #[test]
+        fn test_the_pedal_key_is_not_released_at_the_start_by_default() {
+            let mut config = PlaybackConfig::default();
+            config.countdown = false;
+            let mut engine = PlaybackEngine::new(config, Vec::new());
+            engine.load_compiled_events(vec![KeyEvent::new(0.0, 1, "pedal", "down")], 1.0);
+            let mut driver = LoggingDriver { log: Vec::new() };
+            let (tx, rx) = mpsc::channel();
+            tx.send(PlaybackCommand::Shutdown).unwrap();
+
+            run_playback_loop(engine, &mut driver, &rx, |_| {}, || 0.0, |_| {});
+
+            assert_eq!(driver.log.first(), Some(&(Key::Space, true)));
+        }
+
+        #[test]
         fn test_the_pedal_key_is_released_before_any_event_plays() {
             let mut config = PlaybackConfig::default();
             config.countdown = false;
+            config.release_pedal_on_start = true;
             let mut engine = PlaybackEngine::new(config, Vec::new());
             engine.load_compiled_events(vec![KeyEvent::new(0.0, 1, "pedal", "down")], 1.0);
             let mut driver = LoggingDriver { log: Vec::new() };

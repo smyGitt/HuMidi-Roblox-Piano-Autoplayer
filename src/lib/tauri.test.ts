@@ -50,6 +50,7 @@ describe("toBackendConfig", () => {
     const c = config({
       transpose: -12,
       countdown: false,
+      release_pedal_on_start: true,
       simulate_hands: true,
       use_midi_pedal: true,
       invert_tempo_sway: true,
@@ -57,6 +58,7 @@ describe("toBackendConfig", () => {
     const backend = toBackendConfig(c, "song.mid");
     expect(backend.transpose).toBe(-12);
     expect(backend.countdown).toBe(false);
+    expect(backend.release_pedal_on_start).toBe(true);
     expect(backend.simulate_hands).toBe(true);
     expect(backend.use_midi_pedal).toBe(true);
     expect(backend.invert_tempo_sway).toBe(true);

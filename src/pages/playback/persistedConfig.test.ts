@@ -54,8 +54,20 @@ describe("configFromSaved", () => {
   });
 
   it("round-trips a full config", () => {
-    const config = { ...DEFAULT_CONFIG, transpose: 3, countdown: false, vary_articulation: true, articulation: 80 };
+    const config = {
+      ...DEFAULT_CONFIG,
+      transpose: 3,
+      countdown: false,
+      release_pedal_on_start: true,
+      vary_articulation: true,
+      articulation: 80,
+    };
     expect(configFromSaved(configToPatch(config))).toEqual(config);
+  });
+
+  it("leaves releasing the spacebar at the start off when nothing is saved for it", () => {
+    expect(DEFAULT_CONFIG.release_pedal_on_start).toBe(false);
+    expect(configFromSaved({ tempo: SAVED_TEMPO })?.release_pedal_on_start).toBe(false);
   });
 
   it("ignores values of the wrong type, non-finite numbers, unknown pedal styles and unknown keys", () => {

@@ -5,6 +5,7 @@ export interface PlaybackConfig {
   tempo: number;
   transpose: number;
   countdown: boolean;
+  release_pedal_on_start: boolean;
   use_88_key_layout: boolean;
   pedal_style: string;
   pedal_curve_on: ThresholdNode[];
@@ -40,6 +41,7 @@ export const DEFAULT_CONFIG: PlaybackConfig = {
   tempo: 100,
   transpose: 0,
   countdown: true,
+  release_pedal_on_start: false,
   use_88_key_layout: false,
   pedal_style: "ai",
   pedal_curve_on: [],

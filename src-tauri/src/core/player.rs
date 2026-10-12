@@ -109,6 +109,10 @@ impl PlaybackEngine {
         self.config.countdown
     }
 
+    pub fn should_release_pedal_on_start(&self) -> bool {
+        self.config.release_pedal_on_start
+    }
+
     pub fn countdown_messages() -> Vec<String> {
         vec![
             "Get ready...".to_string(),

@@ -33,6 +33,13 @@ export function OptionsCard({ config, onChange, onReset }: OptionsCardProps) {
       </div>
       <div className="control-row">
         <ToggleSwitch
+          checked={config.release_pedal_on_start}
+          onChange={(v) => onChange({ release_pedal_on_start: v })}
+          label="Release Spacebar at Start"
+        />
+      </div>
+      <div className="control-row">
+        <ToggleSwitch
           checked={config.debug_mode}
           onChange={(v) => onChange({ debug_mode: v })}
           label="Debug Output"

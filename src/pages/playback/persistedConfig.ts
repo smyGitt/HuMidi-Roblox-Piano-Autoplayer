@@ -8,6 +8,7 @@ export const PERSISTED_NAMES: Record<ConfigKey, string> = {
   pedal_style: "pedal_style",
   use_88_key_layout: "use_88_key_layout",
   countdown: "countdown",
+  release_pedal_on_start: "release_pedal_on_start",
   debug_mode: "debug_mode",
   simulate_hands: "simulate_hands",
   enable_chord_roll: "enable_chord_roll",

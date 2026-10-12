@@ -9,6 +9,7 @@ export interface BackendPlaybackConfig {
   tempo: number;
   transpose: number;
   countdown: boolean;
+  release_pedal_on_start: boolean;
   use_88_key_layout: boolean;
   pedal_style: string;
   pedal_curve_on: ThresholdNode[];
@@ -39,6 +40,7 @@ export function toBackendConfig(config: PlaybackConfig, midiFile: string): Backe
     tempo: config.tempo / 100,
     transpose: config.transpose,
     countdown: config.countdown,
+    release_pedal_on_start: config.release_pedal_on_start,
     use_88_key_layout: config.use_88_key_layout,
     pedal_style: config.pedal_style,
     pedal_curve_on: config.pedal_curve_on,
