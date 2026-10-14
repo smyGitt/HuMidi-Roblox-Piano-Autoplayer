@@ -1,11 +1,11 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowSquareOutIcon, GithubLogoIcon } from "@phosphor-icons/react";
+import { GithubLogoIcon } from "@phosphor-icons/react";
 import { MessageModal } from "../components/MessageModal";
 
 export const SOURCEFORGE_URL = "https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/";
 
-const MODAL_WIDTH = 460;
-const MODAL_HEIGHT = 240;
+const MODAL_WIDTH = 420;
+const MODAL_HEIGHT = 224;
 
 interface UpdateAvailableModalProps {
   currentVersion: string;
@@ -29,17 +29,13 @@ export function UpdateAvailableModal({
       body={`A newer version is available (current: ${currentVersion}, latest: ${latestVersion}). Where would you like to get it?`}
       buttons={[
         {
-          label: "To GitHub Releases",
+          label: "GitHub",
           variant: "accent",
           leadingIcon: GithubLogoIcon,
-          trailingIcon: ArrowSquareOutIcon,
-          size: "lg",
           onClick: () => void openUrl(releasesUrl),
         },
         {
-          label: "To SourceForge",
-          trailingIcon: ArrowSquareOutIcon,
-          size: "lg",
+          label: "SourceForge",
           onClick: () => void openUrl(SOURCEFORGE_URL),
         },
         {
