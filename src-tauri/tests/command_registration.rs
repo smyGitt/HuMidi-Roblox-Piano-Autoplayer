@@ -7,7 +7,6 @@ use tauri::test::{get_ipc_response, mock_builder, mock_context, noop_assets, INV
 use tauri::webview::InvokeRequest;
 use tauri::{App, WebviewWindow, WebviewWindowBuilder};
 
-const FRONTEND_URL: &str = "http://tauri.localhost";
 const NO_SUCH_COMMAND: &str = "no_such_command";
 
 struct Harness {
@@ -44,7 +43,7 @@ impl Harness {
             cmd: cmd.to_string(),
             callback: CallbackFn(0),
             error: CallbackFn(1),
-            url: FRONTEND_URL.parse().unwrap(),
+            url: self.window.url().unwrap(),
             body: InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: INVOKE_KEY.to_string(),
