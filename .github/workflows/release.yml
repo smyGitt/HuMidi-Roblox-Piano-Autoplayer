@@ -105,8 +105,12 @@ jobs:
           print("Version order OK")
           EOF
 
+  tests:
+    name: Tests
+    uses: ./.github/workflows/ci.yml
+
   create-release:
-    needs: check-version
+    needs: [check-version, tests]
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.create.outputs.id }}
