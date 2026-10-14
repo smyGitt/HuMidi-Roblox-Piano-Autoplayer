@@ -2,6 +2,7 @@ pub mod auto_curve;
 pub mod curve;
 pub mod legacy;
 pub mod model;
+pub mod peak;
 
 use crate::core::config::PlaybackConfig;
 use crate::core::midi::get_time_groups;
@@ -16,6 +17,8 @@ const PEDAL_LAG: f64 = 0.05;
 const SILENCE_TAIL_SECONDS: f64 = 0.35;
 const MIN_EVENTS_EXCLUSIVE: usize = 2;
 const UNSAFE_INTERVALS: [i32; 2] = [1, 6];
+const PITCHES: usize = 128;
+const PITCH_CLASSES: usize = 12;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiThresholds {
@@ -224,28 +227,25 @@ fn harmonic_strategy(sections: &[MusicalSection]) -> Vec<KeyEvent> {
 }
 
 fn build_input_features(notes: &[Note], fps: f64, total_steps: usize) -> Vec<f32> {
-    let mut pitch_roll = vec![0.0f32; total_steps * 128];
+    let mut pitch_roll = vec![false; total_steps * PITCHES];
     for note in notes {
-        if !(0..128).contains(&note.pitch) {
+        if !(0..PITCHES as i32).contains(&note.pitch) {
             continue;
         }
         let s_idx = (note.start_time * fps) as usize;
         let e_idx = ((note.end_time() * fps) as usize).min(total_steps);
         for t in s_idx..e_idx {
-            pitch_roll[t * 128 + note.pitch as usize] = 1.0;
+            pitch_roll[t * PITCHES + note.pitch as usize] = true;
         }
     }
     let mut features = vec![0.0f32; total_steps * FEATURES];
     for t in 0..total_steps {
-        features[t * FEATURES..t * FEATURES + 128].copy_from_slice(&pitch_roll[t * 128..t * 128 + 128]);
-        for c in 0..12usize {
-            let mut sum = 0.0f32;
-            let mut p = c;
-            while p < 128 {
-                sum += pitch_roll[t * 128 + p];
-                p += 12;
+        for p in 0..PITCHES {
+            let starts_here = pitch_roll[t * PITCHES + p] && (t == 0 || !pitch_roll[(t - 1) * PITCHES + p]);
+            if starts_here {
+                features[t * FEATURES + p] = 1.0;
+                features[t * FEATURES + PITCHES + p % PITCH_CLASSES] += 1.0;
             }
-            features[t * FEATURES + 128 + c] = sum;
         }
     }
     features
@@ -289,6 +289,32 @@ fn percentile(sorted_data: &[f32], pct: f64) -> f32 {
     }
 }
 
+fn curve_events(preds: &[f32], curves: &ThresholdCurves, fps: f64, max_time: f64) -> Vec<KeyEvent> {
+    let mut events = Vec::new();
+    let mut pedal_is_down = false;
+    for (i, &curr_val) in preds.iter().enumerate().skip(1) {
+        if curr_val == 0.0 {
+            continue;
+        }
+        let curr_time = i as f64 / fps;
+        let Some((threshold_on, threshold_off)) = curves.at(curr_time) else {
+            continue;
+        };
+        let value = f64::from(curr_val);
+        if !pedal_is_down && value > threshold_on {
+            pedal_is_down = true;
+            events.push(KeyEvent::new(curr_time, 1, "pedal", "down"));
+        } else if pedal_is_down && value <= threshold_off {
+            pedal_is_down = false;
+            events.push(KeyEvent::new(curr_time, 0, "pedal", "up"));
+        }
+    }
+    if pedal_is_down {
+        events.push(KeyEvent::new(max_time, 0, "pedal", "up"));
+    }
+    events
+}
+
 fn process_ai_predictions(
     mut preds: Vec<f32>,
     notes: &[Note],
@@ -324,33 +350,13 @@ fn process_ai_predictions(
     let Some(auto) = auto_curves(&preds, fps) else {
         return (Vec::new(), None);
     };
-    let curves = match custom {
-        Some(c) => c.clone(),
-        None => auto,
+    let (curves, events) = match custom {
+        Some(c) => (c.clone(), curve_events(&preds, c, fps, max_time)),
+        None => {
+            let events = peak::peak_events(&preds, fps, max_time);
+            (auto, events)
+        }
     };
-
-    let mut events = Vec::new();
-    let mut pedal_is_down = false;
-    for (i, &curr_val) in preds.iter().enumerate().skip(1) {
-        if curr_val == 0.0 {
-            continue;
-        }
-        let curr_time = i as f64 / fps;
-        let Some((threshold_on, threshold_off)) = curves.at(curr_time) else {
-            continue;
-        };
-        let value = f64::from(curr_val);
-        if !pedal_is_down && value > threshold_on {
-            pedal_is_down = true;
-            events.push(KeyEvent::new(curr_time, 1, "pedal", "down"));
-        } else if pedal_is_down && value <= threshold_off {
-            pedal_is_down = false;
-            events.push(KeyEvent::new(curr_time, 0, "pedal", "up"));
-        }
-    }
-    if pedal_is_down {
-        events.push(KeyEvent::new(max_time, 0, "pedal", "up"));
-    }
 
     if events.len() <= MIN_EVENTS_EXCLUSIVE {
         return (Vec::new(), None);
@@ -995,7 +1001,9 @@ mod tests {
                 *p = 0.5 + 0.45 * phase.sin();
             }
             let notes = vec![note(0, 40, 0.0, 1.6, "left")];
-            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, None);
+            let (_, automatic) = process_ai_predictions(preds.clone(), &notes, 1.6, FPS, None);
+            let curves = automatic.unwrap().curves;
+            let (events, meta) = process_ai_predictions(preds, &notes, 1.6, FPS, Some(&curves));
             let meta = meta.unwrap();
             let mut replayed = Vec::new();
             let mut down = false;
@@ -1077,6 +1085,68 @@ mod tests {
 
     mod test_build_input_features {
         use super::*;
+
+        const MIDDLE_C: i32 = 60;
+        const TEST_STEPS: usize = 160;
+        const HALF_SECOND: f64 = 0.5;
+        const ONE_SECOND: f64 = 1.0;
+
+        fn frame_at(seconds: f64) -> usize {
+            (seconds * FPS) as usize
+        }
+
+        fn pitch_flag(features: &[f32], frame: usize, pitch: i32) -> f32 {
+            features[frame * FEATURES + pitch as usize]
+        }
+
+        fn chroma_value(features: &[f32], frame: usize, pitch: i32) -> f32 {
+            features[frame * FEATURES + PITCHES + pitch as usize % PITCH_CLASSES]
+        }
+
+        #[test]
+        fn test_a_held_note_sets_only_its_start_frame() {
+            let notes = vec![note(0, MIDDLE_C, HALF_SECOND, ONE_SECOND, "left")];
+            let features = build_input_features(&notes, FPS, TEST_STEPS);
+            let start = frame_at(HALF_SECOND);
+            assert_eq!(pitch_flag(&features, start - 1, MIDDLE_C), 0.0);
+            assert_eq!(pitch_flag(&features, start, MIDDLE_C), 1.0);
+            for t in start + 1..TEST_STEPS {
+                assert_eq!(pitch_flag(&features, t, MIDDLE_C), 0.0, "frame {t}");
+            }
+        }
+
+        #[test]
+        fn test_chroma_counts_only_the_start_frame() {
+            let notes = vec![note(0, MIDDLE_C, 0.0, ONE_SECOND, "left")];
+            let features = build_input_features(&notes, FPS, TEST_STEPS);
+            assert_eq!(chroma_value(&features, 0, MIDDLE_C), 1.0);
+            for t in 1..frame_at(ONE_SECOND) {
+                assert_eq!(chroma_value(&features, t, MIDDLE_C), 0.0, "frame {t}");
+            }
+        }
+
+        #[test]
+        fn test_back_to_back_same_pitch_notes_give_one_start() {
+            let notes = vec![
+                note(0, MIDDLE_C, 0.0, HALF_SECOND, "left"),
+                note(1, MIDDLE_C, HALF_SECOND, HALF_SECOND, "left"),
+            ];
+            let features = build_input_features(&notes, FPS, TEST_STEPS);
+            assert_eq!(pitch_flag(&features, 0, MIDDLE_C), 1.0);
+            assert_eq!(pitch_flag(&features, frame_at(HALF_SECOND), MIDDLE_C), 0.0);
+        }
+
+        #[test]
+        fn test_same_pitch_repeated_after_a_gap_gives_two_starts() {
+            let notes = vec![
+                note(0, MIDDLE_C, 0.0, HALF_SECOND, "left"),
+                note(1, MIDDLE_C, ONE_SECOND, HALF_SECOND, "left"),
+            ];
+            let features = build_input_features(&notes, FPS, TEST_STEPS);
+            assert_eq!(pitch_flag(&features, 0, MIDDLE_C), 1.0);
+            assert_eq!(pitch_flag(&features, frame_at(HALF_SECOND), MIDDLE_C), 0.0);
+            assert_eq!(pitch_flag(&features, frame_at(ONE_SECOND), MIDDLE_C), 1.0);
+        }
 
         #[test]
         fn test_feature_width_matches_features_constant() {
