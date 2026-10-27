@@ -16,11 +16,15 @@ import {
   clearLoadedSong as invokeClearLoadedSong,
   savePlayback as invokeSavePlayback,
   resumeFromSave as invokeResumeFromSave,
+  loadSaveForEdit as invokeLoadSaveForEdit,
+  fromBackendConfig,
   getSaveDir,
   getMidiDir,
   blockedInputMessage,
   type TrackSummary,
   type SelectedTrackInfo,
+  type ParsedMidiStructure,
+  type SaveEditPlan,
   type PedalData,
   type BackendNote,
   type TempoEvent,
@@ -81,6 +85,11 @@ interface PlaybackEngineValue {
   saveCount: number;
   save: (name?: string) => Promise<SaveResult>;
   resumeSave: (filepath: string, label: string) => Promise<void>;
+  loadSaveForEditing: (filepath: string, label: string) => Promise<void>;
+  loadError: string | null;
+  dismissLoadError: () => void;
+  playbackError: string | null;
+  dismissPlaybackError: () => void;
   playTranslatedSheet: (sheetText: string, bpm: number) => Promise<void>;
   clearSong: () => Promise<void>;
   blockedInput: string | null;
@@ -97,6 +106,15 @@ const NO_AI_CURVES = {
 };
 
 const PlaybackEngineContext = createContext<PlaybackEngineValue | null>(null);
+
+function fileNameFromPath(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+function toTrackPart(name: string, noteCount: number, role: string): TrackPart {
+  const roleLabel = role === "Auto-Detect" ? "Auto" : role === "Left Hand" ? "Left" : "Right";
+  return { name, meta: `♩ ${noteCount} · ${roleLabel}` };
+}
 
 function formatSnapshotDuration(totalDur: number): string {
   const minutes = Math.floor(totalDur / 60);
@@ -138,6 +156,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
   const [isSaving, setIsSaving] = useState(false);
   const [blockedInput, setBlockedInput] = useState<string | null>(null);
   const [legacyThresholdNotice, setLegacyThresholdNotice] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [saveCount, setSaveCount] = useState(0);
   const [pedalIntervals, setPedalIntervals] = useState<[number, number][]>([]);
   const [aiCurves, setAiCurves] = useState<ThresholdCurves | null>(null);
@@ -156,6 +176,8 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
 
   const configRef = useRef(config);
   configRef.current = config;
+  const midiFilePathRef = useRef(midiFilePath);
+  midiFilePathRef.current = midiFilePath;
   const updateConfigRef = useRef(updateConfig);
   updateConfigRef.current = updateConfig;
   const isPlayingRef = useRef(isPlaying);
@@ -239,10 +261,10 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     };
   }, [appendLog, clock, liveKeys]);
 
-  const loadFile = useCallback(async (path: string, name: string) => {
-    if (isPlayingRef.current) await stopRef.current();
+  const beginSong = useCallback((path: string, name: string): number => {
     const version = ++songVersionRef.current;
     setMidiFilePath(path);
+    midiFilePathRef.current = path;
     setFileName(name);
     setHasCompiledNotes(false);
     setHasCompiledPedal(false);
@@ -264,6 +286,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     appendLog(`Loading ${name}`);
     clearSnapshot();
     updateSnapshot({ file: name, source: "MIDI file" });
+    return version;
+  }, [appendLog]);
+
+  const loadFile = useCallback(async (path: string, name: string) => {
+    if (isPlayingRef.current) await stopRef.current();
+    const version = beginSong(path, name);
     if (!isTauri()) {
       setTracks([
         { index: 0, name: "Piano Right", note_count: 214, instrument_name: "Acoustic Grand Piano", is_drum: false },
@@ -285,7 +313,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       if (version !== songVersionRef.current) return;
       appendLog(`Failed to parse MIDI: ${String(e)}`);
     }
-  }, [appendLog]);
+  }, [appendLog, beginSong]);
 
   async function openFileBrowser() {
     if (!isTauri()) {
@@ -299,7 +327,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       defaultPath: midiDir || undefined,
     });
     if (typeof selected === "string") {
-      await loadFile(selected, selected.split(/[\\/]/).pop() ?? selected);
+      await loadFile(selected, fileNameFromPath(selected));
     }
   }
 
@@ -309,16 +337,15 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setParts(
       selection.map(({ index, role }) => {
         const t = tracks.find((tr) => tr.index === index)!;
-        const roleLabel = role === "Auto-Detect" ? "Auto" : role === "Left Hand" ? "Left" : "Right";
-        return { name: t.name, meta: `♩ ${t.note_count} · ${roleLabel}` };
+        return toTrackPart(t.name, t.note_count, role);
       }),
     );
     await compileNotesNow(info);
   }
 
-  async function compileNotesNow(info: SelectedTrackInfo[]): Promise<boolean> {
+  async function compileNotesNow(info: SelectedTrackInfo[], configOverride?: PlaybackConfig): Promise<boolean> {
     const version = songVersionRef.current;
-    const configUsed = configRef.current;
+    const configUsed = configOverride ?? configRef.current;
     if (!isTauri()) {
       setTotalDuration(PREVIEW_SONG.totalDuration);
       setFinalNotes(PREVIEW_SONG.notes);
@@ -336,7 +363,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       return true;
     }
     try {
-      const timeline = await invokeCompileNotes(configUsed, midiFilePath, info);
+      const timeline = await invokeCompileNotes(configUsed, midiFilePathRef.current, info);
       if (version !== songVersionRef.current) return false;
       setTotalDuration(timeline.total_dur);
       setFinalNotes(timeline.final_notes);
@@ -416,7 +443,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     setIsGeneratingPedal(true);
     try {
       const configUsed = configOverride ?? configRef.current;
-      const data = await invokeCompilePedal(configUsed, midiFilePath);
+      const data = await invokeCompilePedal(configUsed, midiFilePathRef.current);
       const curves: ThresholdCurves = { on: data.curve_on, off: data.curve_off };
       const hasAiCurves = hasCurves(curves);
       const curveConfig = hasAiCurves
@@ -444,6 +471,13 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function reportPlaybackStartFailure(e: unknown) {
+    appendLog(`Failed to start playback: ${String(e)}`);
+    const blocked = blockedInputMessage(e);
+    if (blocked !== null) setBlockedInput(blocked);
+    else setPlaybackError(String(e));
+  }
+
   async function play() {
     if (isGeneratingPedalRef.current) return;
     setIsPaused(false);
@@ -451,13 +485,12 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setIsPlaying((p) => !p);
       return;
     }
+    setPlaybackError(null);
     try {
       if (!hasCompiledPedal) await generatePedal();
-      await invokeStartPlayback(configRef.current, midiFilePath);
+      await invokeStartPlayback(configRef.current, midiFilePath, clock.time());
     } catch (e) {
-      appendLog(`Failed to start playback: ${String(e)}`);
-      const blocked = blockedInputMessage(e);
-      if (blocked !== null) setBlockedInput(blocked);
+      reportPlaybackStartFailure(e);
     }
   }
 
@@ -493,7 +526,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       return;
     }
     atEndRef.current = false;
-    if (isPlayingRef.current) clock.jump(time);
+    clock.jump(time);
     await invokeSeekPlayback(time);
   }
 
@@ -580,6 +613,45 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function loadSaveForEditing(filepath: string, label: string) {
+    if (!isTauri()) {
+      appendLog("Load and Edit unavailable outside the desktop app");
+      return;
+    }
+    setLoadError(null);
+    if (isPlayingRef.current) await stop();
+    let plan: SaveEditPlan;
+    try {
+      plan = await invokeLoadSaveForEdit(filepath);
+    } catch (e) {
+      appendLog(`Failed to open ${label} for editing: ${String(e)}`);
+      setLoadError(String(e));
+      return;
+    }
+    const settings = fromBackendConfig(plan.settings);
+    const info: SelectedTrackInfo[] = plan.tracks.map((t) => [t.index, t.role]);
+    const version = beginSong(plan.midi_file, fileNameFromPath(plan.midi_file));
+    let parsed: ParsedMidiStructure;
+    try {
+      parsed = await parseMidiStructure(plan.midi_file);
+    } catch (e) {
+      if (version !== songVersionRef.current) return;
+      appendLog(`Failed to parse MIDI: ${String(e)}`);
+      setLoadError(`The MIDI file could not be read: ${String(e)}`);
+      return;
+    }
+    if (version !== songVersionRef.current) return;
+    setTracks(parsed.tracks);
+    setOriginalBpm(parsed.initial_bpm);
+    setSelectedTracksInfo(info);
+    setParts(plan.tracks.map((t) => toTrackPart(t.name, t.note_count, t.role)));
+    setLegacyThresholdNotice(plan.legacy_pedal_thresholds);
+    updateSnapshot({ tempo: `${Math.round(parsed.initial_bpm)} BPM` });
+    updateConfig(settings);
+    appendLog(`Opened ${label} for editing`);
+    if (await compileNotesNow(info, settings)) await compilePedalNow(settings);
+  }
+
   async function playTranslatedSheet(sheetText: string, bpm: number) {
     if (!isTauri()) {
       appendLog("Sheet playback unavailable outside the desktop app");
@@ -609,7 +681,13 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       appendLog(`Sheet compiled successful: ${timeline.final_notes.length} note(s)`);
       await compilePedalNow({ ...configRef.current, ...NO_AI_CURVES });
       setIsPaused(false);
-      await invokeStartPlayback(configRef.current, "");
+      clock.jump(0);
+      setPlaybackError(null);
+      try {
+        await invokeStartPlayback(configRef.current, "", 0);
+      } catch (e) {
+        reportPlaybackStartFailure(e);
+      }
     } catch (e) {
       appendLog(`Failed to play translated sheet: ${String(e)}`);
     }
@@ -699,6 +777,11 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
     seek,
     save,
     resumeSave,
+    loadSaveForEditing,
+    loadError,
+    dismissLoadError: () => setLoadError(null),
+    playbackError,
+    dismissPlaybackError: () => setPlaybackError(null),
     playTranslatedSheet,
     clearSong,
     blockedInput,

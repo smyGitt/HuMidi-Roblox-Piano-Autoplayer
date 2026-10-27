@@ -23,6 +23,7 @@ export class PlaybackClock {
   private anchorMs = 0;
   private running = false;
   private live = false;
+  private jumpTarget: number | null = null;
   private durationSeconds = 0;
   private frameHandle: number | null = null;
   private readonly listeners = new Set<() => void>();
@@ -50,14 +51,19 @@ export class PlaybackClock {
   }
 
   report(time: number): void {
+    if (this.jumpTarget !== null) {
+      if (time < this.jumpTarget || time > this.jumpTarget + MAX_EXTRAPOLATION_SECONDS) return;
+      this.jumpTarget = null;
+    }
     const wasAdvancing = this.isAdvancing();
-    this.anchorTime = time;
+    this.anchorTime = wasAdvancing ? Math.max(time, Math.min(this.extrapolate(), time + MAX_EXTRAPOLATION_SECONDS)) : time;
     this.anchorMs = this.nowMs();
     this.live = true;
     if (!wasAdvancing) this.changed();
   }
 
   jump(time: number): void {
+    this.jumpTarget = time;
     this.anchorTime = time;
     this.anchorMs = this.nowMs();
     this.live = false;

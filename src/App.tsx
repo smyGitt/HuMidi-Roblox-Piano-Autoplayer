@@ -18,6 +18,8 @@ import { LicenseTab } from "./pages/license/LicenseTab";
 import { UpdateCheckPrompt } from "./dialogs/UpdateCheckPrompt";
 import { UpdateAvailableModal } from "./dialogs/UpdateAvailableModal";
 import { BlockedInputDialog } from "./dialogs/BlockedInputDialog";
+import { LoadFailedDialog } from "./dialogs/LoadFailedDialog";
+import { PlaybackFailedDialog } from "./dialogs/PlaybackFailedDialog";
 import { LegacyThresholdsDialog } from "./dialogs/LegacyThresholdsDialog";
 import { useCollapsedWindowSize } from "./lib/useCollapsedWindowSize";
 import { useKeyForwarding } from "./lib/useKeyForwarding";
@@ -85,7 +87,7 @@ function AppShell() {
   }, [playbackRunning, setActivePage]);
 
   useEffect(() => {
-    if (engine.tracks.length > 0) setTrackSelectionOpen(true);
+    if (engine.tracks.length > 0 && engine.parts.length === 0) setTrackSelectionOpen(true);
   }, [engine.tracks]);
 
   async function confirmTrackSelection(selection: { index: number; role: HandRole }[]) {
@@ -174,6 +176,10 @@ function AppShell() {
 
       {engine.blockedInput !== null && (
         <BlockedInputDialog message={engine.blockedInput} onDismiss={engine.dismissBlockedInput} />
+      )}
+      {engine.loadError !== null && <LoadFailedDialog message={engine.loadError} onDismiss={engine.dismissLoadError} />}
+      {engine.playbackError !== null && (
+        <PlaybackFailedDialog message={engine.playbackError} onDismiss={engine.dismissPlaybackError} />
       )}
       {engine.legacyThresholdNotice && <LegacyThresholdsDialog onDismiss={engine.dismissLegacyThresholdNotice} />}
       {showUpdatePrompt && <UpdateCheckPrompt onChoice={resolveUpdatePrompt} />}

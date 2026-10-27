@@ -66,6 +66,43 @@ export function toBackendConfig(config: PlaybackConfig, midiFile: string): Backe
   };
 }
 
+const PERCENT = 100;
+const PERCENT_DECIMALS = 6;
+
+function fractionToPercent(fraction: number): number {
+  return Number((fraction * PERCENT).toFixed(PERCENT_DECIMALS));
+}
+
+export function fromBackendConfig(backend: BackendPlaybackConfig): PlaybackConfig {
+  return {
+    midi_file: backend.midi_file,
+    tempo: fractionToPercent(backend.tempo),
+    transpose: backend.transpose,
+    countdown: backend.countdown,
+    release_pedal_on_start: backend.release_pedal_on_start,
+    use_88_key_layout: backend.use_88_key_layout,
+    pedal_style: backend.pedal_style,
+    pedal_curve_on: backend.pedal_curve_on,
+    pedal_curve_off: backend.pedal_curve_off,
+    debug_mode: backend.debug_mode,
+    simulate_hands: backend.simulate_hands,
+    enable_chord_roll: backend.enable_chord_roll,
+    vary_timing: backend.vary_timing,
+    timing_variance: backend.timing_variance,
+    vary_articulation: backend.vary_articulation,
+    articulation: fractionToPercent(backend.articulation),
+    enable_drift_correction: backend.enable_drift_correction,
+    drift_decay_factor: fractionToPercent(backend.drift_decay_factor),
+    enable_mistakes: backend.enable_mistakes,
+    mistake_chance: backend.mistake_chance,
+    enable_tempo_sway: backend.enable_tempo_sway,
+    tempo_sway_intensity: backend.tempo_sway_intensity,
+    invert_tempo_sway: backend.invert_tempo_sway,
+    use_midi_pedal: backend.use_midi_pedal,
+    pedal_before_humanize: backend.pedal_before_humanize,
+  };
+}
+
 export interface BackendNote {
   id: number;
   pitch: number;
@@ -189,8 +226,8 @@ export function blockedInputMessage(error: unknown): string | null {
   return start === -1 ? null : text.slice(start);
 }
 
-export async function startPlayback(config: PlaybackConfig, midiFile: string): Promise<void> {
-  return invoke("start_playback", { config: toBackendConfig(config, midiFile) });
+export async function startPlayback(config: PlaybackConfig, midiFile: string, startTime: number): Promise<void> {
+  return invoke("start_playback", { config: toBackendConfig(config, midiFile), startTime });
 }
 
 export async function togglePause(): Promise<void> {
@@ -315,6 +352,24 @@ export async function checkSaveName(name: string): Promise<string> {
 
 export async function loadSaveFile(filepath: string): Promise<unknown> {
   return invoke("load_save_file", { filepath });
+}
+
+export interface EditTrack {
+  index: number;
+  role: string;
+  name: string;
+  note_count: number;
+}
+
+export interface SaveEditPlan {
+  midi_file: string;
+  settings: BackendPlaybackConfig;
+  tracks: EditTrack[];
+  legacy_pedal_thresholds: boolean;
+}
+
+export async function loadSaveForEdit(filepath: string): Promise<SaveEditPlan> {
+  return invoke("load_save_for_edit", { filepath });
 }
 
 export async function listSaves(dir: string): Promise<SaveSummary[]> {

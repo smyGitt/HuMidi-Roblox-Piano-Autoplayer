@@ -169,6 +169,10 @@ export function PlaybackTab({ onEditTrackSelection }: PlaybackTabProps) {
             void engine.resumeSave(save.filepath, save.saveName);
             setLoadDialogOpen(false);
           }}
+          onLoadAndEdit={(save) => {
+            void engine.loadSaveForEditing(save.filepath, save.saveName);
+            setLoadDialogOpen(false);
+          }}
           onRename={(filepath, newName) => void handleRenameSave(filepath, newName)}
           onDelete={(filepath) => void handleDeleteSave(filepath)}
         />

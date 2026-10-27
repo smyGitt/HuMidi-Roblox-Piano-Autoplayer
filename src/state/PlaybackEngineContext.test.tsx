@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { PlaybackConfigProvider, usePlaybackConfig } from "./PlaybackConfigContext";
 import { LogProvider, useLog } from "./LogContext";
 import { PlaybackEngineProvider, usePlaybackEngine, type SaveResult } from "./PlaybackEngineContext";
-import { BLOCKED_INPUT_PREFIX } from "../lib/tauri";
+import { BLOCKED_INPUT_PREFIX, toBackendConfig, type SaveEditPlan } from "../lib/tauri";
 import { DEFAULT_CONFIG } from "../pages/playback/types";
 import { flatCurves } from "../lib/thresholdCurve";
 
@@ -29,6 +29,7 @@ const tauriMocks = vi.hoisted(() => ({
   seekPlayback: vi.fn(),
   savePlayback: vi.fn(),
   resumeFromSave: vi.fn(),
+  loadSaveForEdit: vi.fn(),
   getSaveDir: vi.fn(() => Promise.resolve(null)),
   clearLoadedSong: vi.fn(() => Promise.resolve()),
 }));
@@ -81,6 +82,7 @@ beforeEach(() => {
   tauriMocks.seekPlayback.mockReset();
   tauriMocks.savePlayback.mockReset();
   tauriMocks.resumeFromSave.mockReset();
+  tauriMocks.loadSaveForEdit.mockReset();
   tauriMocks.getSaveDir.mockReturnValue(Promise.resolve(null));
   dialogOpen.mockReset();
 });
@@ -396,6 +398,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     await act(async () => result.current.engine.play());
     expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
     expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.startPlayback.mock.calls[0][2]).toBe(0);
   });
 
   it("a blocked-input error while compiling notes stops the load, clears the song and sets the warning", async () => {
@@ -684,12 +687,48 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(tauriMocks.seekPlayback).toHaveBeenCalledWith(17.5);
   });
 
-  it("seek leaves the clock alone while nothing is playing, since the backend ignores it", async () => {
+  it("seek while stopped moves the clock to the chosen point", async () => {
     tauriMocks.seekPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
     await act(async () => result.current.engine.clock.setDuration(60));
     await act(async () => result.current.engine.seek(17.5));
-    expect(result.current.engine.clock.time()).toBe(0);
+    expect(result.current.engine.clock.time()).toBe(17.5);
+  });
+
+  it("seek while paused moves the clock right away", async () => {
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    tauriMocks.togglePause.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("playback_started")).toBe(true));
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => eventHandlers.get("playback_started")!(null));
+    await act(async () => result.current.engine.togglePause());
+    await act(async () => result.current.engine.seek(42));
+    expect(result.current.engine.clock.time()).toBe(42);
+  });
+
+  it("play starts from the point chosen while stopped", async () => {
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], curve_on: [], curve_off: [], confidence: [], confidence_fps: PEDAL_FPS });
+    tauriMocks.startPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => result.current.engine.seek(17.5));
+    await act(async () => result.current.engine.play());
+    expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.startPlayback.mock.calls[0][2]).toBe(17.5);
+  });
+
+  it("play after a stop starts from the beginning", async () => {
+    tauriMocks.stopPlayback.mockResolvedValue(undefined);
+    tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], curve_on: [], curve_off: [], confidence: [], confidence_fps: PEDAL_FPS });
+    tauriMocks.startPlayback.mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => result.current.engine.clock.report(30));
+    await act(async () => result.current.engine.stop());
+    await act(async () => result.current.engine.play());
+    expect(tauriMocks.startPlayback.mock.calls[0][2]).toBe(0);
   });
 
   it("seek moves the clock right away during playback instead of waiting for the backend's progress event", async () => {
@@ -995,7 +1034,10 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     });
     tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [], curve_on: [], curve_off: [], confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
+    await act(async () => result.current.engine.clock.setDuration(60));
+    await act(async () => result.current.engine.seek(17.5));
 
     await act(async () => result.current.engine.playTranslatedSheet("y y y", 140));
 
@@ -1010,6 +1052,8 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     expect(result.current.engine.hasCompiledNotes).toBe(true);
     expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
     expect(tauriMocks.startPlayback).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.startPlayback.mock.calls[0][2]).toBe(0);
+    expect(result.current.engine.clock.time()).toBe(0);
     expect(result.current.engine.tempoEvents).toEqual([[0, 428_571]]);
   });
 
@@ -1320,5 +1364,410 @@ describe("PlaybackEngineContext saved threshold curves (Tauri mode)", () => {
     await act(async () => result.current.engine.resumeSave("/saves/plain.json", "plain"));
     expect(result.current.playbackConfig.config.pedal_curve_on).toEqual([]);
     expect(result.current.engine.legacyThresholdNotice).toBe(false);
+  });
+});
+
+describe("PlaybackEngineContext Load and Edit (Tauri mode)", () => {
+  const SAVE_PATH = "/saves/song.json";
+  const EDIT_MIDI = "/music/song.mid";
+  const CURVE_ON = [{ time: 0, value: 0.6 }, { time: 5, value: 0.4 }];
+  const CURVE_OFF = [{ time: 0, value: 0.5 }, { time: 5, value: 0.3 }];
+  const SAVED_TEMPO = 80;
+  const SAVED_TRANSPOSE = 2;
+  const SAVED_ARTICULATION = 90;
+  const SAVED_DRIFT = 30;
+  const BPM = 132;
+
+  const parsed = {
+    tracks: [
+      { index: 0, name: "Click", note_count: 3, instrument_name: "Drums/Percussion", is_drum: true },
+      { index: 1, name: "Piano", note_count: 12, instrument_name: "Piano", is_drum: false },
+      { index: 2, name: "Bass", note_count: 7, instrument_name: "Piano", is_drum: false },
+    ],
+    initial_bpm: BPM,
+  };
+  const timeline = {
+    final_notes: [],
+    played_notes: [],
+    total_dur: 10,
+    tempo_events: [[0, 500_000]],
+    time_signatures: [],
+    measure_boundaries: [[0, 2]],
+  };
+  const pedal = { pedal_intervals: [[0, 1]], curve_on: CURVE_ON, curve_off: CURVE_OFF, confidence: [], confidence_fps: PEDAL_FPS };
+
+  function plan(patch: Partial<SaveEditPlan> = {}): SaveEditPlan {
+    const saved = {
+      ...DEFAULT_CONFIG,
+      tempo: SAVED_TEMPO,
+      transpose: SAVED_TRANSPOSE,
+      articulation: SAVED_ARTICULATION,
+      drift_decay_factor: SAVED_DRIFT,
+      pedal_style: "ai",
+      pedal_curve_on: CURVE_ON,
+      pedal_curve_off: CURVE_OFF,
+    };
+    return {
+      midi_file: EDIT_MIDI,
+      settings: toBackendConfig(saved, EDIT_MIDI),
+      tracks: [
+        { index: 1, role: "Right Hand", name: "Piano", note_count: 12 },
+        { index: 2, role: "Left Hand", name: "Bass", note_count: 7 },
+      ],
+      legacy_pedal_thresholds: false,
+      ...patch,
+    };
+  }
+
+  beforeEach(() => {
+    tauriMocks.isTauri.mockReturnValue(true);
+    tauriMocks.loadSaveForEdit.mockReset().mockResolvedValue(plan());
+    tauriMocks.parseMidiStructure.mockResolvedValue(parsed);
+    tauriMocks.compileNotes.mockResolvedValue(timeline);
+    tauriMocks.compilePedal.mockResolvedValue(pedal);
+    tauriMocks.savePlayback.mockResolvedValue("/saves/new.json");
+    tauriMocks.stopPlayback.mockResolvedValue(undefined);
+  });
+
+  async function loadAndEdit(result: ReturnType<typeof renderEngine>["result"]) {
+    await act(async () => result.current.engine.loadSaveForEditing(SAVE_PATH, "song"));
+  }
+
+  it("opens the MIDI file the save names and shows it as the loaded song", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(tauriMocks.loadSaveForEdit).toHaveBeenCalledWith(SAVE_PATH);
+    expect(tauriMocks.parseMidiStructure).toHaveBeenCalledWith(EDIT_MIDI);
+    expect(result.current.engine.fileName).toBe("song.mid");
+    expect(result.current.engine.midiFilePath).toBe(EDIT_MIDI);
+    expect(result.current.engine.tracks).toEqual(parsed.tracks);
+    expect(result.current.engine.originalBpm).toBe(BPM);
+  });
+
+  it("puts every saved setting into the Playback settings in the units the controls use", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    const config = result.current.playbackConfig.config;
+    expect(config.tempo).toBe(SAVED_TEMPO);
+    expect(config.transpose).toBe(SAVED_TRANSPOSE);
+    expect(config.articulation).toBe(SAVED_ARTICULATION);
+    expect(config.drift_decay_factor).toBe(SAVED_DRIFT);
+    expect(config.pedal_style).toBe("ai");
+  });
+
+  it("compiles the notes with the saved settings and the saved track selection", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(tauriMocks.compileNotes).toHaveBeenCalledTimes(1);
+    const [config, midiFile, selectedTracksInfo] = tauriMocks.compileNotes.mock.calls[0];
+    expect(config.tempo).toBe(SAVED_TEMPO);
+    expect(config.transpose).toBe(SAVED_TRANSPOSE);
+    expect(config.articulation).toBe(SAVED_ARTICULATION);
+    expect(midiFile).toBe(EDIT_MIDI);
+    expect(selectedTracksInfo).toEqual([
+      [1, "Right Hand"],
+      [2, "Left Hand"],
+    ]);
+  });
+
+  it("then compiles the pedal with the saved settings and the saved pedal curves", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(tauriMocks.compilePedal).toHaveBeenCalledTimes(1);
+    const [config, midiFile] = tauriMocks.compilePedal.mock.calls[0];
+    expect(config.pedal_style).toBe("ai");
+    expect(config.pedal_curve_on).toEqual(CURVE_ON);
+    expect(config.pedal_curve_off).toEqual(CURVE_OFF);
+    expect(midiFile).toBe(EDIT_MIDI);
+    expect(tauriMocks.compileNotes.mock.invocationCallOrder[0]).toBeLessThan(
+      tauriMocks.compilePedal.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("leaves the song compiled and editable, with the saved curves shown and nothing waiting to be applied", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    const engine = result.current.engine;
+    expect(engine.hasCompiledNotes).toBe(true);
+    expect(engine.hasCompiledPedal).toBe(true);
+    expect(engine.totalDuration).toBe(timeline.total_dur);
+    expect(engine.pedalIntervals).toEqual(pedal.pedal_intervals);
+    expect(result.current.playbackConfig.config.pedal_curve_on).toEqual(CURVE_ON);
+    expect(result.current.playbackConfig.config.pedal_curve_off).toEqual(CURVE_OFF);
+    expect(engine.configDirty).toBe(false);
+    expect(engine.legacyThresholdNotice).toBe(false);
+  });
+
+  it("lists the saved tracks as the loaded parts with their hands", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    const parts = result.current.engine.parts;
+    expect(parts.map((p) => p.name)).toEqual(["Piano", "Bass"]);
+    expect(parts[0].meta).toContain("12");
+    expect(parts[0].meta).toContain("Right");
+    expect(parts[1].meta).toContain("7");
+    expect(parts[1].meta).toContain("Left");
+  });
+
+  it("names an automatic hand as Auto", async () => {
+    tauriMocks.loadSaveForEdit.mockResolvedValue(
+      plan({ tracks: [{ index: 1, role: "Auto-Detect", name: "Piano", note_count: 12 }] }),
+    );
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(result.current.engine.parts[0].meta).toContain("Auto");
+  });
+
+  it("a later save of the edited song records the saved tracks and the MIDI path", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    await act(async () => {
+      await result.current.engine.save("edited");
+    });
+    const [config, midiFile, selectedTracksInfo, fileName, saveName] = tauriMocks.savePlayback.mock.calls[0];
+    expect(config.tempo).toBe(SAVED_TEMPO);
+    expect(midiFile).toBe(EDIT_MIDI);
+    expect(selectedTracksInfo).toEqual([
+      [1, "Right Hand"],
+      [2, "Left Hand"],
+    ]);
+    expect(fileName).toBe("song.mid");
+    expect(saveName).toBe("edited");
+  });
+
+  it("an older save with the single thresholds raises the older save notice", async () => {
+    tauriMocks.loadSaveForEdit.mockResolvedValue(plan({ legacy_pedal_thresholds: true }));
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(result.current.engine.legacyThresholdNotice).toBe(true);
+  });
+
+  it("reports why the save cannot be opened and compiles nothing", async () => {
+    const reason = "The MIDI file for this save was not found: /music/song.mid. Move it back, or use Load.";
+    tauriMocks.loadSaveForEdit.mockRejectedValue(reason);
+    const { result } = renderEngine();
+    expect(result.current.engine.loadError).toBeNull();
+    await loadAndEdit(result);
+    expect(result.current.engine.loadError).toBe(reason);
+    expect(tauriMocks.parseMidiStructure).not.toHaveBeenCalled();
+    expect(tauriMocks.compileNotes).not.toHaveBeenCalled();
+    expect(tauriMocks.compilePedal).not.toHaveBeenCalled();
+    expect(result.current.log.entries.some((e) => e.level === "WARN" && e.line.includes(reason))).toBe(true);
+  });
+
+  it("leaves the song that was loaded before untouched when the save cannot be opened", async () => {
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadFile("/real/other.mid", "other.mid"));
+    tauriMocks.loadSaveForEdit.mockRejectedValue("nope");
+    await loadAndEdit(result);
+    expect(result.current.engine.fileName).toBe("other.mid");
+  });
+
+  it("dismissing the load error clears it", async () => {
+    tauriMocks.loadSaveForEdit.mockRejectedValue("nope");
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    act(() => result.current.engine.dismissLoadError());
+    expect(result.current.engine.loadError).toBeNull();
+  });
+
+  it("a new attempt clears the error of the previous one", async () => {
+    tauriMocks.loadSaveForEdit.mockRejectedValueOnce("nope");
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(result.current.engine.loadError).toBe("nope");
+    await loadAndEdit(result);
+    expect(result.current.engine.loadError).toBeNull();
+  });
+
+  it("reports a MIDI file that cannot be parsed and compiles nothing", async () => {
+    tauriMocks.parseMidiStructure.mockRejectedValue("bad file");
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(result.current.engine.loadError).toContain("bad file");
+    expect(tauriMocks.compileNotes).not.toHaveBeenCalled();
+    expect(result.current.engine.tracks).toHaveLength(0);
+  });
+
+  it("does not generate the pedal when the notes fail to compile", async () => {
+    tauriMocks.compileNotes.mockRejectedValue(new Error("boom"));
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(tauriMocks.compilePedal).not.toHaveBeenCalled();
+    expect(result.current.engine.hasCompiledNotes).toBe(false);
+    expect(result.current.log.entries.some((e) => e.level === "WARN" && e.line.includes("Failed to compile notes"))).toBe(
+      true,
+    );
+  });
+
+  it("shows the blocked input notice when the notes contain input that is not a key press", async () => {
+    tauriMocks.compileNotes.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #1 is not a key`);
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(result.current.engine.blockedInput).toContain("event #1 is not a key");
+  });
+
+  it("stops a song that is playing before it loads the save", async () => {
+    const { result } = renderEngine();
+    await waitFor(() => expect(eventHandlers.has("playback_started")).toBe(true));
+    await act(async () => {
+      eventHandlers.get("playback_started")?.(null);
+    });
+    await loadAndEdit(result);
+    expect(tauriMocks.stopPlayback).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.stopPlayback.mock.invocationCallOrder[0]).toBeLessThan(
+      tauriMocks.loadSaveForEdit.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not stop anything when nothing is playing", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    expect(tauriMocks.stopPlayback).not.toHaveBeenCalled();
+  });
+
+  it("drops the load when the song is cleared while the MIDI is still being read", async () => {
+    const parse = deferred<typeof parsed>();
+    tauriMocks.parseMidiStructure.mockReturnValue(parse.promise);
+    const { result } = renderEngine();
+    let running!: Promise<void>;
+    act(() => {
+      running = result.current.engine.loadSaveForEditing(SAVE_PATH, "song");
+    });
+    await waitFor(() => expect(tauriMocks.parseMidiStructure).toHaveBeenCalled());
+    await act(async () => result.current.engine.clearSong());
+    await act(async () => {
+      parse.resolve(parsed);
+      await running;
+    });
+    expect(tauriMocks.compileNotes).not.toHaveBeenCalled();
+    expect(result.current.engine.fileName).toBe("");
+    expect(result.current.engine.tracks).toHaveLength(0);
+  });
+
+  it("ignores a MIDI read failure that arrives after the song was cleared", async () => {
+    const parse = deferred<typeof parsed>();
+    tauriMocks.parseMidiStructure.mockReturnValue(parse.promise);
+    const { result } = renderEngine();
+    let running!: Promise<void>;
+    act(() => {
+      running = result.current.engine.loadSaveForEditing(SAVE_PATH, "song");
+    });
+    await waitFor(() => expect(tauriMocks.parseMidiStructure).toHaveBeenCalled());
+    await act(async () => result.current.engine.clearSong());
+    await act(async () => {
+      parse.reject("bad file");
+      await running;
+    });
+    expect(result.current.engine.loadError).toBeNull();
+  });
+
+  it("opening another save replaces the first one completely", async () => {
+    const { result } = renderEngine();
+    await loadAndEdit(result);
+    tauriMocks.loadSaveForEdit.mockResolvedValue(
+      plan({
+        midi_file: "/music/other.mid",
+        settings: toBackendConfig({ ...DEFAULT_CONFIG, tempo: 50 }, "/music/other.mid"),
+        tracks: [{ index: 2, role: "Left Hand", name: "Bass", note_count: 7 }],
+      }),
+    );
+    await loadAndEdit(result);
+    expect(result.current.engine.fileName).toBe("other.mid");
+    expect(result.current.engine.parts.map((p) => p.name)).toEqual(["Bass"]);
+    expect(result.current.playbackConfig.config.tempo).toBe(50);
+    expect(tauriMocks.compileNotes.mock.calls[1][1]).toBe("/music/other.mid");
+  });
+});
+
+describe("PlaybackEngineContext Load and Edit (preview mode, isTauri() = false)", () => {
+  it("logs unavailability and does not call the backend", async () => {
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.loadSaveForEditing("/saves/x.json", "x"));
+    expect(result.current.log.entries.some((e) => e.line.toLowerCase().includes("unavailable"))).toBe(true);
+    expect(tauriMocks.loadSaveForEdit).not.toHaveBeenCalled();
+    expect(tauriMocks.parseMidiStructure).not.toHaveBeenCalled();
+  });
+});
+
+describe("PlaybackEngineContext playback start failures (Tauri mode)", () => {
+  const ACCESS_MESSAGE =
+    "HuMidi cannot send key presses because it has no access to /dev/uinput. Run these two commands in a terminal, then press Play again: sudo modprobe uinput && sudo chmod 0666 /dev/uinput. Details: no display";
+  const pedalResult = { pedal_intervals: [], curve_on: [], curve_off: [], confidence: [], confidence_fps: PEDAL_FPS };
+  const sheetTimeline = {
+    final_notes: [],
+    played_notes: [],
+    total_dur: 0.25,
+    tempo_events: [[0, 428_571]],
+    time_signatures: [],
+    measure_boundaries: [[0, 0.25]],
+  };
+
+  beforeEach(() => {
+    tauriMocks.isTauri.mockReturnValue(true);
+    tauriMocks.compilePedal.mockResolvedValue(pedalResult);
+    tauriMocks.compileNotesFromSheet.mockResolvedValue(sheetTimeline);
+    tauriMocks.seekPlayback.mockResolvedValue(undefined);
+  });
+
+  it("starts with no playback error", () => {
+    const { result } = renderEngine();
+    expect(result.current.engine.playbackError).toBeNull();
+  });
+
+  it("a failure to start playback is kept for the user, unchanged, as well as logged", async () => {
+    tauriMocks.startPlayback.mockRejectedValue(ACCESS_MESSAGE);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.playbackError).toBe(ACCESS_MESSAGE);
+    expect(result.current.log.entries.some((e) => e.level === "WARN" && e.line.includes("Failed to start playback"))).toBe(
+      true,
+    );
+  });
+
+  it("an error object is turned into its text", async () => {
+    tauriMocks.startPlayback.mockRejectedValue(new Error("boom"));
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.playbackError).toContain("boom");
+  });
+
+  it("blocked input keeps its own warning and raises no playback error", async () => {
+    tauriMocks.startPlayback.mockRejectedValue(`${BLOCKED_INPUT_PREFIX}event #2 sends the unknown pedal command 'enter'`);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.blockedInput).not.toBeNull();
+    expect(result.current.engine.playbackError).toBeNull();
+  });
+
+  it("dismissing the playback error clears it", async () => {
+    tauriMocks.startPlayback.mockRejectedValue(ACCESS_MESSAGE);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    act(() => result.current.engine.dismissPlaybackError());
+    expect(result.current.engine.playbackError).toBeNull();
+  });
+
+  it("pressing Play again clears the old error when playback starts", async () => {
+    tauriMocks.startPlayback.mockRejectedValueOnce(ACCESS_MESSAGE).mockResolvedValue(undefined);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.playbackError).toBe(ACCESS_MESSAGE);
+    await act(async () => result.current.engine.play());
+    expect(result.current.engine.playbackError).toBeNull();
+  });
+
+  it("a sheet whose playback cannot start shows the error", async () => {
+    tauriMocks.startPlayback.mockRejectedValue(ACCESS_MESSAGE);
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.playTranslatedSheet("y y y", 140));
+    expect(result.current.engine.playbackError).toBe(ACCESS_MESSAGE);
+  });
+
+  it("a sheet that cannot be compiled is not a playback error", async () => {
+    tauriMocks.compileNotesFromSheet.mockRejectedValue(new Error("Sheet produced zero playable notes."));
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.playTranslatedSheet("~~~", 120));
+    expect(result.current.engine.playbackError).toBeNull();
   });
 });

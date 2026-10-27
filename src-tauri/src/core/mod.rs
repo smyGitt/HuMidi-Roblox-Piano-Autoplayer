@@ -4,6 +4,7 @@ pub mod config;
 pub mod humanizer;
 pub mod input_scan;
 pub mod keyboard_driver;
+pub mod linux_keycodes;
 pub mod midi;
 pub mod models;
 pub mod pedal;
@@ -11,3 +12,8 @@ pub mod player;
 pub mod section_analyzer;
 pub mod session_cache;
 pub mod translator;
+#[cfg(target_os = "linux")]
+pub mod uinput_device;
+pub mod uinput_driver;
+pub mod webkit_env;
+pub mod window_nudge;

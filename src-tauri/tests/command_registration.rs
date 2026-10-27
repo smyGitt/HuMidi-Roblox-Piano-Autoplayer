@@ -8,6 +8,10 @@ use tauri::webview::InvokeRequest;
 use tauri::{App, WebviewWindow, WebviewWindowBuilder};
 
 const NO_SUCH_COMMAND: &str = "no_such_command";
+const TICKS_PER_BEAT: u16 = 480;
+const NOTE_PITCH: u8 = 60;
+const NOTE_VELOCITY: u8 = 64;
+const SAVED_TEMPO: f64 = 0.8;
 
 struct Harness {
     _app: App<tauri::test::MockRuntime>,
@@ -101,4 +105,118 @@ fn the_other_hotkey_commands_are_registered() {
         .invoke("forward_key", json!({ "code": "KeyD", "pressed": true }))
         .unwrap();
     assert_eq!(harness.invoke("get_hotkeys", json!({})).unwrap(), json!(["F6", "D"]));
+}
+
+#[test]
+fn start_playback_takes_a_start_time_and_still_requires_compiled_notes() {
+    let harness = Harness::new();
+    let error = harness
+        .invoke("start_playback", json!({ "config": {}, "startTime": 4.0 }))
+        .unwrap_err();
+    assert!(error.to_string().contains("must be compiled"), "{error}");
+}
+
+#[test]
+fn start_playback_refuses_a_request_without_a_start_time() {
+    let harness = Harness::new();
+    let error = harness.invoke("start_playback", json!({ "config": {} })).unwrap_err();
+    assert!(error.to_string().contains("startTime"), "{error}");
+}
+
+fn write_midi_with_one_note(path: &std::path::Path) {
+    use midly::num::{u15, u28, u4, u7};
+    use midly::{Format, Header, MidiMessage, Smf, Timing, TrackEvent, TrackEventKind};
+
+    let channel = u4::from(0);
+    let track = vec![
+        TrackEvent {
+            delta: u28::from(0),
+            kind: TrackEventKind::Midi {
+                channel,
+                message: MidiMessage::NoteOn {
+                    key: u7::from(NOTE_PITCH),
+                    vel: u7::from(NOTE_VELOCITY),
+                },
+            },
+        },
+        TrackEvent {
+            delta: u28::from(u32::from(TICKS_PER_BEAT)),
+            kind: TrackEventKind::Midi {
+                channel,
+                message: MidiMessage::NoteOff {
+                    key: u7::from(NOTE_PITCH),
+                    vel: u7::from(0),
+                },
+            },
+        },
+    ];
+    let smf = Smf {
+        header: Header::new(Format::Parallel, Timing::Metrical(u15::from(TICKS_PER_BEAT))),
+        tracks: vec![track],
+    };
+    let mut bytes = Vec::new();
+    smf.write(&mut bytes).unwrap();
+    std::fs::write(path, bytes).unwrap();
+}
+
+fn write_save_pointing_at(dir: &std::path::Path, midi: &std::path::Path) -> std::path::PathBuf {
+    let save = json!({
+        "metadata": {
+            "playback_settings": {
+                "midi_file": midi.to_string_lossy(),
+                "tempo": SAVED_TEMPO,
+                "pedal_style": "harmonic",
+            },
+            "track_details": [{ "index": 0, "name": "Track 0", "note_count": 1, "role": "Left Hand" }],
+            "compiled_pedal_count": 0,
+        },
+        "compiled_events": [
+            { "time": 0.0, "priority": 2, "action": "press", "key_char": "a", "pitch": NOTE_PITCH, "velocity": NOTE_VELOCITY },
+        ],
+    });
+    let path = dir.join("song.json");
+    std::fs::write(&path, save.to_string()).unwrap();
+    path
+}
+
+#[test]
+fn load_save_for_edit_returns_the_plan_the_frontend_reads() {
+    let harness = Harness::new();
+    let midi = harness._dir.path().join("song.mid");
+    write_midi_with_one_note(&midi);
+    let save = write_save_pointing_at(harness._dir.path(), &midi);
+
+    let plan = harness
+        .invoke("load_save_for_edit", json!({ "filepath": save.to_string_lossy() }))
+        .unwrap();
+
+    assert_eq!(plan["midi_file"], json!(midi.to_string_lossy()));
+    assert_eq!(plan["settings"]["tempo"], json!(SAVED_TEMPO));
+    assert_eq!(plan["settings"]["pedal_style"], json!("harmonic"));
+    assert_eq!(
+        plan["tracks"],
+        json!([{ "index": 0, "role": "Left Hand", "name": "Track 0", "note_count": 1 }])
+    );
+    assert_eq!(plan["legacy_pedal_thresholds"], json!(false));
+}
+
+#[test]
+fn load_save_for_edit_explains_a_save_whose_midi_file_has_moved() {
+    let harness = Harness::new();
+    let missing = harness._dir.path().join("gone.mid");
+    let save = write_save_pointing_at(harness._dir.path(), &missing);
+
+    let error = harness
+        .invoke("load_save_for_edit", json!({ "filepath": save.to_string_lossy() }))
+        .unwrap_err();
+
+    assert!(error.to_string().contains("gone.mid"), "{error}");
+    assert!(error.to_string().contains("was not found"), "{error}");
+}
+
+#[test]
+fn load_save_for_edit_refuses_a_request_without_its_filepath_without_calling_it_unknown() {
+    let harness = Harness::new();
+    let error = harness.invoke("load_save_for_edit", json!({})).unwrap_err();
+    assert!(error.to_string().contains("filepath"), "{error}");
 }

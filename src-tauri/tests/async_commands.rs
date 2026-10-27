@@ -57,6 +57,7 @@ fn hermetic_state(dir: &Path) -> AppState {
         }),
         app_config: Mutex::new(serde_json::json!({})),
         theme_manager: Mutex::new(ThemeManager::new()),
+        uinput_sink: Mutex::new(None),
     }
 }
 
@@ -337,7 +338,7 @@ fn start_playback_does_not_block_the_invoker_while_the_session_is_locked() {
 
     let result = finish_while_holding(
         holder,
-        Box::pin(start_playback(harness.handle(), PlaybackConfig::default())),
+        Box::pin(start_playback(harness.handle(), PlaybackConfig::default(), 0.0)),
     );
     assert_eq!(
         result.unwrap_err(),

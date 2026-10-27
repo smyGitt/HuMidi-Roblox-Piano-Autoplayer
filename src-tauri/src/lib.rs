@@ -40,6 +40,7 @@ pub fn invoke_handler<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> 
         commands::load_save_file,
         commands::list_saves,
         commands::resume_from_save,
+        commands::load_save_for_edit,
         commands::rename_save,
         commands::delete_save,
         commands::translate_sheet_to_notes,
@@ -53,11 +54,13 @@ pub fn invoke_handler<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    core::webkit_env::apply_process_defaults();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
+        .on_page_load(|webview, payload| core::window_nudge::nudge_after_load(webview, payload.event()))
         .setup(|app| {
             commands::spawn_hotkey_listener(app.handle().clone());
 

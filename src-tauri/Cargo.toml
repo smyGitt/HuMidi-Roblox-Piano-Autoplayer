@@ -1,7 +1,7 @@
 [package]
 name = "humidi-tauri"
 version = "2.1.2"
-description = "A Tauri App"
+description = "Piano MIDI autoplayer for Roblox"
 authors = ["you"]
 edition = "2021"
 
@@ -25,7 +25,7 @@ tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 candle-core = "0.11"
-enigo = { version = "0.6", features = ["libei_tokio"] }
+enigo = "0.6"
 midly = "0.5"
 dirs = "6"
 rand = "0.9"
@@ -45,4 +45,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.13.2"
 

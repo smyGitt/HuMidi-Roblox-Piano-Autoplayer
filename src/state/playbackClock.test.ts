@@ -87,6 +87,93 @@ describe("PlaybackClock (backend-driven, selfTimed = false)", () => {
     expect(h.clock.time()).toBe(50);
   });
 
+  it("does not step back when a report arrives later than the time already shown", () => {
+    const h = harness(false);
+    h.clock.setRunning(true);
+    h.clock.report(10);
+    h.advance(0.1);
+    h.clock.report(10.05);
+    expect(h.clock.time()).toBeCloseTo(10.1);
+    h.advance(0.02);
+    expect(h.clock.time()).toBeCloseTo(10.12);
+  });
+
+  it("moves forward to a report that is ahead of the time shown", () => {
+    const h = harness(false);
+    h.clock.setRunning(true);
+    h.clock.report(10);
+    h.advance(0.1);
+    h.clock.report(10.2);
+    expect(h.clock.time()).toBeCloseTo(10.2);
+  });
+
+  it("stays at most MAX_EXTRAPOLATION_SECONDS ahead of a report that is far behind", () => {
+    const h = harness(false);
+    h.clock.setRunning(true);
+    h.clock.report(10);
+    h.advance(MAX_EXTRAPOLATION_SECONDS);
+    h.clock.report(9);
+    expect(h.clock.time()).toBeCloseTo(9 + MAX_EXTRAPOLATION_SECONDS);
+  });
+
+  it("after a forward jump, ignores reports still on their way from before it", () => {
+    const h = harness(false);
+    h.clock.setRunning(true);
+    h.clock.report(10);
+    h.clock.jump(50);
+    h.clock.report(10.1);
+    h.advance(0.1);
+    expect(h.clock.time()).toBe(50);
+    h.clock.report(50.01);
+    h.advance(0.1);
+    expect(h.clock.time()).toBeCloseTo(50.11);
+  });
+
+  it("after a backward jump, ignores reports still on their way from before it", () => {
+    const h = harness(false);
+    h.clock.setRunning(true);
+    h.clock.report(40);
+    h.clock.jump(5);
+    h.clock.report(40.1);
+    expect(h.clock.time()).toBe(5);
+    h.clock.report(5);
+    h.advance(0.1);
+    expect(h.clock.time()).toBeCloseTo(5.1);
+  });
+
+  it("after a jump while not running, ignores stale reports and takes the confirmation", () => {
+    const h = harness(false);
+    h.clock.report(30);
+    h.clock.jump(60);
+    h.clock.report(30.2);
+    expect(h.clock.time()).toBe(60);
+    h.clock.report(60);
+    expect(h.clock.time()).toBe(60);
+    h.clock.report(20);
+    expect(h.clock.time()).toBe(20);
+  });
+
+  it("accepts a confirmation up to MAX_EXTRAPOLATION_SECONDS past the jump target, and not beyond", () => {
+    const h = harness(false);
+    h.clock.jump(50);
+    h.clock.report(50 + MAX_EXTRAPOLATION_SECONDS + 0.01);
+    expect(h.clock.time()).toBe(50);
+    h.clock.report(50 + MAX_EXTRAPOLATION_SECONDS);
+    expect(h.clock.time()).toBeCloseTo(50 + MAX_EXTRAPOLATION_SECONDS);
+  });
+
+  it("notifies listeners when a jump confirmation arrives while not advancing", () => {
+    const h = harness(false);
+    const listener = vi.fn();
+    h.clock.subscribe(listener);
+    h.clock.jump(50);
+    listener.mockClear();
+    h.clock.report(10);
+    expect(listener).not.toHaveBeenCalled();
+    h.clock.report(50);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it("clamps to the song duration and to zero", () => {
     const h = harness(false);
     h.clock.jump(500);

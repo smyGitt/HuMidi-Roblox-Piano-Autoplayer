@@ -19,11 +19,12 @@ interface LoadSaveDialogProps {
   initialSelected?: string | null;
   onCancel: () => void;
   onLoad: (save: SaveEntry) => void;
+  onLoadAndEdit: (save: SaveEntry) => void;
   onRename: (filepath: string, newName: string) => void;
   onDelete: (filepath: string) => void;
 }
 
-export function LoadSaveDialog({ saves, initialSelected = null, onCancel, onLoad, onRename, onDelete }: LoadSaveDialogProps) {
+export function LoadSaveDialog({ saves, initialSelected = null, onCancel, onLoad, onLoadAndEdit, onRename, onDelete }: LoadSaveDialogProps) {
   const [selected, setSelected] = useState<string | null>(initialSelected);
 
   const groups = useMemo(() => {
@@ -60,6 +61,9 @@ export function LoadSaveDialog({ saves, initialSelected = null, onCancel, onLoad
           </Button>
           <Button onClick={onCancel}>
             Cancel
+          </Button>
+          <Button disabled={!selectedSave} onClick={() => selectedSave && onLoadAndEdit(selectedSave)}>
+            Load and Edit
           </Button>
           <Button
             variant="accent"
