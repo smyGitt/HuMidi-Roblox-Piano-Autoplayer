@@ -11,7 +11,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +34,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,6 +59,7 @@ jobs:
         run: cargo test
 
       - name: Give the tests access to a virtual keyboard
+        if: runner.os == 'Linux'
         run: |
           sudo modprobe uinput
           sudo chmod 0666 /dev/uinput
@@ -60,5 +67,6 @@ jobs:
           sudo udevadm control --reload-rules
 
       - name: Virtual keyboard and keyboard reader tests
+        if: runner.os == 'Linux'
         working-directory: src-tauri
         run: cargo test --lib -- --ignored
