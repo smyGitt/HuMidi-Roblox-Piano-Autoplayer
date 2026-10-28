@@ -4049,3 +4049,32 @@ mod test_pedal_model_sharing {
         assert!(state.pedal_model.lock().unwrap().is_none());
     }
 }
+
+mod test_source_is_active {
+    use super::*;
+    use crate::managers::keyboard_hook::HookSource;
+
+    const THREE_KEYBOARDS: usize = 3;
+
+    #[test]
+    fn test_a_poisoned_config_lock_falls_back_to_the_old_hook() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = std::sync::Arc::new(hermetic_state(dir.path()));
+        let poisoner = std::sync::Arc::clone(&state);
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.app_config.lock().unwrap();
+            panic!("poison the config lock");
+        })
+        .join();
+        assert!(source_is_active(&state, HookSource::Rdev, Platform::Linux, THREE_KEYBOARDS));
+        assert!(!source_is_active(&state, HookSource::KeyboardDevices, Platform::Linux, THREE_KEYBOARDS));
+    }
+
+    #[test]
+    fn test_with_a_healthy_config_the_keyboard_devices_win_on_linux() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = hermetic_state(dir.path());
+        assert!(source_is_active(&state, HookSource::KeyboardDevices, Platform::Linux, THREE_KEYBOARDS));
+        assert!(!source_is_active(&state, HookSource::Rdev, Platform::Linux, THREE_KEYBOARDS));
+    }
+}

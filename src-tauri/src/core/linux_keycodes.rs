@@ -67,6 +67,13 @@ pub fn linux_keycode(key: Key) -> Option<u16> {
     }
 }
 
+pub fn character_for_linux_code(code: u16) -> Option<char> {
+    CHARACTER_KEYS
+        .iter()
+        .find(|&&(_, key_code)| key_code == code)
+        .map(|&(character, _)| character)
+}
+
 pub fn all_linux_keycodes() -> Vec<u16> {
     CHARACTER_KEYS
         .iter()

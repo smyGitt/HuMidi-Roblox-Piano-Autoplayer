@@ -31,6 +31,7 @@ import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
 import { Select, TextInput } from "../../components/Field";
 import { Label } from "../../components/Label";
+import { isLinux } from "../../lib/platform";
 import { usePersistedState } from "../../state/usePersistedState";
 import { parseOneOf } from "../../state/persistedParsers";
 
@@ -54,6 +55,7 @@ function DisplayPage() {
           </div>
           <SliderSpinbox min={20} max={100} value={settings.opacity} suffix="%" onChange={settings.setOpacity} />
         </div>
+        <p className="settings-tab__note">Transparency on Linux is currently not supported.</p>
         <div className="control-row">
           <ToggleSwitch checked={settings.showStatusText} onChange={settings.setShowStatusText} label="Show Status Text" />
         </div>
@@ -227,6 +229,7 @@ function FilesPage() {
 }
 
 function HotkeyPage() {
+  const settings = useAppSettings();
   const [playbackLabel, setPlaybackLabel] = useState("F6");
   const [saveLabel, setSaveLabel] = useState("Ctrl+S");
   const [listeningPlayback, setListeningPlayback] = useState(false);
@@ -285,6 +288,22 @@ function HotkeyPage() {
           </Button>
         </div>
       </Card>
+      {isLinux() && (
+        <Card title="Keyboard access (Linux)">
+          <div className="control-row">
+            <ToggleSwitch
+              checked={settings.linuxKeyboardHotkeys}
+              onChange={settings.setLinuxKeyboardHotkeys}
+              label="Read the keyboard directly"
+            />
+          </div>
+          <p className="settings-tab__note">
+            Lets the hotkeys work in every window, including on Wayland. HuMidi can then see every key you press. It
+            needs access to your keyboard devices, which the package sets up; log out and back in once after
+            installing.
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

@@ -75,8 +75,23 @@ pub fn driver_failure_message(platform: Platform, detail: &str) -> String {
     )
 }
 
+pub const VIRTUAL_KEYBOARD_NAME: &str = "HuMidi virtual keyboard";
+
+const SESSION_TYPE_VARIABLE: &str = "XDG_SESSION_TYPE";
+const DISPLAY_VARIABLE: &str = "WAYLAND_DISPLAY";
+const WAYLAND_SESSION: &str = "wayland";
+const WAYLAND_DETAIL: &str = "Wayland does not let an app type into other windows any other way.";
+
+pub fn is_wayland_session(variable: impl Fn(&str) -> Option<String>) -> bool {
+    match variable(SESSION_TYPE_VARIABLE).filter(|kind| !kind.is_empty()) {
+        Some(kind) => kind.eq_ignore_ascii_case(WAYLAND_SESSION),
+        None => variable(DISPLAY_VARIABLE).is_some_and(|display| !display.is_empty()),
+    }
+}
+
 pub fn driver_or_explained_fallback<F, E>(
     platform: Platform,
+    wayland: bool,
     sink: Option<SharedSink>,
     fallback: impl FnOnce() -> Result<F, E>,
 ) -> Result<Box<dyn KeyboardDriver + Send>, String>
@@ -84,6 +99,9 @@ where
     F: KeyboardDriver + Send + 'static,
     E: std::fmt::Display,
 {
+    if sink.is_none() && wayland && platform == Platform::Linux {
+        return Err(driver_failure_message(platform, WAYLAND_DETAIL));
+    }
     driver_or_fallback(sink, fallback).map_err(|e| driver_failure_message(platform, &e.to_string()))
 }
 

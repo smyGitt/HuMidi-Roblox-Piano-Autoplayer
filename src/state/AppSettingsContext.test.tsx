@@ -144,6 +144,34 @@ describe("AppSettingsContext (Tauri mode, isTauri() = true)", () => {
     await waitFor(() => expect(result.current.maxVisibleSaves).toBe(100));
   });
 
+  it("keyboard hotkeys are on by default and an empty config keeps them on", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(tauriMocks.loadAppConfig).toHaveBeenCalled());
+    expect(result.current.linuxKeyboardHotkeys).toBe(true);
+  });
+
+  it("hydrates the keyboard hotkeys setting from linux_keyboard_hotkeys", async () => {
+    tauriMocks.loadAppConfig.mockReturnValue(Promise.resolve({ linux_keyboard_hotkeys: false }));
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(result.current.linuxKeyboardHotkeys).toBe(false));
+  });
+
+  it("ignores a keyboard hotkeys setting of the wrong type", async () => {
+    tauriMocks.loadAppConfig.mockReturnValue(Promise.resolve({ linux_keyboard_hotkeys: "no" }));
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await waitFor(() => expect(tauriMocks.loadAppConfig).toHaveBeenCalled());
+    expect(result.current.linuxKeyboardHotkeys).toBe(true);
+  });
+
+  it("setLinuxKeyboardHotkeys persists under linux_keyboard_hotkeys", async () => {
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    await act(async () => result.current.setLinuxKeyboardHotkeys(false));
+    expect(result.current.linuxKeyboardHotkeys).toBe(false);
+    expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ linux_keyboard_hotkeys: false });
+    await act(async () => result.current.setLinuxKeyboardHotkeys(true));
+    expect(tauriMocks.saveAppConfig).toHaveBeenLastCalledWith({ linux_keyboard_hotkeys: true });
+  });
+
   it("setShowStatusText persists under show_status_text", async () => {
     const { result } = renderHook(() => useAppSettings(), { wrapper });
     await act(async () => result.current.setShowStatusText(true));

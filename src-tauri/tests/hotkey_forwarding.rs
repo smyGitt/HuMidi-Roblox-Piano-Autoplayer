@@ -1,10 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use humidi_tauri_lib::commands::{
-    deliver_key, emit_hotkey_events, forward_key, handle_hook_event, KeySource,
+    deliver_key, emit_hotkey_events, forward_key, handle_device_key, handle_hook_event, handle_source_key,
+    patch_app_config, KeySource,
 };
+use humidi_tauri_lib::core::keyboard_driver::Platform;
+use humidi_tauri_lib::managers::keyboard_hook::{HookSource, KEYBOARD_HOTKEYS_CONFIG_KEY};
 use humidi_tauri_lib::managers::config_manager::ConfigManager;
-use humidi_tauri_lib::managers::hotkey_manager::{dom_code_to_raw, HotkeyEvent};
+use humidi_tauri_lib::managers::hotkey_manager::{dom_code_to_raw, HotkeyEvent, RawKey};
 use humidi_tauri_lib::state::AppState;
 use tauri::test::{mock_app, MockRuntime};
 use tauri::{App, Listener, Manager};
@@ -326,5 +329,109 @@ fn emitting_every_kind_of_event_uses_its_own_channel_and_payload() {
 fn emitting_no_events_emits_nothing() {
     let harness = Harness::new();
     emit_hotkey_events(harness.app.handle(), &[]);
+    assert_eq!(harness.emitted(), vec![]);
+}
+
+const ONE_KEYBOARD_OPEN: usize = 1;
+const NO_KEYBOARD_OPEN: usize = 0;
+
+fn f6() -> RawKey {
+    RawKey::Named("F6")
+}
+
+fn from_source(harness: &Harness, source: HookSource, raw: RawKey, platform: Platform, devices: usize) {
+    handle_source_key(harness.app.handle(), source, raw, true, platform, devices);
+}
+
+fn turn_keyboard_hotkeys(harness: &Harness, on: bool) {
+    let state = harness.app.state::<AppState>();
+    patch_app_config(&state, &serde_json::json!({ KEYBOARD_HOTKEYS_CONFIG_KEY: on })).unwrap();
+}
+
+#[test]
+fn on_linux_with_a_keyboard_open_a_key_from_the_keyboard_devices_toggles_playback() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_toggle_requested", "null")]);
+}
+
+#[test]
+fn on_linux_with_a_keyboard_open_the_old_hook_is_ignored() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::Rdev, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![]);
+}
+
+#[test]
+fn on_linux_with_no_keyboard_open_the_old_hook_is_used_and_the_devices_are_ignored() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, NO_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![]);
+    from_source(&harness, HookSource::Rdev, f6(), Platform::Linux, NO_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_toggle_requested", "null")]);
+}
+
+#[test]
+fn with_the_setting_off_the_old_hook_is_used_even_with_a_keyboard_open() {
+    let harness = Harness::new();
+    turn_keyboard_hotkeys(&harness, false);
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![]);
+    from_source(&harness, HookSource::Rdev, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_toggle_requested", "null")]);
+}
+
+#[test]
+fn turning_the_setting_on_and_off_takes_effect_at_once() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    turn_keyboard_hotkeys(&harness, false);
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    turn_keyboard_hotkeys(&harness, true);
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted().len(), 2);
+}
+
+#[test]
+fn off_linux_the_devices_are_never_used() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Windows, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![]);
+    from_source(&harness, HookSource::Rdev, f6(), Platform::Windows, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_toggle_requested", "null")]);
+}
+
+#[test]
+fn a_key_heard_by_both_hooks_toggles_once() {
+    let harness = Harness::new();
+    from_source(&harness, HookSource::Rdev, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    from_source(&harness, HookSource::KeyboardDevices, f6(), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_toggle_requested", "null")]);
+}
+
+#[test]
+fn a_key_from_the_keyboard_devices_binds_a_new_hotkey_while_listening() {
+    let harness = Harness::new();
+    harness.start_binding();
+    from_source(&harness, HookSource::KeyboardDevices, RawKey::Char('g'), Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_bound_updated", "\"G\"")]);
+}
+
+#[test]
+fn a_release_from_the_keyboard_devices_reaches_the_hotkey_state() {
+    let harness = Harness::new();
+    let app = harness.app.handle();
+    let ctrl = RawKey::ModLeft(humidi_tauri_lib::managers::hotkey_manager::Modifier::Ctrl);
+    handle_source_key(app, HookSource::KeyboardDevices, ctrl, true, Platform::Linux, ONE_KEYBOARD_OPEN);
+    handle_source_key(app, HookSource::KeyboardDevices, ctrl, false, Platform::Linux, ONE_KEYBOARD_OPEN);
+    harness.start_binding();
+    handle_source_key(app, HookSource::KeyboardDevices, RawKey::Char('g'), true, Platform::Linux, ONE_KEYBOARD_OPEN);
+    assert_eq!(harness.emitted(), vec![pair("hotkey_bound_updated", "\"G\"")]);
+}
+
+#[test]
+fn a_key_reported_by_the_keyboard_devices_while_none_is_open_is_ignored_on_every_system() {
+    let harness = Harness::new();
+    handle_device_key(harness.app.handle(), f6(), true);
     assert_eq!(harness.emitted(), vec![]);
 }

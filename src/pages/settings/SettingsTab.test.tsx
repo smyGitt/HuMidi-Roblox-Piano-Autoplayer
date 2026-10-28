@@ -32,6 +32,9 @@ vi.mock("../../lib/tauri", async () => {
   return { ...actual, ...tauriMocks };
 });
 
+const platformMocks = vi.hoisted(() => ({ isLinux: vi.fn(() => true) }));
+vi.mock("../../lib/platform", () => platformMocks);
+
 const openDialog = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openDialog }));
 
@@ -68,6 +71,7 @@ function renderSettings() {
 
 beforeEach(() => {
   tauriMocks.isTauri.mockReturnValue(true);
+  platformMocks.isLinux.mockReturnValue(true);
   tauriMocks.getSaveDir.mockReset().mockReturnValue(Promise.resolve(""));
   tauriMocks.getMidiDir.mockReset().mockReturnValue(Promise.resolve(""));
   tauriMocks.getThemesFile.mockReset().mockReturnValue(Promise.resolve("C:\\Users\\me\\.humidi\\themes.json"));
@@ -164,6 +168,15 @@ describe("SettingsTab > Display page", () => {
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: 35 }));
   });
 
+  it("the Window card, next to Opacity, says transparency on Linux is not supported", () => {
+    renderSettings();
+    const note = screen.getByText("Transparency on Linux is currently not supported.");
+    const card = note.closest(".card") as HTMLElement;
+    expect(card.querySelector(".card__title")?.textContent).toBe("Window");
+    expect(card.contains(screen.getByText("Opacity"))).toBe(true);
+    expect(note.querySelector("input, button, [role='switch']")).toBeNull();
+  });
+
   it("Max visible saves is inside a Saved Songs card", () => {
     renderSettings();
     const card = screen.getByText("Max visible saves").closest(".card") as HTMLElement;
@@ -233,6 +246,69 @@ describe("SettingsTab > System page", () => {
     fireEvent.click(screen.getByText("System"));
     fireEvent.click(screen.getByText("Automatically check for updates"));
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ auto_check_updates: true }));
+  });
+});
+
+const KEYBOARD_CARD_TITLE = "Keyboard access (Linux)";
+const KEYBOARD_SWITCH_LABEL = "Read the keyboard directly";
+const KEYBOARD_WARNING =
+  "Lets the hotkeys work in every window, including on Wayland. HuMidi can then see every key you press. It needs access to your keyboard devices, which the package sets up; log out and back in once after installing.";
+
+describe("SettingsTab > Hotkey page > Linux keyboard access", () => {
+  function openHotkeyPage() {
+    renderSettings();
+    fireEvent.click(screen.getByText("Hotkey"));
+  }
+
+  it("shows a switch for reading the keyboard directly, on by default, in its own card", () => {
+    openHotkeyPage();
+    const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    const card = toggle.closest(".card") as HTMLElement;
+    expect(card.querySelector(".card__title")?.textContent).toBe(KEYBOARD_CARD_TITLE);
+  });
+
+  it("warns, in plain text right under the switch, that HuMidi can then see every key pressed", () => {
+    openHotkeyPage();
+    const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    const warning = screen.getByText(KEYBOARD_WARNING);
+    expect(warning).toBeVisible();
+    expect(toggle.closest(".card")?.contains(warning)).toBe(true);
+    expect(toggle.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(warning.querySelector("input, button, [role='switch']")).toBeNull();
+  });
+
+  it("sits right under the two hotkey cards", () => {
+    openHotkeyPage();
+    const cards = Array.from(document.querySelectorAll(".settings-tab__display > .card")).map(
+      (card) => card.querySelector(".card__title")?.textContent,
+    );
+    expect(cards).toEqual(["Playback Toggle", "Save Playback", KEYBOARD_CARD_TITLE]);
+  });
+
+  it("turning it off persists linux_keyboard_hotkeys and flips the switch", async () => {
+    openHotkeyPage();
+    const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    fireEvent.click(toggle);
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ linux_keyboard_hotkeys: false }));
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenLastCalledWith({ linux_keyboard_hotkeys: true }));
+  });
+
+  it("starts off when the saved setting is off", async () => {
+    tauriMocks.loadAppConfig.mockResolvedValue({ linux_keyboard_hotkeys: false });
+    openHotkeyPage();
+    const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+  });
+
+  it("is not shown on other platforms", () => {
+    platformMocks.isLinux.mockReturnValue(false);
+    openHotkeyPage();
+    expect(screen.queryByText(KEYBOARD_SWITCH_LABEL)).toBeNull();
+    expect(screen.queryByText(KEYBOARD_WARNING)).toBeNull();
+    expect(screen.queryByText(KEYBOARD_CARD_TITLE)).toBeNull();
   });
 });
 

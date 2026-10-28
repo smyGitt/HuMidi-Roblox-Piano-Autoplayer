@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "HuMidi",
+        "width": 800,
+        "height": 600,
+        "transparent": false
+      }
+    ]
+  },
+  "bundle": {
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/udev/rules.d/70-humidi-input.rules": "packaging/linux/70-humidi-input.rules",
+          "/usr/lib/modules-load.d/humidi.conf": "packaging/linux/humidi-modules.conf"
+        },
+        "postInstallScript": "packaging/linux/postinst.sh",
+        "postRemoveScript": "packaging/linux/postrm.sh"
+      },
+      "rpm": {
+        "files": {
+          "/usr/lib/udev/rules.d/70-humidi-input.rules": "packaging/linux/70-humidi-input.rules",
+          "/usr/lib/modules-load.d/humidi.conf": "packaging/linux/humidi-modules.conf"
+        },
+        "postInstallScript": "packaging/linux/postinst.sh",
+        "postRemoveScript": "packaging/linux/postrm.sh"
+      }
+    }
+  }
+}

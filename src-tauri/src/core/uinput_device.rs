@@ -6,7 +6,7 @@ use evdev::{AttributeSet, EventType, InputEvent, KeyCode};
 use crate::core::linux_keycodes::all_linux_keycodes;
 use crate::core::uinput_driver::KeySink;
 
-pub const DEVICE_NAME: &str = "HuMidi virtual keyboard";
+pub const DEVICE_NAME: &str = crate::core::uinput_driver::VIRTUAL_KEYBOARD_NAME;
 
 const KEY_DOWN: i32 = 1;
 const KEY_UP: i32 = 0;

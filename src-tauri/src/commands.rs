@@ -21,12 +21,13 @@ use crate::core::player::{PlaybackEngine, PlayerEvent};
 use crate::core::section_analyzer::{assign_hands, SectionAnalyzer};
 use crate::core::session_cache;
 use crate::core::translator::VirtualPianoFormat;
-use crate::core::uinput_driver::{driver_or_explained_fallback, SharedSink};
+use crate::core::uinput_driver::{driver_or_explained_fallback, is_wayland_session, SharedSink};
 use crate::managers::hotkey_manager::{
     dom_code_to_raw, rdev_key_to_raw, HotkeyEvent, RawKey, PLAYBACK_HOTKEY_CONFIG_KEY,
     SAVE_HOTKEY_CONFIG_KEY,
 };
 use crate::managers::injected_echo::EchoTrackingDriver;
+use crate::managers::keyboard_hook::{active_hook, HookSource, ACTIVE_DEVICES};
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
 use tauri::{path::BaseDirectory, Emitter, Manager, State};
 
@@ -665,7 +666,12 @@ fn start_playback_blocking<R: tauri::Runtime>(
     };
 
     let mut driver = EchoTrackingDriver::new(
-        driver_or_explained_fallback(Platform::current(), platform_uinput_sink(state), EnigoDriver::new)?,
+        driver_or_explained_fallback(
+            Platform::current(),
+            is_wayland_session(|name| std::env::var(name).ok()),
+            platform_uinput_sink(state),
+            EnigoDriver::new,
+        )?,
         Arc::clone(&state.injected_echoes),
     );
     let engine = engine_starting_at(config, merged_events, total_dur, start_time);
@@ -1761,12 +1767,59 @@ pub fn handle_hook_event<R: tauri::Runtime>(
     let Some((raw, is_press)) = key_from_rdev_event(event_type) else {
         return;
     };
+    handle_source_key(
+        app,
+        HookSource::Rdev,
+        raw,
+        is_press,
+        Platform::current(),
+        ACTIVE_DEVICES.count(),
+    );
+}
+
+pub fn source_is_active(state: &AppState, source: HookSource, platform: Platform, device_count: usize) -> bool {
+    let active = match state.app_config.lock() {
+        Ok(config) => active_hook(platform, &config, device_count),
+        Err(_) => HookSource::Rdev,
+    };
+    active == source
+}
+
+pub fn handle_source_key<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    source: HookSource,
+    raw: RawKey,
+    is_press: bool,
+    platform: Platform,
+    device_count: usize,
+) {
     let state = app.state::<AppState>();
+    if !source_is_active(&state, source, platform, device_count) {
+        return;
+    }
     let events = deliver_key(&state, raw, is_press, KeySource::GlobalHook);
     emit_hotkey_events(app, &events);
 }
 
+pub fn handle_device_key<R: tauri::Runtime>(app: &tauri::AppHandle<R>, raw: RawKey, is_press: bool) {
+    handle_source_key(
+        app,
+        HookSource::KeyboardDevices,
+        raw,
+        is_press,
+        Platform::current(),
+        ACTIVE_DEVICES.count(),
+    );
+}
+
 pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
+    #[cfg(target_os = "linux")]
+    {
+        let device_app = app.clone();
+        crate::managers::keyboard_device_reader::spawn(std::sync::Arc::new(move |raw, pressed| {
+            handle_device_key(&device_app, raw, pressed)
+        }));
+    }
     std::thread::spawn(move || {
         let _ = rdev::listen(move |event| handle_hook_event(&app, &event.event_type));
     });

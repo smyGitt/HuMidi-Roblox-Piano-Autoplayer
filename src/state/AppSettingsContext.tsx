@@ -15,6 +15,7 @@ interface AppSettings {
   showStatusText: boolean;
   switchToVisualizerOnPlay: boolean;
   maxVisibleSaves: number;
+  linuxKeyboardHotkeys: boolean;
 }
 
 interface AppSettingsContextValue extends AppSettings {
@@ -29,6 +30,7 @@ interface AppSettingsContextValue extends AppSettings {
   setShowStatusText: (v: boolean) => void;
   setSwitchToVisualizerOnPlay: (v: boolean) => void;
   setMaxVisibleSaves: (v: number) => void;
+  setLinuxKeyboardHotkeys: (v: boolean) => void;
   showUpdatePrompt: boolean;
   resolveUpdatePrompt: (v: boolean) => void;
   updateAvailable: { tag: string; url: string; currentVersion: string } | null;
@@ -61,6 +63,7 @@ const DEFAULTS: AppSettings = {
   showStatusText: false,
   switchToVisualizerOnPlay: true,
   maxVisibleSaves: DEFAULT_MAX_VISIBLE_SAVES,
+  linuxKeyboardHotkeys: true,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -80,6 +83,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [showStatusText, setShowStatusTextState] = useState(DEFAULTS.showStatusText);
   const [switchToVisualizerOnPlay, setSwitchToVisualizerOnPlayState] = useState(DEFAULTS.switchToVisualizerOnPlay);
   const [maxVisibleSaves, setMaxVisibleSavesState] = useState(DEFAULTS.maxVisibleSaves);
+  const [linuxKeyboardHotkeys, setLinuxKeyboardHotkeysState] = useState(DEFAULTS.linuxKeyboardHotkeys);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<{ tag: string; url: string; currentVersion: string } | null>(
     null,
@@ -117,6 +121,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           setSwitchToVisualizerOnPlayState(cfg.switch_to_visualizer_on_play);
         }
         if (typeof cfg.max_visible_saves === "number") setMaxVisibleSavesState(clampVisibleSaves(cfg.max_visible_saves));
+        if (typeof cfg.linux_keyboard_hotkeys === "boolean") setLinuxKeyboardHotkeysState(cfg.linux_keyboard_hotkeys);
         if (typeof cfg.auto_check_updates === "boolean") {
           setAutoCheckUpdatesState(cfg.auto_check_updates);
         } else {
@@ -184,6 +189,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (isTauri()) void saveAppConfig({ max_visible_saves: clamped });
   }
 
+  function setLinuxKeyboardHotkeys(v: boolean) {
+    setLinuxKeyboardHotkeysState(v);
+    if (isTauri()) void saveAppConfig({ linux_keyboard_hotkeys: v });
+  }
+
   function resolveUpdatePrompt(v: boolean) {
     setShowUpdatePrompt(false);
     setAutoCheckUpdates(v);
@@ -206,6 +216,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showStatusText,
       switchToVisualizerOnPlay,
       maxVisibleSaves,
+      linuxKeyboardHotkeys,
       setAlwaysOnTop,
       setOpacity,
       setShowTimeline,
@@ -217,6 +228,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setShowStatusText,
       setSwitchToVisualizerOnPlay,
       setMaxVisibleSaves,
+      setLinuxKeyboardHotkeys,
       showUpdatePrompt,
       resolveUpdatePrompt,
       updateAvailable,
@@ -234,6 +246,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showStatusText,
       switchToVisualizerOnPlay,
       maxVisibleSaves,
+      linuxKeyboardHotkeys,
       showUpdatePrompt,
       updateAvailable,
     ],

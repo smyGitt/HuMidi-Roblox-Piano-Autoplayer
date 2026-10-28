@@ -99,3 +99,29 @@ mod test_all_linux_keycodes {
         assert_eq!(listed, expected);
     }
 }
+
+mod test_character_for_linux_code {
+    use super::*;
+
+    #[test]
+    fn test_every_letter_and_digit_code_gives_back_its_character() {
+        for (ch, code) in EXPECTED {
+            assert_eq!(character_for_linux_code(code), Some(ch), "{ch}");
+        }
+    }
+
+    #[test]
+    fn test_it_is_the_inverse_of_the_character_lookup() {
+        for (ch, _) in EXPECTED {
+            let code = linux_keycode(Key::Char(ch)).unwrap();
+            assert_eq!(character_for_linux_code(code), Some(ch), "{ch}");
+        }
+    }
+
+    #[test]
+    fn test_keys_that_are_not_characters_have_none() {
+        for code in [KEY_SPACE, KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_LEFTALT, 0, 1, 200] {
+            assert_eq!(character_for_linux_code(code), None, "{code}");
+        }
+    }
+}

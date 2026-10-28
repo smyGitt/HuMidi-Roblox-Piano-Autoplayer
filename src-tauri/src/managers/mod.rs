@@ -2,5 +2,9 @@ pub mod config_manager;
 pub mod hook_seen;
 pub mod hotkey_manager;
 pub mod injected_echo;
+#[cfg(target_os = "linux")]
+pub mod keyboard_device_reader;
+pub mod keyboard_hook;
+pub mod linux_hotkey_keys;
 pub mod theme_manager;
 pub mod update_manager;

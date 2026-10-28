@@ -1247,6 +1247,12 @@ button:disabled {
   max-width: var(--space-58);
 }
 
+.settings-tab__note {
+  margin: 0;
+  font-size: var(--font-size);
+  color: var(--text_muted);
+}
+
 .settings-tab__path-input {
   flex: 1;
   color: var(--text_muted);

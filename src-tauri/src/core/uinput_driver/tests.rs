@@ -254,7 +254,7 @@ mod test_driver_or_explained_fallback {
     #[test]
     fn test_a_fallback_error_on_linux_comes_back_explained() {
         let result =
-            driver_or_explained_fallback(Platform::Linux, None, || Err::<Quiet, _>("no display".to_string()));
+            driver_or_explained_fallback(Platform::Linux, false, None, || Err::<Quiet, _>("no display".to_string()));
         let message = result.err().unwrap();
         assert!(message.contains("sudo chmod 0666 /dev/uinput"), "{message}");
         assert!(message.ends_with("no display"), "{message}");
@@ -263,17 +263,120 @@ mod test_driver_or_explained_fallback {
     #[test]
     fn test_a_fallback_error_elsewhere_comes_back_as_it_was() {
         let result =
-            driver_or_explained_fallback(Platform::Windows, None, || Err::<Quiet, _>("no display".to_string()));
+            driver_or_explained_fallback(Platform::Windows, false, None, || Err::<Quiet, _>("no display".to_string()));
         assert_eq!(result.err(), Some("no display".to_string()));
     }
 
     #[test]
     fn test_a_working_fallback_and_a_device_both_give_a_driver() {
-        assert!(driver_or_explained_fallback(Platform::Linux, None, || Ok::<_, String>(Quiet)).is_ok());
+        assert!(driver_or_explained_fallback(Platform::Linux, false, None, || Ok::<_, String>(Quiet)).is_ok());
         let (sink, _sent) = fake_sink();
-        assert!(driver_or_explained_fallback(Platform::Linux, Some(SharedSink::new(sink)), || {
+        assert!(driver_or_explained_fallback(Platform::Linux, false, Some(SharedSink::new(sink)), || {
             Err::<Quiet, _>("unused".to_string())
         })
         .is_ok());
+    }
+}
+
+mod test_wayland_without_a_device {
+    use super::*;
+    use std::cell::Cell;
+
+    struct Quiet;
+
+    impl KeyboardDriver for Quiet {
+        fn press(&mut self, _key: Key) -> KeyActionResult {
+            Ok(())
+        }
+        fn release(&mut self, _key: Key) -> KeyActionResult {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_on_wayland_without_a_device_there_is_an_error_and_the_fallback_is_never_built() {
+        let built = Cell::new(false);
+        let result = driver_or_explained_fallback(Platform::Linux, true, None, || {
+            built.set(true);
+            Ok::<_, String>(Quiet)
+        });
+        let message = result.err().unwrap();
+        assert!(!built.get());
+        assert!(message.contains("/dev/uinput"), "{message}");
+        assert!(message.contains("sudo chmod 0666 /dev/uinput"), "{message}");
+        assert!(message.contains("Wayland"), "{message}");
+    }
+
+    #[test]
+    fn test_on_wayland_a_device_is_still_used() {
+        let (sink, sent) = fake_sink();
+        let mut driver = driver_or_explained_fallback(Platform::Linux, true, Some(SharedSink::new(sink)), || {
+            Err::<Quiet, _>("unused".to_string())
+        })
+        .unwrap();
+        driver.press(Key::Char('g')).unwrap();
+        assert_eq!(*sent.lock().unwrap(), vec![(KEY_G, true)]);
+    }
+
+    #[test]
+    fn test_without_wayland_the_fallback_still_works_when_there_is_no_device() {
+        assert!(driver_or_explained_fallback(Platform::Linux, false, None, || Ok::<_, String>(Quiet)).is_ok());
+    }
+
+    #[test]
+    fn test_the_wayland_rule_applies_only_on_linux() {
+        assert!(driver_or_explained_fallback(Platform::Windows, true, None, || Ok::<_, String>(Quiet)).is_ok());
+        assert!(driver_or_explained_fallback(Platform::MacOs, true, None, || Ok::<_, String>(Quiet)).is_ok());
+    }
+}
+
+mod test_is_wayland_session {
+    use super::*;
+
+    fn session(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let owned: Vec<(String, String)> = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        move |name| owned.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
+    }
+
+    #[test]
+    fn test_a_wayland_session_type_is_wayland_whatever_its_case() {
+        assert!(is_wayland_session(session(&[("XDG_SESSION_TYPE", "wayland")])));
+        assert!(is_wayland_session(session(&[("XDG_SESSION_TYPE", "Wayland")])));
+    }
+
+    #[test]
+    fn test_an_x11_session_is_not_wayland_even_with_a_wayland_display_set() {
+        assert!(!is_wayland_session(session(&[("XDG_SESSION_TYPE", "x11"), ("WAYLAND_DISPLAY", "wayland-0")])));
+    }
+
+    #[test]
+    fn test_any_other_session_type_is_not_wayland() {
+        assert!(!is_wayland_session(session(&[("XDG_SESSION_TYPE", "tty"), ("WAYLAND_DISPLAY", "wayland-0")])));
+    }
+
+    #[test]
+    fn test_without_a_session_type_a_wayland_display_decides() {
+        assert!(is_wayland_session(session(&[("WAYLAND_DISPLAY", "wayland-0")])));
+        assert!(!is_wayland_session(session(&[("WAYLAND_DISPLAY", "")])));
+    }
+
+    #[test]
+    fn test_an_empty_session_type_counts_as_missing() {
+        assert!(is_wayland_session(session(&[("XDG_SESSION_TYPE", ""), ("WAYLAND_DISPLAY", "wayland-0")])));
+    }
+
+    #[test]
+    fn test_with_neither_it_is_not_wayland() {
+        assert!(!is_wayland_session(session(&[])));
+    }
+}
+
+
+mod test_virtual_keyboard_name {
+    use super::*;
+
+    #[test]
+    fn test_the_name_is_the_one_the_ci_rule_and_the_hotkey_reader_look_for() {
+        assert_eq!(VIRTUAL_KEYBOARD_NAME, "HuMidi virtual keyboard");
     }
 }

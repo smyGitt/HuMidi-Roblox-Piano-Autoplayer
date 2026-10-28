@@ -38,6 +38,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 approx = "0.5"
 tempfile = "3"
 tauri = { version = "2", features = ["test"] }
+tauri-utils = { version = "2", features = ["build"] }
 
 [profile.release]
 opt-level = 3
