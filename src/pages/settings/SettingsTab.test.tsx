@@ -250,9 +250,9 @@ describe("SettingsTab > System page", () => {
 });
 
 const KEYBOARD_CARD_TITLE = "Keyboard access (Linux)";
-const KEYBOARD_SWITCH_LABEL = "Read the keyboard directly";
+const KEYBOARD_SWITCH_LABEL = "Always listen to keys (Linux)";
 const KEYBOARD_WARNING =
-  "Lets the hotkeys work in every window, including on Wayland. HuMidi can then see every key you press. It needs access to your keyboard devices, which the package sets up; log out and back in once after installing.";
+  "HuMidi reads your keyboard directly, so hotkeys work in every window, even when another app has focus. This also means HuMidi can see every key you press.";
 
 describe("SettingsTab > Hotkey page > Linux keyboard access", () => {
   function openHotkeyPage() {
@@ -276,6 +276,13 @@ describe("SettingsTab > Hotkey page > Linux keyboard access", () => {
     expect(toggle.closest(".card")?.contains(warning)).toBe(true);
     expect(toggle.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(warning.querySelector("input, button, [role='switch']")).toBeNull();
+  });
+
+  it("explains the switch in at most two sentences, using only letters, spaces, periods and commas", () => {
+    openHotkeyPage();
+    const text = screen.getByText(KEYBOARD_WARNING).textContent ?? "";
+    expect(text.match(/[.!?]/g)?.length).toBeLessThanOrEqual(2);
+    expect(text).toMatch(/^[A-Za-z ,.]+$/);
   });
 
   it("sits right under the two hotkey cards", () => {

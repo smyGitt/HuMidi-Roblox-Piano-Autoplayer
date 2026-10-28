@@ -294,13 +294,12 @@ function HotkeyPage() {
             <ToggleSwitch
               checked={settings.linuxKeyboardHotkeys}
               onChange={settings.setLinuxKeyboardHotkeys}
-              label="Read the keyboard directly"
+              label="Always listen to keys (Linux)"
             />
           </div>
           <p className="settings-tab__note">
-            Lets the hotkeys work in every window, including on Wayland. HuMidi can then see every key you press. It
-            needs access to your keyboard devices, which the package sets up; log out and back in once after
-            installing.
+            HuMidi reads your keyboard directly, so hotkeys work in every window, even when another app has focus.
+            This also means HuMidi can see every key you press.
           </p>
         </Card>
       )}

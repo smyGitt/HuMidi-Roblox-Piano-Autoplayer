@@ -12,7 +12,8 @@ pub const RESCAN_INTERVAL: Duration = Duration::from_secs(5);
 
 pub type KeySink = Arc<dyn Fn(RawKey, bool) + Send + Sync>;
 
-pub fn scan_once(on_key: &KeySink) {
+pub fn scan_once(on_key: &KeySink) -> usize {
+    let mut started = 0;
     for (path, device) in evdev::enumerate() {
         if is_own_device(device.name().unwrap_or_default()) {
             continue;
@@ -27,7 +28,9 @@ pub fn scan_once(on_key: &KeySink) {
         }
         let on_key = Arc::clone(on_key);
         std::thread::spawn(move || read_device(path, device, on_key));
+        started += 1;
     }
+    started
 }
 
 fn read_device(path: PathBuf, mut device: Device, on_key: KeySink) {
