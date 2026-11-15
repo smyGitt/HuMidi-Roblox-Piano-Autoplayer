@@ -167,3 +167,45 @@ mod test_config_path {
         assert!(p.ends_with(".humidi/config.json") || p.ends_with(".humidi\\config.json"));
     }
 }
+
+mod test_root_dir_for {
+    use super::*;
+    use crate::core::keyboard_driver::Platform;
+
+    fn exe() -> PathBuf {
+        PathBuf::from("/usr/bin")
+    }
+
+    fn home() -> PathBuf {
+        PathBuf::from("/home/kevin")
+    }
+
+    #[test]
+    fn test_windows_uses_the_executable_folder() {
+        assert_eq!(root_dir_for(Platform::Windows, &exe(), &home()), exe());
+    }
+
+    #[test]
+    fn test_linux_uses_the_humidi_folder_in_home() {
+        assert_eq!(
+            root_dir_for(Platform::Linux, &exe(), &home()),
+            home().join(".humidi")
+        );
+    }
+
+    #[test]
+    fn test_macos_uses_the_humidi_folder_in_home() {
+        assert_eq!(
+            root_dir_for(Platform::MacOs, &exe(), &home()),
+            home().join(".humidi")
+        );
+    }
+
+    #[test]
+    fn test_other_uses_the_humidi_folder_in_home() {
+        assert_eq!(
+            root_dir_for(Platform::Other, &exe(), &home()),
+            home().join(".humidi")
+        );
+    }
+}

@@ -18,6 +18,22 @@ fn device(name: &str) -> PathBuf {
     PathBuf::from(format!("/dev/input/{name}"))
 }
 
+mod test_rdev_hook_runs_on {
+    use super::*;
+
+    #[test]
+    fn test_it_runs_on_windows_linux_and_other_systems() {
+        for platform in [Platform::Windows, Platform::Linux, Platform::Other] {
+            assert!(rdev_hook_runs_on(platform), "{platform:?}");
+        }
+    }
+
+    #[test]
+    fn test_it_does_not_run_on_macos_where_it_aborts_the_app_on_the_first_key() {
+        assert!(!rdev_hook_runs_on(Platform::MacOs));
+    }
+}
+
 mod test_keyboard_hotkeys_enabled {
     use super::*;
 

@@ -1,14 +1,25 @@
 use std::path::{Path, PathBuf};
 
+use crate::core::keyboard_driver::Platform;
+
 fn empty_object() -> serde_json::Value {
     serde_json::Value::Object(serde_json::Map::new())
 }
 
+pub(crate) fn root_dir_for(platform: Platform, exe_dir: &Path, home: &Path) -> PathBuf {
+    match platform {
+        Platform::Windows => exe_dir.to_path_buf(),
+        Platform::MacOs | Platform::Linux | Platform::Other => home.join(".humidi"),
+    }
+}
+
 pub(crate) fn determine_root_dir() -> PathBuf {
-    std::env::current_exe()
+    let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let home = dirs::home_dir().unwrap_or_default();
+    root_dir_for(Platform::current(), &exe_dir, &home)
 }
 
 pub fn config_path() -> PathBuf {

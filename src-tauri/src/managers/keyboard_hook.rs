@@ -24,6 +24,10 @@ pub enum HookSource {
     KeyboardDevices,
 }
 
+pub fn rdev_hook_runs_on(platform: Platform) -> bool {
+    platform != Platform::MacOs
+}
+
 pub fn keyboard_hotkeys_enabled(config: &Value) -> bool {
     config.get(KEYBOARD_HOTKEYS_CONFIG_KEY) != Some(&Value::Bool(false))
 }

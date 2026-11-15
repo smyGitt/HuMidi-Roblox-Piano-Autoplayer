@@ -27,7 +27,7 @@ use crate::managers::hotkey_manager::{
     SAVE_HOTKEY_CONFIG_KEY,
 };
 use crate::managers::injected_echo::EchoTrackingDriver;
-use crate::managers::keyboard_hook::{active_hook, HookSource, ACTIVE_DEVICES};
+use crate::managers::keyboard_hook::{active_hook, rdev_hook_runs_on, HookSource, ACTIVE_DEVICES};
 use crate::state::{AppState, PlaybackCommand, PlaybackHandle, PlaybackSession};
 use tauri::{path::BaseDirectory, Emitter, Manager, State};
 
@@ -1819,6 +1819,9 @@ pub fn spawn_hotkey_listener(app: tauri::AppHandle) {
         crate::managers::keyboard_device_reader::spawn(std::sync::Arc::new(move |raw, pressed| {
             handle_device_key(&device_app, raw, pressed)
         }));
+    }
+    if !rdev_hook_runs_on(Platform::current()) {
+        return;
     }
     std::thread::spawn(move || {
         let _ = rdev::listen(move |event| handle_hook_event(&app, &event.event_type));
