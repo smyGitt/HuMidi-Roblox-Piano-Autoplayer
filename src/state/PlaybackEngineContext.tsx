@@ -586,7 +586,7 @@ export function PlaybackEngineProvider({ children }: { children: ReactNode }) {
       setMeasureBoundaries(result.measure_boundaries);
       setHasCompiledNotes(true);
       setHasCompiledPedal(true);
-      setPedalIntervals([]);
+      setPedalIntervals(result.pedal_intervals);
       setAiCurves(null);
       setPedalConfidence(null);
       setCompiledNotesConfig(null);

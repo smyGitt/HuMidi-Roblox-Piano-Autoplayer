@@ -476,6 +476,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     tauriMocks.compilePedal.mockResolvedValue({ pedal_intervals: [[0, 1]], curve_on: [{ time: 0, value: 0.62 }], curve_off: [{ time: 0, value: 0.38 }], confidence: [], confidence_fps: PEDAL_FPS });
     tauriMocks.resumeFromSave.mockResolvedValue({
       ...NO_SAVED_CURVES,
+      pedal_intervals: [],
       final_notes: [],
       played_notes: [],
       total_dur: 1,
@@ -980,6 +981,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     };
     tauriMocks.resumeFromSave.mockResolvedValue({
       ...NO_SAVED_CURVES,
+      pedal_intervals: [],
       final_notes: [resumedNote],
       played_notes: [resumedNote],
       total_dur: 5.5,
@@ -1010,7 +1012,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
   });
 
   it("resumeSave, once played, does NOT trigger a redundant compile_pedal call from play()", async () => {
-    tauriMocks.resumeFromSave.mockResolvedValue({ final_notes: [], played_notes: [], total_dur: 1, ...NO_SAVED_CURVES });
+    tauriMocks.resumeFromSave.mockResolvedValue({ final_notes: [], played_notes: [], total_dur: 1, pedal_intervals: [], ...NO_SAVED_CURVES });
     tauriMocks.startPlayback.mockResolvedValue(undefined);
     const { result } = renderEngine();
     await act(async () => result.current.engine.resumeSave("/saves/song.json", "song"));
@@ -1114,6 +1116,7 @@ describe("PlaybackEngineContext (Tauri mode, isTauri() = true)", () => {
     it("resumeSave clears the snapshot then sets file/source/tracks/pedal from the resumed save", async () => {
       tauriMocks.resumeFromSave.mockResolvedValue({
       ...NO_SAVED_CURVES,
+      pedal_intervals: [],
         final_notes: [],
         played_notes: [],
         total_dur: 5.5,
@@ -1308,10 +1311,22 @@ describe("PlaybackEngineContext saved threshold curves (Tauri mode)", () => {
     measure_boundaries: [],
     track_count: 1,
     pedal_count: 1,
+    pedal_intervals: [],
   };
 
   beforeEach(() => {
     tauriMocks.isTauri.mockReturnValue(true);
+  });
+
+  it("a resumed save shows the pedal intervals of its saved events", async () => {
+    tauriMocks.resumeFromSave.mockResolvedValue({
+      ...SAVE,
+      ...NO_SAVED_CURVES,
+      pedal_intervals: [[0, 1], [2, 3]],
+    });
+    const { result } = renderEngine();
+    await act(async () => result.current.engine.resumeSave("/saves/song.json", "song"));
+    expect(result.current.engine.pedalIntervals).toEqual([[0, 1], [2, 3]]);
   });
 
   it("an older save with the single thresholds loads them as flat lines and raises the notice", async () => {

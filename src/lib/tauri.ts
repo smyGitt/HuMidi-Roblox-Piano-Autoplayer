@@ -155,6 +155,7 @@ export interface ResumedSession {
   measure_boundaries: MeasureBoundary[];
   track_count: number;
   pedal_count: number;
+  pedal_intervals: [number, number][];
   pedal_curve_on: ThresholdNode[];
   pedal_curve_off: ThresholdNode[];
   legacy_pedal_thresholds: boolean;

@@ -1230,6 +1230,7 @@ pub struct ResumedSession {
     pub measure_boundaries: Vec<(f64, f64)>,
     pub track_count: usize,
     pub pedal_count: i64,
+    pub pedal_intervals: Vec<(f64, f64)>,
     pub pedal_curve_on: Vec<ThresholdNode>,
     pub pedal_curve_off: Vec<ThresholdNode>,
     pub legacy_pedal_thresholds: bool,
@@ -1337,6 +1338,7 @@ pub fn resume_from_save_logic(
     events.sort();
 
     let final_notes = reconstruct_notes_for_visualizer(&events);
+    let pedal_intervals = extract_pedal_intervals(&events);
     let max_time = events
         .iter()
         .map(|e| e.time)
@@ -1379,6 +1381,7 @@ pub fn resume_from_save_logic(
         measure_boundaries,
         track_count,
         pedal_count,
+        pedal_intervals,
         pedal_curve_on: saved_curves.on,
         pedal_curve_off: saved_curves.off,
         legacy_pedal_thresholds: saved_curves.legacy,

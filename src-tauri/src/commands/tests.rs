@@ -3137,6 +3137,35 @@ mod test_resume_from_save_logic {
         serde_json::json!({"time": t, "priority": 4, "action": "release", "key_char": key_for(pitch), "pitch": pitch, "velocity": null})
     }
 
+
+    fn pedal_v(t: f64, direction: &str) -> Value {
+        serde_json::json!({"time": t, "priority": 1, "action": "pedal", "key_char": direction, "pitch": null, "velocity": null})
+    }
+
+    #[test]
+    fn test_returns_the_pedal_intervals_of_the_saved_events() {
+        let data = events_value(vec![
+            pedal_v(0.0, "down"),
+            press_v(0.1, 60),
+            release_v(0.5, 60),
+            pedal_v(1.0, "up"),
+            pedal_v(2.0, "down"),
+            pedal_v(3.0, "up"),
+        ]);
+        let mut session = PlaybackSession::default();
+        let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+        assert_eq!(result.pedal_intervals, vec![(0.0, 1.0), (2.0, 3.0)]);
+    }
+
+    #[test]
+    fn test_a_save_without_pedal_events_has_no_pedal_intervals() {
+        let data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
+        let mut session = PlaybackSession::default();
+        let result = resume_from_save_logic(&data, &mut session).unwrap();
+
+        assert!(result.pedal_intervals.is_empty());
+    }
     #[test]
     fn test_valid_save_populates_session_for_playback() {
         let data = events_value(vec![press_v(0.0, 60), release_v(0.5, 60)]);
