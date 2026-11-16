@@ -21,7 +21,7 @@ HuMidi now uses a trained model from [PedalAI](https://github.com/smyGitt/PedalA
 
 # How do you run it?
 ### If you downloaded the file from the releases:
-  just run the `.exe` or `.dmg`! 
+  just run the `.exe` or `.dmg`, or install the `.deb` or `.rpm` on Linux! 
   
   Remember that it accepts `.mid` files only. it works best with piano-only `.mid`, but I've seen it work with mixed instruments.
 
