@@ -90,6 +90,14 @@ describe("FileHeader save flow", () => {
     expect(engine.save).not.toHaveBeenCalled();
   });
 
+  it("the Saving... modal carries the PedalAI note under the spinner", () => {
+    engine.isSaving = true;
+    render(<FileHeader />);
+    const note = screen.getByText("Saving might take long if you have PedalAI selected, and have not generated pedal events yet.");
+    expect(note.className).toBe("saving-dialog__note");
+    expect(note.closest(".saving-dialog")).not.toBeNull();
+  });
+
   it("shows the Saving... modal with the spinner only while a save is in progress", () => {
     engine.isSaving = true;
     const { unmount } = render(<FileHeader />);

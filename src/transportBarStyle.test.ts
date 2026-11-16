@@ -35,6 +35,29 @@ describe("transport bar media controls", () => {
     expect(controls()).toMatch(/align-items:\s*center/);
   });
 
+  it("glows on hover: a round gradient from the text color fading to transparent, no solid fill", () => {
+    const hover = ruleBody(".transport-bar__controls .btn--icon:hover:not(:disabled)");
+    expect(hover).toMatch(
+      /background:\s*radial-gradient\(circle,\s*color-mix\(in srgb,\s*var\(--text_primary\)\s+var\(--glow-strength\),\s*transparent\),\s*transparent\s+var\(--glow-reach\)\)/,
+    );
+    expect(hover).not.toMatch(/\d+px/);
+  });
+
+  it("has the glow strength and reach as named tokens in :root", () => {
+    const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
+    expect(root).toMatch(/--glow-strength:\s*\d+%/);
+    expect(root).toMatch(/--glow-reach:\s*\d+%/);
+  });
+
+  it("stacks the saving dialog spinner above its centered, muted note", () => {
+    const dialog = ruleBody(".saving-dialog");
+    expect(dialog).toMatch(/flex-direction:\s*column/);
+    expect(dialog).toMatch(/gap:\s*var\(--space-2\)/);
+    const note = ruleBody(".saving-dialog__note");
+    expect(note).toMatch(/text-align:\s*center/);
+    expect(note).toMatch(/color:\s*var\(--text_muted\)/);
+  });
+
   it("draws the control icons at 32px", () => {
     expect(ruleBody(".transport-bar__controls .btn")).toMatch(/--icon-size:\s*var\(--space-4\)/);
   });

@@ -14,6 +14,8 @@
   --radius-pill: 9999px;
   --toggle-indent: calc(var(--space-4) + var(--space-1));
   --knob-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --glow-strength: 40%;
+  --glow-reach: 70%;
   --rotate-expandable: 90deg;
   --space-1: 8px;
   --space-2: 16px;
@@ -515,6 +517,10 @@ button:disabled {
   --icon-size: var(--space-4);
   padding: var(--space-1);
   border-radius: 50%;
+}
+
+.transport-bar__controls .btn--icon:hover:not(:disabled) {
+  background: radial-gradient(circle, color-mix(in srgb, var(--text_primary) var(--glow-strength), transparent), transparent var(--glow-reach));
 }
 
 .transport-bar__controls .transport-bar__skip {
@@ -1463,9 +1469,16 @@ button:disabled {
 
 .saving-dialog {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
   height: 100%;
+}
+
+.saving-dialog__note {
+  text-align: center;
+  color: var(--text_muted);
 }
 
 .save-dialog {
