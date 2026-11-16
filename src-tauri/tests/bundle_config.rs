@@ -173,3 +173,26 @@ fn git_checks_the_packaging_files_out_with_unix_line_endings_on_every_system() {
         "{attributes}"
     );
 }
+
+#[test]
+fn the_program_that_gets_installed_is_called_humidi_with_no_tauri_in_its_name() {
+    let manifest = include_str!("../Cargo.toml").replace("\r\n", "\n");
+    assert!(
+        manifest.contains("[[bin]]\nname = \"HuMidi\"\npath = \"src/main.rs\"\n"),
+        "Cargo.toml needs a [[bin]] named HuMidi"
+    );
+}
+
+#[test]
+fn the_tauri_config_does_not_rename_the_program_a_second_time() {
+    let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    assert!(config.get("mainBinaryName").is_none());
+}
+
+#[test]
+fn nothing_the_linux_packages_install_still_names_the_program_with_tauri_in_it() {
+    let linux: serde_json::Value = serde_json::from_str(include_str!("../tauri.linux.conf.json")).unwrap();
+    assert!(!linux.to_string().contains("humidi-tauri"));
+    let main: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    assert!(!main["bundle"].to_string().contains("humidi-tauri"));
+}
