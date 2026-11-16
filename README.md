@@ -12,7 +12,16 @@
 
 
 ## About HuMidi
-HuMidi includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
+HuMidi includes various humanization options for a natural, human-like playback. Including:
+
+- Timing variation, note articulation, chord rolling, tempo sway, hand drift and occasional mistakes
+- Automatic pedal timing with PedalAI, plus adaptive, rhythmic and harmonic pedal styles
+- 61-key and 88-key keyboard support
+- A visualizer, saves and a sheet translator
+- Themes
+- Hotkeys that work while Roblox has focus
+
+Easy to run via executable or source code, with GUI support included. Every setting is explained in the [Settings reference](https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/wiki/Settings-Reference) on the wiki.
 
 <img width="594" height="542" alt="v2 3 1showcase" src="https://github.com/user-attachments/assets/222d6dc0-ee3f-401d-b077-07d460b28a54" /> [Showcase video](https://youtu.be/SBgUwCTg3e0?si=sWQaj2faSUBnTLk1)
 
