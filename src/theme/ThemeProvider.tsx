@@ -3,8 +3,15 @@ import { isTauri, getActiveThemeName, setActiveThemeName, getCustomThemes, type 
 import { THEMES, DEFAULT_THEME_NAME, applyThemeToRoot, completeTokens, type Theme } from "./tokens";
 
 function toTheme(custom: CustomThemeColors): Theme {
-  const { name, builtin: _builtin, ...tokens } = custom;
-  return { name, tokens: completeTokens(tokens) };
+  const { name, builtin: _builtin, image, image_scale, image_x, image_y, ...tokens } = custom;
+  return {
+    name,
+    tokens: completeTokens(tokens),
+    image: image || undefined,
+    imageZoom: image_scale,
+    imageX: image_x,
+    imageY: image_y,
+  };
 }
 
 interface ThemeContextValue {

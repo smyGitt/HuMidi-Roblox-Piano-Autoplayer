@@ -135,3 +135,71 @@ describe("TransportBar collapse toggle color", () => {
     expect(screen.getByTitle("Collapse").className).toContain("btn--subtle");
   });
 });
+
+describe("TransportBar image", () => {
+  function renderWithImage(image: string | undefined, imageZoom?: number, imageX?: number, imageY?: number) {
+    return render(
+      <TransportBar
+        isPlaying={false}
+        clock={new PlaybackClock({ selfTimed: false })}
+        totalTime={10}
+        isCollapsed={false}
+        status="ready"
+        statusLabel="READY"
+        showStatusText={false}
+        playEnabled
+        image={image}
+        imageZoom={imageZoom}
+        imageX={imageX}
+        imageY={imageY}
+        onScrub={vi.fn()}
+        onPlayPause={vi.fn()}
+        onStop={vi.fn()}
+        onSeekStart={vi.fn()}
+        onSeekEnd={vi.fn()}
+        onToggleCollapsed={vi.fn()}
+      />,
+    );
+  }
+
+  it("shows no image when none is given", () => {
+    renderWithImage(undefined);
+    expect(document.querySelector(".transport-bar__image")).toBeNull();
+  });
+
+  it("puts the given image straight in the bar, as a background layer outside every row", () => {
+    renderWithImage("data:image/png;base64,AAAA");
+    const image = document.querySelector(".transport-bar__image") as HTMLImageElement;
+    expect(image.getAttribute("src")).toBe("data:image/png;base64,AAAA");
+    expect(image.getAttribute("alt")).toBe("");
+    const bar = document.querySelector(".transport-bar") as HTMLElement;
+    expect(image.parentElement).toBe(bar);
+    expect(bar.firstElementChild).toBe(image);
+    expect(document.querySelector(".transport-bar__side--end")?.querySelector("img")).toBeNull();
+  });
+
+  function imageVar(name: string): string {
+    return (document.querySelector(".transport-bar__image") as HTMLElement).style.getPropertyValue(name);
+  }
+
+  it("scales the image by its zoom multiplier as given, so 2.5 is 2.5 and no zoom is 1", () => {
+    const first = renderWithImage("data:image/png;base64,AAAA", 2.5);
+    expect(imageVar("--image-zoom")).toBe("2.5");
+    first.unmount();
+    const second = renderWithImage("data:image/png;base64,AAAA", 6.7);
+    expect(imageVar("--image-zoom")).toBe("6.7");
+    second.unmount();
+    renderWithImage("data:image/png;base64,AAAA");
+    expect(imageVar("--image-zoom")).toBe("1");
+  });
+
+  it("moves the image by its x and y offsets in pixels, and not at all when there are none", () => {
+    const first = renderWithImage("data:image/png;base64,AAAA", 1, 12, -5);
+    expect(imageVar("--image-x")).toBe("12px");
+    expect(imageVar("--image-y")).toBe("-5px");
+    first.unmount();
+    renderWithImage("data:image/png;base64,AAAA");
+    expect(imageVar("--image-x")).toBe("0px");
+    expect(imageVar("--image-y")).toBe("0px");
+  });
+});

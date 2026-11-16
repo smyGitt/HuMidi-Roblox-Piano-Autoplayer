@@ -293,6 +293,10 @@ export interface CustomThemeColors {
   viz_key_white: string;
   viz_key_black: string;
   viz_key_pressed: string;
+  image?: string;
+  image_scale?: number;
+  image_x?: number;
+  image_y?: number;
   builtin: boolean;
 }
 
@@ -330,6 +334,10 @@ export async function exportThemeFile(path: string, theme: CustomThemeColors): P
 
 export async function writeTextFile(path: string, contents: string): Promise<void> {
   return invoke("write_text_file", { path, contents });
+}
+
+export async function readImageDataUrl(path: string): Promise<string> {
+  return invoke("read_image_data_url", { path });
 }
 
 export async function importThemeFile(path: string): Promise<CustomThemeColors> {

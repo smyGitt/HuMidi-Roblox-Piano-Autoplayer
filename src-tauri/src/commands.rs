@@ -875,6 +875,37 @@ pub fn write_text_file(path: String, contents: String) -> Result<(), String> {
     write_text_file_logic(Path::new(&path), &contents)
 }
 
+const BYTES_PER_MIB: usize = 1024 * 1024;
+pub const MAX_IMAGE_BYTES: usize = 2 * BYTES_PER_MIB;
+
+fn image_mime(path: &Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    match extension.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        _ => None,
+    }
+}
+
+pub fn read_image_data_url_logic(path: &Path) -> Result<String, String> {
+    use base64::Engine;
+    let mime = image_mime(path).ok_or_else(|| "That file is not a supported image.".to_string())?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return Err("That image is too large.".to_string());
+    }
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{mime};base64,{encoded}"))
+}
+
+#[tauri::command]
+pub fn read_image_data_url(path: String) -> Result<String, String> {
+    read_image_data_url_logic(Path::new(&path))
+}
+
 #[tauri::command]
 pub fn import_theme_file(
     path: String,

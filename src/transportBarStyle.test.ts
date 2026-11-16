@@ -62,3 +62,34 @@ describe("transport bar media controls", () => {
     expect(ruleBody(".transport-bar__controls .btn")).toMatch(/--icon-size:\s*var\(--space-4\)/);
   });
 });
+
+describe("transport bar image", () => {
+  it("is a background layer: out of the layout, behind the controls, never catching the mouse", () => {
+    const image = ruleBody(".transport-bar__image");
+    expect(image).toMatch(/position:\s*absolute/);
+    expect(image).toMatch(/z-index:\s*var\(--z-behind\)/);
+    expect(image).toMatch(/pointer-events:\s*none/);
+  });
+
+  it("is as tall as the base height times its zoom, centered vertically then moved by its x and y offsets, towards the right", () => {
+    const image = ruleBody(".transport-bar__image");
+    expect(image).toMatch(/height:\s*calc\(var\(--space-5\)\s*\*\s*var\(--image-zoom\)\)/);
+    expect(image).toMatch(/top:\s*50%/);
+    expect(image).toMatch(/transform:\s*translate\(var\(--image-x\),\s*calc\(-50%\s*\+\s*var\(--image-y\)\)\)/);
+    expect(image).toMatch(/right:\s*var\(--space-6\)/);
+    expect(image).toMatch(/object-fit:\s*contain/);
+    expect(image).toMatch(/max-width:\s*100%/);
+  });
+
+  it("is clipped by the bar, which makes its own stacking layer, so it never grows the bar or covers the page", () => {
+    const bar = ruleBody(".transport-bar");
+    expect(bar).toMatch(/position:\s*relative/);
+    expect(bar).toMatch(/z-index:\s*0/);
+    expect(bar).toMatch(/overflow:\s*hidden/);
+  });
+
+  it("has a named layer token below the page content", () => {
+    const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
+    expect(root).toMatch(/--z-behind:\s*-1/);
+  });
+});

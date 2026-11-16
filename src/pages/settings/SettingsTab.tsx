@@ -131,14 +131,7 @@ function DisplayPage() {
         </div>
       </Card>
 
-      <Card
-        title="Appearance"
-        footer={
-          <Button onClick={() => setThemeDialogOpen(true)}>
-            Customize...
-          </Button>
-        }
-      >
+      <Card title="Appearance">
         <div className="control-row">
           <div className="control-row__label">
             <Label>Theme</Label>
@@ -150,6 +143,7 @@ function DisplayPage() {
               </option>
             ))}
           </Select>
+          <Button onClick={() => setThemeDialogOpen(true)}>Customize...</Button>
           <Platforms id="theme" />
         </div>
       </Card>

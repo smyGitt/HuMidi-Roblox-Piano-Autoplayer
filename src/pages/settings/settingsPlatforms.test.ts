@@ -30,6 +30,7 @@ const PASSED_ON_ALL_SYSTEMS: SettingId[] = [
   "midiDirectory",
   "themesFile",
   "playbackHotkey",
+  "saveHotkey",
   "linuxKeyboardHotkeys",
   "autoCheckUpdates",
   "checkNow",
@@ -72,10 +73,15 @@ describe("Linux flags", () => {
     }
   });
 
-  it("show nothing for Opacity, which cannot work on Linux, and for the untested Save hotkey", () => {
-    for (const id of ["opacity", "saveHotkey"] as const) {
-      expect(SETTING_PLATFORMS[id].linux).toBe(false);
-      expect(SETTING_PLATFORMS[id].linuxWorks).toEqual([]);
-    }
+  it("show nothing for Opacity, which cannot work on Linux", () => {
+    expect(SETTING_PLATFORMS.opacity.linux).toBe(false);
+    expect(SETTING_PLATFORMS.opacity.linuxWorks).toEqual([]);
+  });
+
+  it("show the Save hotkey working on every tested Linux system", () => {
+    const entry = SETTING_PLATFORMS.saveHotkey;
+    expect(entry.linux).toBe(true);
+    expect(entry.linuxWorks).toEqual(SETTING_PLATFORMS.playbackHotkey.linuxWorks);
+    expect(entry.linuxFails).toEqual([]);
   });
 });

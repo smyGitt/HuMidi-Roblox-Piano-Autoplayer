@@ -50,6 +50,7 @@
   --duration-spinner: 800ms;
   --easing: cubic-bezier(0.215, 0.61, 0.355, 1);
   --opacity-disabled: 0.5;
+  --z-behind: -1;
   --z-raised: 2;
   --z-sidebar: 10;
   --z-modal: 100;
@@ -352,7 +353,8 @@ button:disabled {
   flex-direction: column;
   background: var(--bg_surface);
   border-right: var(--border-width) solid var(--border);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: width var(--duration) var(--easing);
 }
 
@@ -472,6 +474,9 @@ button:disabled {
 /* --- Transport bar --- */
 
 .transport-bar {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
   flex: none;
   border-top: var(--border-width) solid var(--border);
   background: var(--bg_surface);
@@ -540,6 +545,18 @@ button:disabled {
 
 .transport-bar__side--end {
   justify-content: flex-end;
+}
+
+.transport-bar__image {
+  position: absolute;
+  z-index: var(--z-behind);
+  pointer-events: none;
+  top: 50%;
+  right: var(--space-6);
+  transform: translate(var(--image-x), calc(-50% + var(--image-y)));
+  height: calc(var(--space-5) * var(--image-zoom));
+  max-width: 100%;
+  object-fit: contain;
 }
 
 /* --- Card --- */
@@ -1830,10 +1847,27 @@ button:disabled {
   background: transparent;
   border: none;
   color: var(--text_primary);
-  font-family: "Courier New", monospace;
   font-size: var(--font-size);
   padding: 0;
   min-width: 0;
+}
+
+.theme-dialog__image-row {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.theme-dialog__image-fields {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.theme-dialog__image-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .theme-dialog__save-row {

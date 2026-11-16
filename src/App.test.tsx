@@ -220,3 +220,76 @@ describe("App Load and Edit", () => {
     expect(screen.queryByText("Cannot start playback")).toBeNull();
   });
 });
+
+describe("App theme image", () => {
+  const IMAGE = "data:image/png;base64,AAAA";
+  const THEME_NAME = "Picture";
+
+  function themeColors(image: string, imageScale = 1, imageX = 0, imageY = 0) {
+    return {
+      name: THEME_NAME,
+      bg_primary: "#000000",
+      bg_surface: "#111111",
+      bg_input: "#222222",
+      text_primary: "#ffffff",
+      text_muted: "#aaaaaa",
+      border: "#333333",
+      accent: "#ff8800",
+      accent_play: "#00ff00",
+      accent_stop: "#ff0000",
+      pedal_color: "#ffaa00",
+      accent_loaded: "#ffff00",
+      knob_color: "#ffffff",
+      viz_note_left: "",
+      viz_note_right: "",
+      viz_note_other: "",
+      viz_progress_line: "",
+      viz_measure_line: "",
+      viz_key_white: "",
+      viz_key_black: "",
+      viz_key_pressed: "",
+      image,
+      image_scale: imageScale,
+      image_x: imageX,
+      image_y: imageY,
+      builtin: false,
+    };
+  }
+
+  function answerWithTheme(image: string, imageScale = 1, imageX = 0, imageY = 0) {
+    tauriApi.invoke.mockImplementation(async (command: string) => {
+      if (command === "load_app_config") return {};
+      if (command === "get_active_theme_name") return THEME_NAME;
+      if (command === "get_custom_themes") return [themeColors(image, imageScale, imageX, imageY)];
+      return undefined;
+    });
+  }
+
+  it("shows the active theme's image in the transport bar", async () => {
+    answerWithTheme(IMAGE);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector(".transport-bar__image")?.getAttribute("src")).toBe(IMAGE));
+  });
+
+  it("scales and moves the image by the active theme's zoom and offsets", async () => {
+    answerWithTheme(IMAGE, 6.7, -12, 7);
+    render(<App />);
+    await waitFor(() => expect(document.querySelector(".transport-bar__image")).not.toBeNull());
+    const style = (document.querySelector(".transport-bar__image") as HTMLElement).style;
+    expect([style.getPropertyValue("--image-zoom"), style.getPropertyValue("--image-x"), style.getPropertyValue("--image-y")]).toEqual([
+      "6.7",
+      "-12px",
+      "7px",
+    ]);
+  });
+
+  it("shows no image when the active theme has none", async () => {
+    answerWithTheme("");
+    render(<App />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(document.documentElement.style.getPropertyValue("--accent")).toBe("#ff8800"));
+    expect(document.querySelector(".transport-bar__image")).toBeNull();
+  });
+});

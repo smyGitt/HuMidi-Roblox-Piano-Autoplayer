@@ -240,3 +240,21 @@ fn write_text_file_refuses_a_request_missing_its_arguments_without_calling_it_un
     let error = harness.invoke("write_text_file", json!({})).unwrap_err();
     assert!(!is_not_found(&error), "{error}");
 }
+
+#[test]
+fn read_image_data_url_is_registered_and_returns_a_data_url_for_the_path_the_frontend_sends() {
+    let harness = Harness::new();
+    let path = harness._dir.path().join("pic.png");
+    std::fs::write(&path, [0u8, 1, 2]).unwrap();
+    let result = harness
+        .invoke("read_image_data_url", json!({ "path": path.to_string_lossy() }))
+        .unwrap();
+    assert_eq!(result, json!("data:image/png;base64,AAEC"));
+}
+
+#[test]
+fn read_image_data_url_refuses_a_request_missing_its_path_without_calling_it_unknown() {
+    let harness = Harness::new();
+    let error = harness.invoke("read_image_data_url", json!({})).unwrap_err();
+    assert!(!is_not_found(&error), "{error}");
+}

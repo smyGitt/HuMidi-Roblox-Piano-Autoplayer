@@ -30,6 +30,10 @@ fn sample_theme(name: &str) -> ThemeColors {
         viz_key_white: "#ffffff".to_string(),
         viz_key_black: "#222222".to_string(),
         viz_key_pressed: "#33cc33".to_string(),
+        image: "data:image/png;base64,AAAA".to_string(),
+        image_scale: 2.5,
+        image_x: -12,
+        image_y: 7,
         builtin: false,
     }
 }
@@ -47,6 +51,63 @@ mod test_theme_colors_format {
         assert_eq!(customs[0].accent, "#5588ff");
         assert_eq!(customs[0].viz_note_left, "");
         assert_eq!(customs[0].viz_key_pressed, "");
+        assert_eq!(customs[0].image, "");
+        assert_eq!(customs[0].image_scale, 1.0);
+        assert_eq!(customs[0].image_x, 0);
+        assert_eq!(customs[0].image_y, 0);
+    }
+
+    #[test]
+    fn test_image_scale_and_offsets_round_trip_through_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        manager_in(dir.path()).save_custom(sample_theme("Sunset"));
+        let reloaded = manager_in(dir.path()).custom_themes();
+        assert_eq!(reloaded[0].image_scale, 2.5);
+        assert_eq!(reloaded[0].image_x, -12);
+        assert_eq!(reloaded[0].image_y, 7);
+    }
+
+    #[test]
+    fn test_a_scale_far_above_any_old_cap_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut theme = sample_theme("Huge");
+        theme.image_scale = 1234.5;
+        manager_in(dir.path()).save_custom(theme);
+        assert_eq!(manager_in(dir.path()).custom_themes()[0].image_scale, 1234.5);
+    }
+
+    #[test]
+    fn test_a_theme_with_an_image_but_no_scale_or_offsets_saved_loads_at_1x_and_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let saved = r##"{"custom":[{"name":"Pic","bg_primary":"#111111","bg_surface":"#222222","bg_input":"#333333","text_primary":"#eeeeee","text_muted":"#999999","border":"#444444","accent":"#5588ff","accent_play":"#33cc33","accent_stop":"#cc3333","pedal_color":"#ffaa00","accent_loaded":"#ccaa00","knob_color":"#ffffff","image":"data:image/png;base64,AAAA"}]}"##;
+        std::fs::write(dir.path().join("themes.json"), saved).unwrap();
+        let loaded = &manager_in(dir.path()).custom_themes()[0];
+        assert_eq!((loaded.image_scale, loaded.image_x, loaded.image_y), (1.0, 0, 0));
+    }
+
+    #[test]
+    fn test_an_old_percent_image_zoom_in_the_file_is_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        let saved = r##"{"custom":[{"name":"Pic","bg_primary":"#111111","bg_surface":"#222222","bg_input":"#333333","text_primary":"#eeeeee","text_muted":"#999999","border":"#444444","accent":"#5588ff","accent_play":"#33cc33","accent_stop":"#cc3333","pedal_color":"#ffaa00","accent_loaded":"#ccaa00","knob_color":"#ffffff","image":"data:image/png;base64,AAAA","image_zoom":250}]}"##;
+        std::fs::write(dir.path().join("themes.json"), saved).unwrap();
+        assert_eq!(manager_in(dir.path()).custom_themes()[0].image_scale, 1.0);
+    }
+
+    #[test]
+    fn test_image_round_trips_through_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        manager_in(dir.path()).save_custom(sample_theme("Sunset"));
+        let reloaded = manager_in(dir.path()).custom_themes();
+        assert_eq!(reloaded[0].image, "data:image/png;base64,AAAA");
+    }
+
+    #[test]
+    fn test_saving_a_theme_with_no_image_keeps_it_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut theme = sample_theme("Plain");
+        theme.image = String::new();
+        manager_in(dir.path()).save_custom(theme);
+        assert_eq!(manager_in(dir.path()).custom_themes()[0].image, "");
     }
 
     #[test]

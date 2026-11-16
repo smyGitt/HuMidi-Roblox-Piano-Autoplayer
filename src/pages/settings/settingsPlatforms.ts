@@ -68,7 +68,7 @@ export const SETTING_PLATFORMS: Record<SettingId, SettingPlatforms> = {
   midiDirectory: platforms(true, ALL_TESTED),
   themesFile: platforms(true, ALL_TESTED),
   playbackHotkey: platforms(true, ALL_TESTED),
-  saveHotkey: platforms(true, NOT_ON_LINUX),
+  saveHotkey: platforms(true, ALL_TESTED),
   linuxKeyboardHotkeys: platforms(false, ALL_TESTED),
   autoCheckUpdates: platforms(true, ALL_TESTED),
   checkNow: platforms(true, ALL_TESTED),

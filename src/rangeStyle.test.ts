@@ -259,3 +259,37 @@ describe("popup that opens above", () => {
     expect(above).toMatch(/bottom:\s*100%/);
   });
 });
+
+describe("theme editor font", () => {
+  it("uses the default font for the hex boxes, not a special one", () => {
+    const body = ruleBody(".theme-dialog__swatch-hex");
+    expect(body).not.toMatch(/font-family/);
+    expect(body).toMatch(/font-size:\s*var\(--font-size\)/);
+  });
+
+  it("has no special font anywhere in the theme editor rules", () => {
+    const start = appCss.indexOf(".theme-dialog {");
+    const end = appCss.indexOf(".message-modal__text {");
+    expect(appCss.slice(start, end)).not.toMatch(/font-family/);
+  });
+});
+
+describe("theme editor image row", () => {
+  it("lays the Choose Image and Clear buttons out in a row", () => {
+    const body = ruleBody(".theme-dialog__image-row");
+    expect(body).toMatch(/display:\s*flex/);
+    expect(body).toMatch(/gap:\s*var\(--space-1\)/);
+  });
+});
+
+describe("theme editor image fields", () => {
+  it("lines the Zoom, X and Y boxes up in a row with a label before each", () => {
+    const row = ruleBody(".theme-dialog__image-fields");
+    expect(row).toMatch(/display:\s*flex/);
+    expect(row).toMatch(/align-items:\s*center/);
+    expect(row).toMatch(/gap:\s*var\(--space-2\)/);
+    const field = ruleBody(".theme-dialog__image-field");
+    expect(field).toMatch(/display:\s*flex/);
+    expect(field).toMatch(/gap:\s*var\(--space-1\)/);
+  });
+});

@@ -21,9 +21,33 @@ export interface ThemeTokens {
   viz_key_pressed: string;
 }
 
+export const MIN_IMAGE_ZOOM = 0.1;
+export const IMAGE_ZOOM_STEP = 0.1;
+export const DEFAULT_IMAGE_ZOOM = 1;
+export const DEFAULT_IMAGE_OFFSET = 0;
+const IMAGE_ZOOM_DECIMALS = 1;
+
+export function clampImageZoom(value: number): number {
+  const rounded = Number(value.toFixed(IMAGE_ZOOM_DECIMALS));
+  return Math.max(MIN_IMAGE_ZOOM, rounded);
+}
+
+export function imageFields(theme: Theme) {
+  return {
+    image: theme.image ?? "",
+    image_scale: theme.imageZoom ?? DEFAULT_IMAGE_ZOOM,
+    image_x: theme.imageX ?? DEFAULT_IMAGE_OFFSET,
+    image_y: theme.imageY ?? DEFAULT_IMAGE_OFFSET,
+  };
+}
+
 export interface Theme {
   name: string;
   tokens: ThemeTokens;
+  image?: string;
+  imageZoom?: number;
+  imageX?: number;
+  imageY?: number;
 }
 
 export const THEMES: Theme[] = [
@@ -80,26 +104,51 @@ export const THEMES: Theme[] = [
   {
     name: "Hatsune Miku",
     tokens: {
+      bg_primary: "#000000",
+      bg_surface: "#1f1d1e",
+      bg_input: "#121112",
+      text_primary: "#ffffff",
+      text_muted: "#92898b",
+      border: "#3a3637",
+      accent: "#00d0ea",
+      accent_play: "#00d0ea",
+      accent_stop: "#ff0003",
+      pedal_color: "#009db2",
+      accent_loaded: "#ffd800",
+      knob_color: "#ffffff",
+      viz_note_left: "#00d0ea",
+      viz_note_right: "#009db2",
+      viz_note_other: "#92898b",
+      viz_progress_line: "#ff0003",
+      viz_measure_line: "#3a3637",
+      viz_key_white: "#ffffff",
+      viz_key_black: "#000000",
+      viz_key_pressed: "#00d0ea",
+    },
+  },
+  {
+    name: "Kasane Teto",
+    tokens: {
       bg_primary: "#111111",
-      bg_surface: "#2c2c2c",
-      bg_input: "#1a1611",
-      text_primary: "#00bbcc",
-      text_muted: "#2a7fa3",
-      border: "#2e5963",
-      accent: "#00ffff",
-      accent_play: "#4affff",
-      accent_stop: "#ff0000",
-      pedal_color: "#51a4cb",
-      accent_loaded: "#d4bd0d",
-      knob_color: "#dbdbdb",
-      viz_note_left: "#00ffff",
-      viz_note_right: "#4affff",
-      viz_note_other: "#2a7fa3",
-      viz_progress_line: "#ff0000",
-      viz_measure_line: "#2e5963",
-      viz_key_white: "#dbdbdb",
-      viz_key_black: "#2c2c2c",
-      viz_key_pressed: "#4affff",
+      bg_surface: "#2a2a2a",
+      bg_input: "#1a1a1a",
+      text_primary: "#f0f0f0",
+      text_muted: "#a08a8e",
+      border: "#4a3a3d",
+      accent: "#d4203c",
+      accent_play: "#ff5c77",
+      accent_stop: "#ff9f1c",
+      pedal_color: "#ff8fa3",
+      accent_loaded: "#f4c20d",
+      knob_color: "#f0f0f0",
+      viz_note_left: "#d4203c",
+      viz_note_right: "#ff8fa3",
+      viz_note_other: "#a08a8e",
+      viz_progress_line: "#ffd166",
+      viz_measure_line: "#4a3a3d",
+      viz_key_white: "#f0f0f0",
+      viz_key_black: "#2a2a2a",
+      viz_key_pressed: "#ff5c77",
     },
   },
 ];

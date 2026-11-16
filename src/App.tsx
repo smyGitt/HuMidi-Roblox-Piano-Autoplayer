@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ThemeProvider } from "./theme/ThemeProvider";
+import { ThemeProvider, useTheme } from "./theme/ThemeProvider";
 import { AppSettingsProvider, useAppSettings } from "./state/AppSettingsContext";
 import { PlaybackConfigProvider, usePlaybackConfig } from "./state/PlaybackConfigContext";
 import { LogProvider, useLog } from "./state/LogContext";
@@ -45,6 +45,7 @@ function AppShell() {
   const [trackSelectionOpen, setTrackSelectionOpen] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
   const { appendLog } = useLog();
+  const { theme } = useTheme();
   useCollapsedWindowSize(isCollapsed, windowRef, appendLog);
   useKeyForwarding();
   const {
@@ -149,6 +150,10 @@ function AppShell() {
         statusLabel={statusLabel}
         showStatusText={showStatusText}
         playEnabled={engine.hasCompiledNotes}
+        image={theme.image}
+        imageZoom={theme.imageZoom}
+        imageX={theme.imageX}
+        imageY={theme.imageY}
         onScrub={(time) => void engine.seek(time)}
         onPlayPause={() => {
           if (engine.isPlaying) void engine.togglePause();

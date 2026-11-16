@@ -159,6 +159,28 @@ describe("SettingsTab > Files page", () => {
 });
 
 describe("SettingsTab > Display page", () => {
+  it("the Customize button is in the Theme row, right after the dropdown and before the platform logos", () => {
+    renderSettings();
+    const row = screen.getByText("Theme").closest(".control-row") as HTMLElement;
+    const select = row.querySelector("select") as HTMLElement;
+    const button = screen.getByText("Customize...").closest("button") as HTMLElement;
+    expect(button.closest(".control-row")).toBe(row);
+    expect(select.nextElementSibling).toBe(button);
+    expect(button.nextElementSibling?.className).toBe("platform-icons");
+  });
+
+  it("the Appearance card has no footer any more", () => {
+    renderSettings();
+    const card = screen.getByText("Theme").closest(".card") as HTMLElement;
+    expect(card.querySelector(".card__footer")).toBeNull();
+  });
+
+  it("the Customize button still opens the theme editor", async () => {
+    renderSettings();
+    fireEvent.click(screen.getByText("Customize..."));
+    await waitFor(() => expect(screen.getByText("Theme Editor")).toBeTruthy());
+  });
+
   it("Max visible saves is a plain number box with no slider", () => {
     renderSettings();
     const row = screen.getByText("Max visible saves").closest(".control-row") as HTMLElement;

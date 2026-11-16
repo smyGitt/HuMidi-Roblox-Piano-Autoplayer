@@ -2129,6 +2129,7 @@ name = "humidi-tauri"
 version = "2.1.2"
 dependencies = [
  "approx",
+ "base64 0.22.1",
  "candle-core",
  "chrono",
  "dirs",

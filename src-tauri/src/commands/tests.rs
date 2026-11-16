@@ -4147,3 +4147,65 @@ mod test_write_text_file_logic {
         assert!(!path.exists());
     }
 }
+
+mod test_read_image_data_url_logic {
+    use super::*;
+
+    fn write(dir: &std::path::Path, name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let path = dir.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_a_png_becomes_a_png_data_url_of_its_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "a.png", &[0, 1, 2, 253, 254, 255]);
+        assert_eq!(
+            read_image_data_url_logic(&path).unwrap(),
+            "data:image/png;base64,AAEC/f7/"
+        );
+    }
+
+    #[test]
+    fn test_each_supported_extension_gets_its_mime_type_whatever_its_case() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, mime) in [
+            ("a.jpg", "image/jpeg"),
+            ("a.JPEG", "image/jpeg"),
+            ("a.gif", "image/gif"),
+            ("a.webp", "image/webp"),
+            ("a.svg", "image/svg+xml"),
+            ("a.PNG", "image/png"),
+        ] {
+            let path = write(dir.path(), name, &[1]);
+            let url = read_image_data_url_logic(&path).unwrap();
+            assert!(url.starts_with(&format!("data:{mime};base64,")), "{name}: {url}");
+        }
+    }
+
+    #[test]
+    fn test_an_unsupported_extension_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "a.txt", b"hello");
+        assert!(read_image_data_url_logic(&path).unwrap_err().contains("not a supported image"));
+        let none = write(dir.path(), "noext", b"hello");
+        assert!(read_image_data_url_logic(&none).unwrap_err().contains("not a supported image"));
+    }
+
+    #[test]
+    fn test_a_file_over_the_size_limit_is_refused_and_one_at_the_limit_is_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let big = write(dir.path(), "big.png", &vec![0u8; MAX_IMAGE_BYTES + 1]);
+        assert!(read_image_data_url_logic(&big).unwrap_err().contains("too large"));
+        let exact = write(dir.path(), "exact.png", &vec![0u8; MAX_IMAGE_BYTES]);
+        assert!(read_image_data_url_logic(&exact).is_ok());
+    }
+
+    #[test]
+    fn test_a_missing_file_reports_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let error = read_image_data_url_logic(&dir.path().join("missing.png")).unwrap_err();
+        assert!(!error.is_empty());
+    }
+}

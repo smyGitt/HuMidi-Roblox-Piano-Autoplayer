@@ -6,6 +6,12 @@ import { useTheme } from "../theme/ThemeProvider";
 import {
   THEMES,
   COLOR_FIELD_GROUPS,
+  DEFAULT_IMAGE_OFFSET,
+  DEFAULT_IMAGE_ZOOM,
+  IMAGE_ZOOM_STEP,
+  MIN_IMAGE_ZOOM,
+  clampImageZoom,
+  imageFields,
   applyThemeToRoot,
   completeTokens,
   uniqueCopyName,
@@ -18,10 +24,14 @@ import {
   deleteCustomTheme,
   exportThemeFile,
   importThemeFile,
+  readImageDataUrl,
   type CustomThemeColors,
 } from "../lib/tauri";
 import { Button } from "../components/Button";
 import { ColorInput, Select, TextInput } from "../components/Field";
+import { DraftNumberInput } from "../components/DraftNumberInput";
+
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 interface ThemeDialogProps {
   onClose: () => void;
@@ -94,28 +104,51 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
 
   async function persist(theme: Theme, builtin = false): Promise<void> {
     if (!isTauri()) return;
-    const payload: CustomThemeColors = { name: theme.name, ...theme.tokens, builtin };
+    const payload: CustomThemeColors = { name: theme.name, ...theme.tokens, ...imageFields(theme), builtin };
     await saveCustomTheme(payload);
     await refreshCustomThemes();
   }
 
-  async function handleColorChange(field: keyof ThemeTokens, value: string) {
+  async function changeCurrent(patch: Partial<Omit<Theme, "name">>) {
+    const changed = { tokens: current.tokens, image: current.image, imageZoom: current.imageZoom, imageX: current.imageX, imageY: current.imageY, ...patch };
     if (isBuiltin) {
       const candidate = uniqueCopyName(current.name, allNames);
-      const forked: Theme = { name: candidate, tokens: { ...current.tokens, [field]: value } };
+      const forked: Theme = { name: candidate, ...changed };
       await persist(forked);
       setCurrent(forked);
       setDirty(false);
       return;
     }
-    const updated: Theme = { name: current.name, tokens: { ...current.tokens, [field]: value } };
-    setCurrent(updated);
+    setCurrent({ name: current.name, ...changed });
     setDirty(true);
+  }
+
+  async function handleColorChange(field: keyof ThemeTokens, value: string) {
+    await changeCurrent({ tokens: { ...current.tokens, [field]: value } });
+  }
+
+  async function handlePickImage() {
+    const path = await openDialog({ multiple: false, filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }] });
+    if (!path || typeof path !== "string") return;
+    try {
+      const image = await readImageDataUrl(path);
+      await changeCurrent({ image });
+    } catch (e) {
+      window.alert(`Could not use that image: ${String(e)}`);
+    }
+  }
+
+  async function handleClearImage() {
+    await changeCurrent({ image: undefined });
+  }
+
+  async function handleImageNumber(value: number, apply: (value: number) => Partial<Omit<Theme, "name">>) {
+    await changeCurrent(apply(value));
   }
 
   async function handleNew() {
     const candidate = uniqueCopyName(current.name, allNames);
-    const forked: Theme = { name: candidate, tokens: current.tokens };
+    const forked: Theme = { ...current, name: candidate };
     await persist(forked);
     setCurrent(forked);
     setDirty(false);
@@ -141,10 +174,10 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
       window.alert(`A theme named "${newName}" already exists.`);
       return;
     }
-    const renamed: Theme = { name: newName, tokens: current.tokens };
+    const renamed: Theme = { ...current, name: newName };
     if (isTauri()) {
       await deleteCustomTheme(current.name);
-      await saveCustomTheme({ name: newName, ...renamed.tokens, builtin: false });
+      await saveCustomTheme({ name: newName, ...renamed.tokens, ...imageFields(renamed), builtin: false });
     }
     await refreshCustomThemes();
     setCurrent(renamed);
@@ -169,7 +202,7 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
     const path = await saveDialog({ defaultPath: `${safeName}.json`, filters: [{ name: "JSON", extensions: ["json"] }] });
     if (!path) return;
     try {
-      await exportThemeFile(path, { name: current.name, ...current.tokens, builtin: false });
+      await exportThemeFile(path, { name: current.name, ...current.tokens, ...imageFields(current), builtin: false });
     } catch (e) {
       window.alert(`Export failed: ${String(e)}`);
     }
@@ -187,8 +220,15 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
         candidate = `${imported.name || "Imported Theme"} ${n}`;
         n += 1;
       }
-      const { name: _n, builtin: _b, ...tokens } = imported;
-      const theme: Theme = { name: candidate, tokens: completeTokens(tokens) };
+      const { name: _n, builtin: _b, image, image_scale, image_x, image_y, ...tokens } = imported;
+      const theme: Theme = {
+        name: candidate,
+        tokens: completeTokens(tokens),
+        image: image || undefined,
+        imageZoom: image_scale,
+        imageX: image_x,
+        imageY: image_y,
+      };
       await persist(theme);
       setCurrent(theme);
       setDirty(false);
@@ -281,6 +321,50 @@ export function ThemeDialog({ onClose }: ThemeDialogProps) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="theme-dialog__group">
+          <span className="theme-dialog__group-title">Image</span>
+          <div className="theme-dialog__image-row">
+            <Button onClick={() => void handlePickImage()}>Choose Image</Button>
+            <Button disabled={!current.image} onClick={() => void handleClearImage()}>
+              Clear
+            </Button>
+          </div>
+          <div className="theme-dialog__image-fields">
+            <label className="theme-dialog__image-field">
+              <span>Zoom</span>
+              <DraftNumberInput
+                aria-label="Zoom"
+                min={MIN_IMAGE_ZOOM}
+                step={IMAGE_ZOOM_STEP}
+                value={current.imageZoom ?? DEFAULT_IMAGE_ZOOM}
+                disabled={!current.image}
+                onCommit={(v) => void handleImageNumber(v, (n) => ({ imageZoom: clampImageZoom(n) }))}
+              />
+              <span>x</span>
+            </label>
+            <label className="theme-dialog__image-field">
+              <span>X</span>
+              <DraftNumberInput
+                aria-label="X offset"
+                step={1}
+                value={current.imageX ?? DEFAULT_IMAGE_OFFSET}
+                disabled={!current.image}
+                onCommit={(v) => void handleImageNumber(v, (n) => ({ imageX: Math.round(n) }))}
+              />
+            </label>
+            <label className="theme-dialog__image-field">
+              <span>Y</span>
+              <DraftNumberInput
+                aria-label="Y offset"
+                step={1}
+                value={current.imageY ?? DEFAULT_IMAGE_OFFSET}
+                disabled={!current.image}
+                onCommit={(v) => void handleImageNumber(v, (n) => ({ imageY: Math.round(n) }))}
+              />
+            </label>
+          </div>
         </div>
 
         <div className="theme-dialog__save-row">

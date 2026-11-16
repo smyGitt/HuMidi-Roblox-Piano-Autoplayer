@@ -3,6 +3,11 @@ use std::path::{Path, PathBuf};
 use super::config_manager::determine_root_dir;
 
 pub const FALLBACK_THEME_NAME: &str = "Midnight";
+pub const DEFAULT_IMAGE_SCALE: f32 = 1.0;
+
+fn default_image_scale() -> f32 {
+    DEFAULT_IMAGE_SCALE
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ThemeColors {
@@ -35,6 +40,14 @@ pub struct ThemeColors {
     pub viz_key_black: String,
     #[serde(default)]
     pub viz_key_pressed: String,
+    #[serde(default)]
+    pub image: String,
+    #[serde(default = "default_image_scale")]
+    pub image_scale: f32,
+    #[serde(default)]
+    pub image_x: i32,
+    #[serde(default)]
+    pub image_y: i32,
     #[serde(default)]
     pub builtin: bool,
 }

@@ -36,6 +36,7 @@ pub fn invoke_handler<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> 
         commands::export_theme_file,
         commands::import_theme_file,
         commands::write_text_file,
+        commands::read_image_data_url,
         commands::save_playback,
         commands::check_save_name,
         commands::load_save_file,

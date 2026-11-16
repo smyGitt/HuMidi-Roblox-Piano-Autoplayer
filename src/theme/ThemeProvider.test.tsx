@@ -142,3 +142,75 @@ describe("ThemeProvider (Tauri mode, isTauri() = true)", () => {
     expect(tauriMocks.setActiveThemeName).toHaveBeenCalledWith("Light");
   });
 });
+
+describe("ThemeProvider theme image", () => {
+  beforeEach(() => {
+    tauriMocks.isTauri.mockReturnValue(true);
+  });
+
+  const baseCustom = {
+    name: "Sunset",
+    bg_primary: "#000",
+    bg_surface: "#111",
+    bg_input: "#222",
+    text_primary: "#fff",
+    text_muted: "#aaa",
+    border: "#333",
+    accent: "#f80",
+    accent_play: "#0f0",
+    accent_stop: "#f00",
+    pedal_color: "#fa0",
+    accent_loaded: "#ff0",
+    knob_color: "#fff",
+    viz_note_left: "",
+    viz_note_right: "",
+    viz_note_other: "",
+    viz_progress_line: "",
+    viz_measure_line: "",
+    viz_key_white: "",
+    viz_key_black: "",
+    viz_key_pressed: "",
+    builtin: false,
+  };
+
+  it("passes a custom theme's image on as theme.image", async () => {
+    tauriMocks.getActiveThemeName.mockReturnValue(Promise.resolve("Sunset"));
+    tauriMocks.getCustomThemes.mockReturnValue(Promise.resolve([{ ...baseCustom, image: "data:image/png;base64,AAAA" }]));
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    await waitFor(() => expect(result.current.themeName).toBe("Sunset"));
+    expect(result.current.theme.image).toBe("data:image/png;base64,AAAA");
+    expect(Object.keys(result.current.theme.tokens)).not.toContain("image");
+  });
+
+  it("passes the image scale and offsets on as theme.imageZoom, imageX and imageY", async () => {
+    tauriMocks.getActiveThemeName.mockReturnValue(Promise.resolve("Sunset"));
+    tauriMocks.getCustomThemes.mockReturnValue(
+      Promise.resolve([{ ...baseCustom, image: "data:x", image_scale: 6.7, image_x: -12, image_y: 7 }]),
+    );
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    await waitFor(() => expect(result.current.themeName).toBe("Sunset"));
+    expect([result.current.theme.imageZoom, result.current.theme.imageX, result.current.theme.imageY]).toEqual([6.7, -12, 7]);
+  });
+
+  it("leaves them unset when the file has none", async () => {
+    tauriMocks.getActiveThemeName.mockReturnValue(Promise.resolve("Sunset"));
+    tauriMocks.getCustomThemes.mockReturnValue(Promise.resolve([{ ...baseCustom, image: "data:x" }]));
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    await waitFor(() => expect(result.current.themeName).toBe("Sunset"));
+    expect([result.current.theme.imageZoom, result.current.theme.imageX, result.current.theme.imageY]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("has no image for a custom theme whose image is empty or missing, and for built-in themes", async () => {
+    tauriMocks.getActiveThemeName.mockReturnValue(Promise.resolve("Sunset"));
+    tauriMocks.getCustomThemes.mockReturnValue(Promise.resolve([{ ...baseCustom, image: "" }]));
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    await waitFor(() => expect(result.current.themeName).toBe("Sunset"));
+    expect(result.current.theme.image).toBeUndefined();
+    act(() => result.current.setThemeName(DEFAULT_THEME_NAME));
+    expect(result.current.theme.image).toBeUndefined();
+  });
+});

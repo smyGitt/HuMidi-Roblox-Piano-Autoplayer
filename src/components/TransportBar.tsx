@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   ArrowsInSimpleIcon,
   ArrowsOutSimpleIcon,
@@ -12,6 +13,7 @@ import { RangeInput } from "./Field";
 import { StatusIndicator, type PlaybackStatus } from "./StatusIndicator";
 import type { PlaybackClock } from "../state/playbackClock";
 import { useClockValue } from "../state/useClockValue";
+import { DEFAULT_IMAGE_OFFSET, DEFAULT_IMAGE_ZOOM } from "../theme/tokens";
 
 const SCRUBBER_STEPS = 10000;
 
@@ -32,6 +34,10 @@ interface TransportBarProps {
   statusLabel: string;
   showStatusText: boolean;
   playEnabled: boolean;
+  image?: string;
+  imageZoom?: number;
+  imageX?: number;
+  imageY?: number;
   onScrub: (time: number) => void;
   onPlayPause: () => void;
   onStop: () => void;
@@ -83,6 +89,10 @@ export function TransportBar({
   statusLabel,
   showStatusText,
   playEnabled,
+  image,
+  imageZoom = DEFAULT_IMAGE_ZOOM,
+  imageX = DEFAULT_IMAGE_OFFSET,
+  imageY = DEFAULT_IMAGE_OFFSET,
   onScrub,
   onPlayPause,
   onStop,
@@ -92,6 +102,14 @@ export function TransportBar({
 }: TransportBarProps) {
   return (
     <div className={`transport-bar${isCollapsed ? " transport-bar--collapsed" : ""}`}>
+      {image && (
+        <img
+          className="transport-bar__image"
+          src={image}
+          alt=""
+          style={{ "--image-zoom": imageZoom, "--image-x": `${imageX}px`, "--image-y": `${imageY}px` } as CSSProperties}
+        />
+      )}
       <ScrubberRow clock={clock} totalTime={totalTime} onScrub={onScrub} />
 
       <div className="transport-bar__btn-row">
