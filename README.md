@@ -14,7 +14,7 @@
 ## About HuMidi
 HuMidi includes various humanization options for a natural, human-like playback. Including automatic pedal timing and 88-key keyboard support. Easy to run via executable or source code, with GUI support included.
 
-<img width="408" height="454" alt="image" src="https://github.com/user-attachments/assets/d879a4cb-f3ca-494c-928e-40633103e234" />
+<img width="594" height="542" alt="v2 3 1showcase" src="https://github.com/user-attachments/assets/222d6dc0-ee3f-401d-b077-07d460b28a54" /> [Showcase video](https://youtu.be/SBgUwCTg3e0?si=sWQaj2faSUBnTLk1)
 
 ## Note on ML Components
 HuMidi now uses a trained model from [PedalAI](https://github.com/smyGitt/PedalAI) for sustain pedal generation. For information on training data sources, licensing, and related legal considerations, refer to [PedalAI's README](https://github.com/smyGitt/PedalAI#copyright--intended-use).
