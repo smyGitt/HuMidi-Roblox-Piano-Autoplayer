@@ -31,7 +31,6 @@
             --rule: #323232;
             --link: #8ab4f8;
             --key: #cfcfcf;
-            --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
             --rail: 13rem;
         }
         * { box-sizing: border-box; }
@@ -58,13 +57,13 @@
         .rail { position: sticky; top: 2rem; align-self: start; }
         .rail .logo { width: 4.5rem; height: 4.5rem; background: #fff; border-radius: 6px; padding: 4px; display: block; }
         .rail h1 { font-size: 1.6rem; margin: 0.9rem 0 0.25rem; }
-        .rail .ver { font: 0.85rem var(--mono); color: var(--muted); }
+        .rail .ver { font-size: 0.85rem; color: var(--muted); }
         .rail ul { list-style: none; padding: 0; margin: 1.5rem 0 0; border-left: 1px solid var(--rule); }
         .rail li a { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0 0.35rem 0.9rem; margin-left: -1px; border-left: 1px solid transparent; text-decoration: none; color: var(--text); }
         .rail li a:hover { border-left-color: var(--link); color: #fff; }
 
         main > section { margin-bottom: 3.5rem; }
-        main > section > h2 { display: flex; align-items: center; gap: 0.6rem; font-size: 0.95rem; font-family: var(--mono); font-weight: 600; text-transform: lowercase; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 1rem; }
+        main > section > h2 { display: flex; align-items: center; gap: 0.6rem; font-size: 0.95rem; font-weight: 600; text-transform: lowercase; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 1rem; }
         main > section > h2::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
 
         .lede { font-size: 1.15rem; margin-top: 0; }
@@ -75,14 +74,14 @@
         table.dl td, table.dl th { text-align: left; padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
         table.dl th { font-weight: 600; color: #fff; white-space: nowrap; }
         table.dl th span { display: inline-flex; align-items: center; gap: 0.6rem; }
-        table.dl td.f { font-family: var(--mono); font-size: 0.9rem; color: var(--muted); }
+        table.dl td.f { font-size: 0.9rem; color: var(--muted); }
         .alt { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
         .alt a { display: inline-flex; align-items: center; gap: 0.4rem; }
 
         .specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border: 1px solid var(--rule); }
         .spec { display: grid; grid-template-columns: 2rem 1fr; gap: 0.25rem 0.75rem; padding: 1rem; border: 0 solid var(--rule); border-width: 0 1px 1px 0; margin: 0 -1px -1px 0; }
         .spec svg.i { width: 1.4rem; height: 1.4rem; color: var(--link); margin-top: 0.15rem; grid-row: span 2; }
-        .spec b { color: #fff; font-family: var(--mono); font-size: 0.9rem; font-weight: 600; }
+        .spec b { color: #fff; font-size: 0.9rem; font-weight: 600; }
         .spec span { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
 
         .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 1rem; }
@@ -98,7 +97,7 @@
         ol.log li { display: grid; grid-template-columns: 5rem 1fr; gap: 0 1.5rem; position: relative; padding-bottom: 1.5rem; }
         ol.log li::before { content: ""; position: absolute; left: 5.75rem; top: 0.55rem; width: 0.55rem; height: 0.55rem; background: var(--bg); border: 1px solid var(--link); transform: translateX(-50%) rotate(45deg); }
         ol.log li:first-child::before { background: var(--link); }
-        ol.log .v { font: 600 0.95rem var(--mono); text-align: right; padding-top: 0.15rem; }
+        ol.log .v { font-weight: 600; font-size: 0.95rem; text-align: right; padding-top: 0.15rem; }
         ol.log h3 { font-size: 1rem; }
         ol.log p { color: var(--muted); margin: 0.25rem 0 0; font-size: 0.95rem; }
         ol.log li:first-child p { color: var(--text); }
@@ -188,7 +187,7 @@
             <div class="alt">
                 <a href="https://github.com/smyGitt/HuMidi-Roblox-Piano-Autoplayer/releases/latest"><svg class="i"><use href="#i-gh"/></svg>GitHub releases</a>
                 <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/files/latest/download"><svg class="i"><use href="#i-dl"/></svg>SourceForge</a>
-                <div class="sf-root" data-id="3982299" data-badge="oss-users-love-us-white" style="width:125px">
+                <div class="sf-root" data-id="3982299" data-badge="oss-sf-favorite-white" data-metadata="achievement=oss-sf-favorite" style="width:125px">
                     <a href="https://sourceforge.net/projects/humidi-roblox-piano-autoplayer/" target="_blank">HuMidi</a>
                 </div>
             </div>
