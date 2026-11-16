@@ -1,6 +1,6 @@
 export const appCss: string = Object.values(
   import.meta.glob<string>("/src/App.css", { query: "?raw", import: "default", eager: true }),
-)[0];
+)[0].replace(/\r\n/g, "\n");
 
 export function ruleBody(selector: string): string {
   const start = appCss.indexOf(`\n${selector} {`);
