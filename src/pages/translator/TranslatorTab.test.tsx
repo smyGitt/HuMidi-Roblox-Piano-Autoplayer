@@ -64,7 +64,6 @@ beforeEach(() => {
   logMocks.appendLog.mockReset();
   engineMock.fileName = "";
   engineMock.finalNotes = [];
-  window.localStorage.clear();
 });
 
 describe("TranslatorTab format dropdown", () => {
