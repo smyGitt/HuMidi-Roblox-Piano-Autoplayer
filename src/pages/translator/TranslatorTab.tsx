@@ -21,6 +21,8 @@ const SHEET_FILE_EXTENSION = "txt";
 const MIDI_EXTENSION = /\.midi?$/i;
 const MODES = ["Import", "Export"] as const;
 
+type SaveResult = { path: string } | { error: string };
+
 function FormatSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <div className="translator-tab__format">
@@ -84,19 +86,31 @@ export function TranslatorTab() {
     }
   }
 
-  async function saveSheet() {
+  async function saveSheet(text: string): Promise<SaveResult | null> {
     const baseName = engine.fileName.replace(MIDI_EXTENSION, "") || DEFAULT_SHEET_FILE_NAME;
     try {
       const path = await saveDialog({
         defaultPath: `${baseName}.${SHEET_FILE_EXTENSION}`,
         filters: [{ name: "Text", extensions: [SHEET_FILE_EXTENSION] }],
       });
-      if (typeof path !== "string") return;
-      await writeTextFile(path, exportText);
-      setExportStatus(`Saved to ${path}`);
+      if (typeof path !== "string") return null;
+      await writeTextFile(path, text);
+      return { path };
     } catch (e) {
-      setExportStatus(`Failed to save: ${String(e)}`);
+      return { error: String(e) };
     }
+  }
+
+  async function saveGeneratedSheet() {
+    const result = await saveSheet(exportText);
+    if (!result) return;
+    setExportStatus("path" in result ? `Saved to ${result.path}` : `Failed to save: ${result.error}`);
+  }
+
+  async function saveImportedSheet() {
+    const result = await saveSheet(importText);
+    if (!result) return;
+    appendLog("path" in result ? `Saved sheet to ${result.path}` : `Failed to save sheet: ${result.error}`);
   }
 
   return (
@@ -128,10 +142,16 @@ export function TranslatorTab() {
             <ToggleSwitch checked={humanize} onChange={setHumanize} label="Humanize" />
             <Button
               variant="accent"
+              size="sm"
               className="translator-tab__end"
               disabled={!importText.trim()}
-              onClick={playSheet}
+              onClick={saveImportedSheet}
+              aria-label="Save sheet"
+              title="Save sheet"
             >
+              <FloppyDiskIcon weight="fill" />
+            </Button>
+            <Button variant="accent" disabled={!importText.trim()} onClick={playSheet}>
               Play Sheet
             </Button>
           </div>
@@ -158,7 +178,7 @@ export function TranslatorTab() {
               variant="accent"
               size="sm"
               disabled={!exportText}
-              onClick={saveSheet}
+              onClick={saveGeneratedSheet}
               aria-label="Save sheet"
               title="Save sheet"
             >

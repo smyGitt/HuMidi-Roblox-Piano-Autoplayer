@@ -1,3 +1,6 @@
+import hatsuneMikuImage from "./images/hatsune-miku.webp?inline";
+import kasaneTetoImage from "./images/kasane-teto.webp?inline";
+
 export interface ThemeTokens {
   bg_primary: string;
   bg_surface: string;
@@ -125,6 +128,10 @@ export const THEMES: Theme[] = [
       viz_key_black: "#000000",
       viz_key_pressed: "#00d0ea",
     },
+    image: hatsuneMikuImage,
+    imageZoom: 12,
+    imageX: 130,
+    imageY: 185,
   },
   {
     name: "Kasane Teto",
@@ -150,6 +157,10 @@ export const THEMES: Theme[] = [
       viz_key_black: "#2a2a2a",
       viz_key_pressed: "#ff5c77",
     },
+    image: kasaneTetoImage,
+    imageZoom: 10.1,
+    imageX: -90,
+    imageY: 145,
   },
 ];
 

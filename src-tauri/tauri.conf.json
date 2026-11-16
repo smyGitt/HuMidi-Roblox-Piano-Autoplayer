@@ -23,6 +23,11 @@
       "csp": null
     }
   },
+  "plugins": {
+    "opener": {
+      "requireLiteralLeadingDot": false
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis", "app", "dmg", "appimage", "deb", "rpm"],

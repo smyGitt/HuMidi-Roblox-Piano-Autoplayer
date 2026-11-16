@@ -8,6 +8,7 @@ const tauriMocks = vi.hoisted(() => ({
   notesToSheet: vi.fn<() => Promise<string>>(),
   writeTextFile: vi.fn<(path: string, contents: string) => Promise<void>>(),
 }));
+const logMocks = vi.hoisted(() => ({ appendLog: vi.fn() }));
 const dialogMocks = vi.hoisted(() => ({ save: vi.fn<(options: unknown) => Promise<string | null>>() }));
 const engineMock = vi.hoisted(() => ({
   fileName: "",
@@ -37,7 +38,7 @@ vi.mock("../../state/PlaybackEngineContext", () => ({
 }));
 
 vi.mock("../../state/LogContext", () => ({
-  useLog: () => ({ appendLog: vi.fn() }),
+  useLog: () => ({ appendLog: logMocks.appendLog }),
   useOptionalLog: () => null,
 }));
 
@@ -60,6 +61,7 @@ beforeEach(() => {
   tauriMocks.notesToSheet.mockReset().mockResolvedValue(SHEET);
   tauriMocks.writeTextFile.mockReset().mockResolvedValue(undefined);
   dialogMocks.save.mockReset().mockResolvedValue("/home/me/song.txt");
+  logMocks.appendLog.mockReset();
   engineMock.fileName = "";
   engineMock.finalNotes = [];
   window.localStorage.clear();
@@ -155,11 +157,12 @@ describe("TranslatorTab full-screen text box", () => {
 });
 
 describe("TranslatorTab Play Sheet position", () => {
-  it("marks Play Sheet as the right-side button of the bar, last in the bar", () => {
+  it("keeps Play Sheet last in the bar, and the right-side marker on the button before it", () => {
     render(<TranslatorTab />);
     const play = screen.getByText("Play Sheet");
-    expect(play.className).toContain("translator-tab__end");
+    expect(play.className).not.toContain("translator-tab__end");
     expect(workspace().lastElementChild?.lastElementChild).toBe(play);
+    expect(play.previousElementSibling?.className).toContain("translator-tab__end");
   });
 });
 
@@ -272,5 +275,92 @@ describe("TranslatorTab save button", () => {
     tauriMocks.writeTextFile.mockRejectedValue("Permission denied (os error 13)");
     fireEvent.click(screen.getByLabelText("Save sheet"));
     expect(await screen.findByText("Failed to save: Permission denied (os error 13)")).toBeTruthy();
+  });
+});
+
+describe("TranslatorTab import save button", () => {
+  const IMPORT_SHEET = "q w e r\n[tu] p";
+
+  function typeSheet(text: string) {
+    fireEvent.change(screen.getByPlaceholderText("Paste a sheet here..."), { target: { value: text } });
+  }
+
+  function save(): HTMLButtonElement {
+    return screen.getByLabelText("Save sheet") as HTMLButtonElement;
+  }
+
+  function pathsOf(html: string): string[] {
+    return [...html.matchAll(/ d="([^"]+)"/g)].map((match) => match[1]);
+  }
+
+  it("is an icon-only filled floppy disk button immediately to the left of Play Sheet", () => {
+    render(<TranslatorTab />);
+    expect(save().textContent).toBe("");
+    const expected = render(<FloppyDiskIcon weight="fill" />);
+    expect(pathsOf(save().innerHTML)).toEqual(pathsOf(expected.container.innerHTML));
+    expect(save().title).toBe("Save sheet");
+    expect(save().nextElementSibling).toBe(screen.getByText("Play Sheet"));
+    expect(save().className).toContain("translator-tab__end");
+  });
+
+  it("is disabled until there is sheet text, like Play Sheet", () => {
+    render(<TranslatorTab />);
+    expect(save().disabled).toBe(true);
+    typeSheet("   ");
+    expect(save().disabled).toBe(true);
+    typeSheet(IMPORT_SHEET);
+    expect(save().disabled).toBe(false);
+  });
+
+  it("asks where to save, suggesting the song name with .txt, and writes the pasted sheet there", async () => {
+    engineMock.fileName = "song.mid";
+    render(<TranslatorTab />);
+    typeSheet(IMPORT_SHEET);
+    fireEvent.click(save());
+    await waitFor(() => expect(tauriMocks.writeTextFile).toHaveBeenCalledWith("/home/me/song.txt", IMPORT_SHEET));
+    expect(dialogMocks.save).toHaveBeenCalledWith({
+      defaultPath: "song.txt",
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+  });
+
+  it("suggests sheet.txt when no song is loaded", async () => {
+    render(<TranslatorTab />);
+    typeSheet(IMPORT_SHEET);
+    fireEvent.click(save());
+    await waitFor(() => expect(dialogMocks.save).toHaveBeenCalled());
+    expect(dialogMocks.save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "sheet.txt" }));
+  });
+
+  it("writes nothing when the user cancels the dialog", async () => {
+    dialogMocks.save.mockResolvedValue(null);
+    render(<TranslatorTab />);
+    typeSheet(IMPORT_SHEET);
+    fireEvent.click(save());
+    await waitFor(() => expect(dialogMocks.save).toHaveBeenCalled());
+    expect(tauriMocks.writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("records where it saved, and the error when it cannot write, in the app log", async () => {
+    render(<TranslatorTab />);
+    typeSheet(IMPORT_SHEET);
+    fireEvent.click(save());
+    await waitFor(() => expect(logMocks.appendLog).toHaveBeenCalledWith("Saved sheet to /home/me/song.txt"));
+    tauriMocks.writeTextFile.mockRejectedValue("Permission denied (os error 13)");
+    fireEvent.click(save());
+    await waitFor(() => expect(logMocks.appendLog).toHaveBeenCalledWith("Failed to save sheet: Permission denied (os error 13)"));
+  });
+
+  it("does not touch the Export page: its Save button still saves the generated sheet with its own status line", async () => {
+    tauriMocks.isTauri.mockReturnValue(true);
+    engineMock.finalNotes = [{}];
+    render(<TranslatorTab />);
+    typeSheet(IMPORT_SHEET);
+    openExport();
+    fireEvent.click(screen.getByText("Generate Sheet"));
+    await screen.findByText("Generated 2 line(s).");
+    fireEvent.click(screen.getByLabelText("Save sheet"));
+    await waitFor(() => expect(tauriMocks.writeTextFile).toHaveBeenCalledWith("/home/me/song.txt", SHEET));
+    expect(await screen.findByText("Saved to /home/me/song.txt")).toBeTruthy();
   });
 });

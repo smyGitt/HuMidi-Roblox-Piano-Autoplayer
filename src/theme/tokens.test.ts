@@ -79,3 +79,40 @@ describe("clampImageZoom", () => {
     expect(clampImageZoom(1)).toBe(1);
   });
 });
+
+describe("built-in theme images", () => {
+  const WEBP_PREFIX = "data:image/webp;base64,";
+
+  function ascii(image: string, from: number, to: number): string {
+    return atob(image.slice(WEBP_PREFIX.length)).slice(from, to);
+  }
+
+  function isWebp(image: string | undefined): boolean {
+    if (!image || !image.startsWith(WEBP_PREFIX)) return false;
+    return ascii(image, 0, 4) === "RIFF" && ascii(image, 8, 12) === "WEBP";
+  }
+
+  it("gives Hatsune Miku her picture, zoomed 12x and moved 130 right and 185 down", () => {
+    const miku = THEMES.find((theme) => theme.name === "Hatsune Miku")!;
+    expect(isWebp(miku.image)).toBe(true);
+    expect([miku.imageZoom, miku.imageX, miku.imageY]).toEqual([12, 130, 185]);
+  });
+
+  it("gives Kasane Teto her picture, zoomed 10.1x and moved 90 left and 145 down", () => {
+    const teto = THEMES.find((theme) => theme.name === "Kasane Teto")!;
+    expect(isWebp(teto.image)).toBe(true);
+    expect([teto.imageZoom, teto.imageX, teto.imageY]).toEqual([10.1, -90, 145]);
+  });
+
+  it("has two different pictures", () => {
+    const miku = THEMES.find((theme) => theme.name === "Hatsune Miku")!;
+    const teto = THEMES.find((theme) => theme.name === "Kasane Teto")!;
+    expect(miku.image).not.toBe(teto.image);
+  });
+
+  it("gives the other built-in themes no picture", () => {
+    for (const theme of THEMES.filter((t) => t.name !== "Hatsune Miku" && t.name !== "Kasane Teto")) {
+      expect(theme.image).toBeUndefined();
+    }
+  });
+});

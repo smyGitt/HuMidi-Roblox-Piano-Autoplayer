@@ -24,7 +24,7 @@ describe("translator page layout", () => {
 });
 
 describe("translator bar right side", () => {
-  it("pushes the marked button to the right edge of the bar", () => {
+  it("pushes the marked button, and so the buttons after it, to the right edge of the bar", () => {
     expect(ruleBody(".translator-tab__end")).toMatch(/margin-left:\s*auto/);
   });
 });
