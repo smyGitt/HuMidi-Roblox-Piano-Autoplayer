@@ -52,9 +52,7 @@ export function Sidebar({ activePage, onNavigate, visualizerDisabled }: SidebarP
     >
       <div className="sidebar__logo">
         <img src={logo} alt="" width={24} height={24} />
-        <span className="sidebar__wordmark">
-          Hu<i>Midi</i>
-        </span>
+        <span className="sidebar__wordmark">HuMidi</span>
       </div>
 
       <nav className="sidebar__nav">
