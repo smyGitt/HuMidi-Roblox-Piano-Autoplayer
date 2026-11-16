@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../../theme/ThemeProvider";
-import { AppSettingsProvider } from "../../state/AppSettingsContext";
+import { AppSettingsProvider, MAX_VISIBLE_SAVES } from "../../state/AppSettingsContext";
 import { PlaybackConfigProvider, usePlaybackConfig } from "../../state/PlaybackConfigContext";
 import { LogProvider } from "../../state/LogContext";
 import { DEFAULT_CONFIG } from "../playback/types";
@@ -159,10 +159,25 @@ describe("SettingsTab > Files page", () => {
 });
 
 describe("SettingsTab > Display page", () => {
+  it("Max visible saves is a plain number box with no slider", () => {
+    renderSettings();
+    const row = screen.getByText("Max visible saves").closest(".control-row") as HTMLElement;
+    expect(row.querySelector("input[type='range']")).toBeNull();
+    expect(row.querySelector("input[type='number']")).not.toBeNull();
+  });
+
+  it("Max visible saves clamps a typed value into its allowed range", async () => {
+    renderSettings();
+    const row = screen.getByText("Max visible saves").closest(".control-row") as HTMLElement;
+    const box = row.querySelector("input[type='number']") as HTMLInputElement;
+    fireEvent.change(box, { target: { value: "100000" } });
+    await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: MAX_VISIBLE_SAVES }));
+  });
+
   it("Max visible saves shows the default 20 and persists a change under max_visible_saves", async () => {
     renderSettings();
     const row = screen.getByText("Max visible saves").closest(".control-row") as HTMLElement;
-    const spinbox = row.querySelector(".slider-spinbox__spinbox") as HTMLInputElement;
+    const spinbox = row.querySelector("input[type='number']") as HTMLInputElement;
     expect(spinbox.value).toBe("20");
     fireEvent.change(spinbox, { target: { value: "35" } });
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: 35 }));
@@ -352,7 +367,15 @@ describe("SettingsTab > Hotkey page and remembered page", () => {
 vi.mock("./settingsPlatforms", async () => {
   const actual = await vi.importActual<typeof import("./settingsPlatforms")>("./settingsPlatforms");
   const everywhere = Object.fromEntries(
-    actual.SETTING_IDS.map((id) => [id, { windows: true, linux: id === "alwaysOnTop" ? "partial" : true }]),
+    actual.SETTING_IDS.map((id) => [
+      id,
+      {
+        windows: true,
+        linux: id === "alwaysOnTop" ? "partial" : true,
+        linuxWorks: ["System A"],
+        linuxFails: id === "alwaysOnTop" ? ["System B"] : [],
+      },
+    ]),
   );
   return { ...actual, SETTING_PLATFORMS: everywhere };
 });
@@ -439,5 +462,25 @@ describe("SettingsTab > explanations behind info icons", () => {
     const reset = screen.getByText("Reset All Settings").closest(".control-row") as HTMLElement;
     expect(tipText(reset)).toMatch(/^Restore all playback and humanization settings to their defaults/);
     expect(document.querySelectorAll(".page-placeholder__hint")).toHaveLength(0);
+  });
+});
+
+describe("SettingsTab > Linux logo hover", () => {
+  it("shows the systems a setting works on when its Linux logo is hovered", () => {
+    renderSettings();
+    const icon = screen.getAllByLabelText("Works on Linux")[0] as HTMLElement;
+    fireEvent.mouseEnter(icon.closest(".platform-icons__linux") as HTMLElement);
+    const items = [...screen.getByRole("tooltip").querySelectorAll("ul li")].map((item) => item.textContent);
+    expect(items).toEqual(["System A"]);
+  });
+
+  it("shows both lists on the triangle of Always on Top", () => {
+    renderSettings();
+    const icon = screen.getByLabelText("Partly works on Linux") as HTMLElement;
+    fireEvent.mouseEnter(icon.closest(".platform-icons__linux") as HTMLElement);
+    const lists = [...screen.getByRole("tooltip").querySelectorAll("ul")].map((list) =>
+      [...list.querySelectorAll("li")].map((item) => item.textContent),
+    );
+    expect(lists).toEqual([["System A"], ["System B"]]);
   });
 });

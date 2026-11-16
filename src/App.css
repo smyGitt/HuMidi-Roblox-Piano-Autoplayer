@@ -35,7 +35,6 @@
   --space-33: 264px;
   --space-34: 272px;
   --space-40: 320px;
-  --space-58: 464px;
   --sidebar-width: var(--space-7);
   --pedal-square-size: var(--space-16);
   --pedal-chart-height: var(--space-25);
@@ -507,14 +506,15 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  padding: 0 var(--space-1);
   background: var(--bg_primary);
   border-radius: var(--radius-pill);
 }
 
 .transport-bar__controls .btn {
   --icon-size: var(--space-4);
-  padding: 0;
+  padding: var(--space-1);
+  border-radius: 50%;
 }
 
 .transport-bar__controls .transport-bar__skip {
@@ -974,6 +974,15 @@ button:disabled {
   color: var(--text_primary);
 }
 
+.control-row:has(> .slider-spinbox) > .control-row__label {
+  flex: none;
+}
+
+.control-row > .slider-spinbox {
+  flex: 1;
+  min-width: 0;
+}
+
 .control-row__suffix {
   color: var(--text_muted);
 }
@@ -1010,6 +1019,11 @@ button:disabled {
   color: var(--text_primary);
   font-size: var(--font-size);
   white-space: normal;
+}
+
+.info-tip__text--above {
+  top: auto;
+  bottom: 100%;
 }
 
 .card--with-side {
@@ -1373,7 +1387,6 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-width: var(--space-58);
 }
 
 .settings-tab__path-input {
@@ -1837,4 +1850,26 @@ button:disabled {
 .platform-icons svg {
   width: var(--space-2);
   height: var(--space-2);
+}
+
+.platform-icons__windows,
+.platform-icons__linux {
+  display: inline-flex;
+  align-items: center;
+}
+
+.platform-icons__panel {
+  left: auto;
+  right: 0;
+}
+
+.platform-icons__heading {
+  display: block;
+  color: var(--text_muted);
+}
+
+.platform-icons__list {
+  margin: 0;
+  padding-left: var(--space-2);
+  list-style: disc;
 }

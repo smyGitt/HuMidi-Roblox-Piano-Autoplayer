@@ -82,3 +82,75 @@ describe("InfoTip", () => {
     expect(screen.getByText(TEXT)).toBeTruthy();
   });
 });
+
+describe("InfoTip near the edge of the window", () => {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+
+  function mockRect(rect: { left: number; top: number; right: number; bottom: number }) {
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const isPanel = this.getAttribute("role") === "tooltip";
+      return (isPanel ? { ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top, x: rect.left, y: rect.top, toJSON() {} } : original.call(this)) as DOMRect;
+    };
+  }
+
+  function restore() {
+    HTMLElement.prototype.getBoundingClientRect = original;
+  }
+
+  it("shifts left when the message would run past the right edge", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 700, configurable: true });
+    mockRect({ left: 900, top: 100, right: 1100, bottom: 150 });
+    render(<InfoTip text={TEXT} />);
+    fireEvent.click(button());
+    expect(screen.getByRole("tooltip").style.transform).toBe("translateX(-108px)");
+    restore();
+  });
+
+  it("shifts right when the message would run past the left edge", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 700, configurable: true });
+    mockRect({ left: -20, top: 100, right: 180, bottom: 150 });
+    render(<InfoTip text={TEXT} />);
+    fireEvent.click(button());
+    expect(screen.getByRole("tooltip").style.transform).toBe("translateX(28px)");
+    restore();
+  });
+
+  it("opens above the icon when there is no room below", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 700, configurable: true });
+    mockRect({ left: 100, top: 660, right: 300, bottom: 710 });
+    render(<InfoTip text={TEXT} />);
+    fireEvent.click(button());
+    expect(screen.getByRole("tooltip").className).toContain("info-tip__text--above");
+    restore();
+  });
+
+  it("stays where it is when it fits", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 700, configurable: true });
+    mockRect({ left: 100, top: 100, right: 300, bottom: 150 });
+    render(<InfoTip text={TEXT} />);
+    fireEvent.click(button());
+    const panel = screen.getByRole("tooltip");
+    expect(panel.style.transform).toBe("");
+    expect(panel.className).not.toContain("--above");
+    restore();
+  });
+
+  it("measures again the next time it opens", () => {
+    Object.defineProperty(window, "innerWidth", { value: 1000, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 700, configurable: true });
+    mockRect({ left: 900, top: 100, right: 1100, bottom: 150 });
+    const { container } = render(<InfoTip text={TEXT} />);
+    const tip = container.firstElementChild as HTMLElement;
+    fireEvent.mouseEnter(tip);
+    expect(screen.getByRole("tooltip").style.transform).toBe("translateX(-108px)");
+    fireEvent.mouseLeave(tip);
+    mockRect({ left: 100, top: 100, right: 300, bottom: 150 });
+    fireEvent.mouseEnter(tip);
+    expect(screen.getByRole("tooltip").style.transform).toBe("");
+    restore();
+  });
+});

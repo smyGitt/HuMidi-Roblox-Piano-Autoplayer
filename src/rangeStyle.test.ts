@@ -205,3 +205,57 @@ describe("humanize slider row layout", () => {
     expect(ruleBody(".hum-row__title")).toMatch(/cursor:\s*pointer/);
   });
 });
+
+describe("settings page width", () => {
+  it("has no maximum width, so the cards fill the page", () => {
+    expect(ruleBody(".settings-tab__display")).not.toMatch(/max-width/);
+    expect(appCss).not.toMatch(/--space-58/);
+  });
+});
+
+describe("platform logo hover panel", () => {
+  it("opens toward the left, so a panel at the right edge of a row stays on screen", () => {
+    const panel = ruleBody(".platform-icons__panel");
+    expect(panel).toMatch(/left:\s*auto/);
+    expect(panel).toMatch(/right:\s*0/);
+  });
+
+  it("lays each logo wrapper out like the bare logo it replaced", () => {
+    const match = appCss.match(/\.platform-icons__windows,\s*\.platform-icons__linux\s*\{([^}]*)\}/);
+    expect(match).not.toBeNull();
+    expect((match as RegExpMatchArray)[1]).toMatch(/display:\s*inline-flex/);
+    expect((match as RegExpMatchArray)[1]).toMatch(/align-items:\s*center/);
+  });
+});
+
+describe("platform logo panel list", () => {
+  it("shows plain bullets with a small indent and no extra margins", () => {
+    const list = ruleBody(".platform-icons__list");
+    expect(list).toMatch(/list-style:\s*disc/);
+    expect(list).toMatch(/margin:\s*0/);
+    expect(list).toMatch(/padding-left:\s*var\(--space-2\)/);
+  });
+
+  it("sets the headings apart from the items", () => {
+    expect(ruleBody(".platform-icons__heading")).toMatch(/color:\s*var\(--text_muted\)/);
+  });
+});
+
+describe("control row with a slider", () => {
+  it("lets the slider take the rest of the row after the label", () => {
+    expect(ruleBody(".control-row > .slider-spinbox")).toMatch(/flex:\s*1/);
+    expect(ruleBody(".control-row > .slider-spinbox")).toMatch(/min-width:\s*0/);
+  });
+
+  it("stops the label growing in a row that has a slider", () => {
+    expect(ruleBody(".control-row:has(> .slider-spinbox) > .control-row__label")).toMatch(/flex:\s*none/);
+  });
+});
+
+describe("popup that opens above", () => {
+  it("sits above the icon instead of below", () => {
+    const above = ruleBody(".info-tip__text--above");
+    expect(above).toMatch(/top:\s*auto/);
+    expect(above).toMatch(/bottom:\s*100%/);
+  });
+});

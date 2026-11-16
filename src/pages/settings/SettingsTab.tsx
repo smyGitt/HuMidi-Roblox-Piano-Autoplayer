@@ -29,7 +29,7 @@ import {
 } from "../../lib/tauri";
 import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
-import { Select, TextInput } from "../../components/Field";
+import { NumberInput, Select, TextInput } from "../../components/Field";
 import { Label } from "../../components/Label";
 import { InfoTip } from "../../components/InfoTip";
 import { PlatformIcons } from "../../components/PlatformIcons";
@@ -118,11 +118,14 @@ function DisplayPage() {
           <div className="control-row__label">
             <Label>Max visible saves</Label>
           </div>
-          <SliderSpinbox
+          <NumberInput
             min={MIN_VISIBLE_SAVES}
             max={MAX_VISIBLE_SAVES}
             value={settings.maxVisibleSaves}
-            onChange={settings.setMaxVisibleSaves}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isNaN(v)) settings.setMaxVisibleSaves(v);
+            }}
           />
           <Platforms id="maxVisibleSaves" />
         </div>

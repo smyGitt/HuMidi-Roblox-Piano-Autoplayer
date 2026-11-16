@@ -1,12 +1,14 @@
 import { InfoIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
+import { useKeepOnScreen } from "./useKeepOnScreen";
 
 export function InfoTip({ text }: { text: string }) {
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
   const open = hovered || pinned;
+  const { ref: panelRef, style: panelStyle, aboveClass } = useKeepOnScreen<HTMLSpanElement>(open);
 
   useEffect(() => {
     if (!pinned) return;
@@ -42,7 +44,7 @@ export function InfoTip({ text }: { text: string }) {
         <InfoIcon weight="fill" />
       </Button>
       {open && (
-        <span role="tooltip" className="info-tip__text">
+        <span role="tooltip" ref={panelRef} style={panelStyle} className={`info-tip__text${aboveClass}`}>
           {text}
         </span>
       )}

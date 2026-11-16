@@ -11,8 +11,14 @@ describe("transport bar media controls", () => {
     expect(controls()).not.toMatch(/border:/);
   });
 
-  it("has vertical padding as well as horizontal padding", () => {
-    expect(controls()).toMatch(/padding:\s*var\(--space-1\)\s+var\(--space-2\)/);
+  it("has only a little horizontal padding, since each round button carries its own padding", () => {
+    expect(controls()).toMatch(/padding:\s*0\s+var\(--space-1\)/);
+  });
+
+  it("makes each media button a circle with room around its icon, so the highlight is round", () => {
+    const button = ruleBody(".transport-bar__controls .btn");
+    expect(button).toMatch(/border-radius:\s*50%/);
+    expect(button).toMatch(/padding:\s*var\(--space-1\)/);
   });
 
   it("has a named pill radius token in :root", () => {
