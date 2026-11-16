@@ -5,6 +5,9 @@ import { PEDAL_MAPPING, type PlaybackConfig } from "./types";
 import { Button } from "../../components/Button";
 import { NumberInput, Select } from "../../components/Field";
 import { Label } from "../../components/Label";
+import { InfoTip } from "../../components/InfoTip";
+
+const PEDAL_STYLE_NOTE = "PedalAI or Adaptive is recommended, or pick None or no pedal event generation";
 
 const PEDAL_LABELS = Object.keys(PEDAL_MAPPING);
 const PEDAL_MAPPING_INV: Record<string, string> = Object.fromEntries(
@@ -24,7 +27,7 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
       title="PERFORMANCE"
       titleButtons={
         <Button variant="icon" subtle danger onClick={onReset} title="Reset">
-          <ArrowCounterClockwiseIcon weight="duotone" />
+          <ArrowCounterClockwiseIcon weight="fill" />
         </Button>
       }
       className="performance-card"
@@ -32,6 +35,7 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
       <div className="control-row">
         <div className="control-row__label">
           <Label>Pedal Style</Label>
+          <InfoTip text={PEDAL_STYLE_NOTE} />
         </div>
         <Select
           value={PEDAL_MAPPING_INV[config.pedal_style] ?? "PedalAI"}
@@ -44,9 +48,6 @@ export function PerformanceCard({ config, onChange, onReset, midiPedalAvailable 
           ))}
         </Select>
       </div>
-      <span className="performance-card__pedal-note">
-        Prefer PedalAI or Adaptive. The others ignore the musical style.
-      </span>
       <div className="control-row">
         <ToggleSwitch
           checked={config.pedal_before_humanize}

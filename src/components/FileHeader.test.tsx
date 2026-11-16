@@ -1,3 +1,4 @@
+import { FolderOpenIcon } from "@phosphor-icons/react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileHeader } from "./FileHeader";
@@ -110,5 +111,21 @@ describe("FileHeader save flow", () => {
     fireEvent.click(screen.getByText("Save", { selector: ".modal__footer .btn" }));
     await waitFor(() => expect(engine.save).toHaveBeenCalledWith("preview"));
     expect(tauriMocks.checkSaveName).not.toHaveBeenCalled();
+  });
+});
+
+describe("FileHeader folder icon", () => {
+  it("draws the Replace button with the filled open-folder icon", () => {
+    render(<FileHeader />);
+    const paths = (html: string) => [...html.matchAll(/ d="([^"]+)"/g)].map((match) => match[1]);
+    const actual = paths((screen.getByLabelText("Replace") as HTMLElement).innerHTML);
+    const expected = render(<FolderOpenIcon weight="fill" />);
+    const expectedPaths = paths(expected.container.innerHTML);
+    expect(actual).toEqual(expectedPaths);
+  });
+
+  it("keeps the Replace button at its current medium size", () => {
+    render(<FileHeader />);
+    expect(screen.getByLabelText("Replace").className).toContain("btn--md");
   });
 });

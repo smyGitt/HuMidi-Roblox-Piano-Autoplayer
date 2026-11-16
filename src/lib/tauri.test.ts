@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { forwardKey, fromBackendConfig, loadSaveForEdit, startPlayback, toBackendConfig, type SaveEditPlan } from "./tauri";
+import { forwardKey, fromBackendConfig, loadSaveForEdit, startPlayback, toBackendConfig, writeTextFile, type SaveEditPlan } from "./tauri";
 import { DEFAULT_CONFIG, type PlaybackConfig } from "../pages/playback/types";
 
 const coreMocks = vi.hoisted(() => ({
@@ -205,5 +205,12 @@ describe("loadSaveForEdit", () => {
   it("passes a backend failure on to the caller", async () => {
     coreMocks.invoke.mockRejectedValue("The MIDI file for this save was not found: /songs/a.mid.");
     await expect(loadSaveForEdit("/saves/a.json")).rejects.toContain("was not found");
+  });
+});
+
+describe("writeTextFile", () => {
+  it("asks the backend to write the text to the path", async () => {
+    await writeTextFile("/home/me/sheet.txt", "t y u");
+    expect(coreMocks.invoke).toHaveBeenCalledWith("write_text_file", { path: "/home/me/sheet.txt", contents: "t y u" });
   });
 });

@@ -31,12 +31,27 @@ import { Button } from "../../components/Button";
 import { TabPage } from "../../components/TabPage";
 import { Select, TextInput } from "../../components/Field";
 import { Label } from "../../components/Label";
+import { InfoTip } from "../../components/InfoTip";
+import { PlatformIcons } from "../../components/PlatformIcons";
+import { SETTING_PLATFORMS, type SettingId } from "./settingsPlatforms";
 import { isLinux } from "../../lib/platform";
 import { usePersistedState } from "../../state/usePersistedState";
 import { parseOneOf } from "../../state/persistedParsers";
 
+const KEYBOARD_ACCESS_DESCRIPTION =
+  "HuMidi reads your keyboard directly, so hotkeys work in every window, even when another app has focus. This also means HuMidi can see every key you press.";
+const PEDAL_PROMPT_DESCRIPTION =
+  "Minimum number of embedded MIDI sustain-pedal events before prompting whether to use them directly instead of generating new pedal events.";
+const RESET_DESCRIPTION =
+  "Restore all playback and humanization settings to their defaults. Pedal AI thresholds have their own Reset button on the Playback tab and are not affected here.";
+const REDACT_PATHS_DESCRIPTION = "Collapses absolute file paths in the Debug log to just their filename.";
+
 const NAV_ITEMS = ["Display", "Files", "Hotkey", "System", "Privacy"] as const;
 type SettingsNav = (typeof NAV_ITEMS)[number];
+
+function Platforms({ id }: { id: SettingId }) {
+  return <PlatformIcons {...SETTING_PLATFORMS[id]} />;
+}
 
 function DisplayPage() {
   const settings = useAppSettings();
@@ -48,22 +63,25 @@ function DisplayPage() {
       <Card title="Window">
         <div className="control-row">
           <ToggleSwitch checked={settings.alwaysOnTop} onChange={settings.setAlwaysOnTop} label="Always on Top" />
+          <Platforms id="alwaysOnTop" />
         </div>
         <div className="control-row">
           <div className="control-row__label">
             <Label>Opacity</Label>
           </div>
           <SliderSpinbox min={20} max={100} value={settings.opacity} suffix="%" onChange={settings.setOpacity} />
+          <Platforms id="opacity" />
         </div>
-        <p className="settings-tab__note">Transparency on Linux is currently not supported.</p>
         <div className="control-row">
           <ToggleSwitch checked={settings.showStatusText} onChange={settings.setShowStatusText} label="Show Status Text" />
+          <Platforms id="showStatusText" />
         </div>
       </Card>
 
       <Card title="Visualizer">
         <div className="control-row">
           <ToggleSwitch checked={settings.showTimeline} onChange={settings.setShowTimeline} label="Show Timeline" />
+          <Platforms id="showTimeline" />
         </div>
         <div className="control-row">
           <ToggleSwitch
@@ -71,9 +89,11 @@ function DisplayPage() {
             onChange={settings.setVisualizerHorizontal}
             label="Horizontal Scrolling"
           />
+          <Platforms id="visualizerHorizontal" />
         </div>
         <div className="control-row">
           <ToggleSwitch checked={settings.showPiano} onChange={settings.setShowPiano} label="Show Piano" />
+          <Platforms id="showPiano" />
         </div>
         <div className="control-row">
           <ToggleSwitch
@@ -81,6 +101,7 @@ function DisplayPage() {
             onChange={settings.setShowPianoPedal}
             label="Show Piano Pedal"
           />
+          <Platforms id="showPianoPedal" />
         </div>
         <div className="control-row">
           <ToggleSwitch
@@ -88,6 +109,7 @@ function DisplayPage() {
             onChange={settings.setSwitchToVisualizerOnPlay}
             label="Switch to Visualizer on Play"
           />
+          <Platforms id="switchToVisualizerOnPlay" />
         </div>
       </Card>
 
@@ -102,6 +124,7 @@ function DisplayPage() {
             value={settings.maxVisibleSaves}
             onChange={settings.setMaxVisibleSaves}
           />
+          <Platforms id="maxVisibleSaves" />
         </div>
       </Card>
 
@@ -124,6 +147,7 @@ function DisplayPage() {
               </option>
             ))}
           </Select>
+          <Platforms id="theme" />
         </div>
       </Card>
 
@@ -133,18 +157,20 @@ function DisplayPage() {
 }
 
 function DirectoryRow({
+  id,
   title,
   hint,
   path,
   onBrowse,
 }: {
+  id: SettingId;
   title: string;
   hint: string;
   path: string;
   onBrowse: () => void;
 }) {
   return (
-    <Card title={title}>
+    <Card title={title} titleButtons={<InfoTip text={hint} />}>
       <div className="control-row">
         <TextInput className="settings-tab__path-input" readOnly value={path || "Not set"} />
         <Button
@@ -157,8 +183,8 @@ function DirectoryRow({
         <Button onClick={onBrowse} disabled={!isTauri()}>
           Browse...
         </Button>
+        <Platforms id={id} />
       </div>
-      <span className="page-placeholder__hint">{hint}</span>
     </Card>
   );
 }
@@ -207,18 +233,21 @@ function FilesPage() {
   return (
     <div className="settings-tab__display">
       <DirectoryRow
+        id="saveDirectory"
         title="Save Directory"
         hint='Where "Save Playback" writes practice-run files.'
         path={saveDir}
         onBrowse={browseSaveDir}
       />
       <DirectoryRow
+        id="midiDirectory"
         title="MIDI Directory"
         hint="Default directory the MIDI file picker opens to."
         path={midiDir}
         onBrowse={browseMidiDir}
       />
       <DirectoryRow
+        id="themesFile"
         title="Themes File"
         hint="JSON file where custom themes are stored."
         path={themesFile}
@@ -272,6 +301,7 @@ function HotkeyPage() {
           >
             Change
           </Button>
+          <Platforms id="playbackHotkey" />
         </div>
       </Card>
       <Card title="Save Playback">
@@ -286,6 +316,7 @@ function HotkeyPage() {
           >
             Change
           </Button>
+          <Platforms id="saveHotkey" />
         </div>
       </Card>
       {isLinux() && (
@@ -296,11 +327,9 @@ function HotkeyPage() {
               onChange={settings.setLinuxKeyboardHotkeys}
               label="Always listen to keys (Linux)"
             />
+            <InfoTip text={KEYBOARD_ACCESS_DESCRIPTION} />
+            <Platforms id="linuxKeyboardHotkeys" />
           </div>
-          <p className="settings-tab__note">
-            HuMidi reads your keyboard directly, so hotkeys work in every window, even when another app has focus.
-            This also means HuMidi can see every key you press.
-          </p>
         </Card>
       )}
     </div>
@@ -347,6 +376,7 @@ function SystemPage() {
             onChange={settings.setAutoCheckUpdates}
             label="Automatically check for updates"
           />
+          <Platforms id="autoCheckUpdates" />
         </div>
         <div className="control-row">
           <Button disabled={checking} onClick={() => void handleCheckNow()}>
@@ -359,12 +389,14 @@ function SystemPage() {
           )}
           {checkResult?.status === "no_update" && <span>Up to date.</span>}
           {checkResult?.status === "indeterminate" && <span>Couldn't check for updates.</span>}
+          <Platforms id="checkNow" />
         </div>
       </Card>
       <Card title="MIDI Import">
         <div className="control-row">
           <div className="control-row__label">
             <Label>Pedal Prompt Threshold</Label>
+            <InfoTip text={PEDAL_PROMPT_DESCRIPTION} />
           </div>
           <SliderSpinbox
             min={1}
@@ -372,28 +404,25 @@ function SystemPage() {
             value={settings.pedalPromptThreshold}
             onChange={settings.setPedalPromptThreshold}
           />
+          <Platforms id="pedalPromptThreshold" />
         </div>
-        <span className="page-placeholder__hint">
-          Minimum number of embedded MIDI sustain-pedal events before prompting whether to use them directly
-          instead of generating new pedal events.
-        </span>
       </Card>
       <Card title="Reset">
-        <Button
-          onClick={() =>
-            setConfig((c) => ({
-              ...DEFAULT_CONFIG,
-              pedal_curve_on: c.pedal_curve_on,
-              pedal_curve_off: c.pedal_curve_off,
-            }))
-          }
-        >
-          Reset All Settings
-        </Button>
-        <span className="page-placeholder__hint">
-          Restore all playback and humanization settings to their defaults. Pedal AI thresholds have their own
-          Reset button on the Playback tab and are not affected here.
-        </span>
+        <div className="control-row">
+          <Button
+            onClick={() =>
+              setConfig((c) => ({
+                ...DEFAULT_CONFIG,
+                pedal_curve_on: c.pedal_curve_on,
+                pedal_curve_off: c.pedal_curve_off,
+              }))
+            }
+          >
+            Reset All Settings
+          </Button>
+          <InfoTip text={RESET_DESCRIPTION} />
+          <Platforms id="resetAll" />
+        </div>
       </Card>
     </div>
   );
@@ -405,9 +434,14 @@ function PrivacyPage() {
     <div className="settings-tab__display">
       <Card title="Debug Log">
         <div className="control-row">
-          <ToggleSwitch checked={redactPaths} onChange={setRedactPaths} label="Redact file paths" />
+          <ToggleSwitch
+            checked={redactPaths}
+            onChange={setRedactPaths}
+            label="Redact file paths"
+          />
+          <InfoTip text={REDACT_PATHS_DESCRIPTION} />
+          <Platforms id="redactPaths" />
         </div>
-        <span className="page-placeholder__hint">Collapses absolute file paths in the Debug log to just their filename.</span>
       </Card>
     </div>
   );

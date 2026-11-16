@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FloppyDiskIcon, FolderSimpleIcon, MusicNoteIcon, XSquareIcon } from "@phosphor-icons/react";
+import { FloppyDiskIcon, FolderOpenIcon, MusicNoteIcon, XSquareIcon } from "@phosphor-icons/react";
 import { Button } from "./Button";
 import { usePlaybackEngine } from "../state/PlaybackEngineContext";
 import { checkSaveName, isTauri } from "../lib/tauri";
@@ -52,7 +52,7 @@ export function FileHeader() {
   return (
     <div className="file-header">
       <div className="file-header__tile">
-        <MusicNoteIcon weight="duotone" />
+        <MusicNoteIcon weight="fill" />
       </div>
       <div className="file-header__info">
         <Label className="file-header__name" slide>{engine.fileName || "No file loaded"}</Label>
@@ -67,13 +67,13 @@ export function FileHeader() {
         aria-label="Save playback"
         title="Save playback"
       >
-        <FloppyDiskIcon weight="duotone" />
+        <FloppyDiskIcon weight="fill" />
       </Button>
       <Button variant="icon" subtle size="md" onClick={handleReplace} aria-label="Replace">
-        <FolderSimpleIcon weight="duotone" />
+        <FolderOpenIcon weight="fill" />
       </Button>
       <Button variant="icon" subtle size="md" onClick={() => void engine.clearSong()} aria-label="Clear">
-        <XSquareIcon weight="duotone" />
+        <XSquareIcon weight="fill" />
       </Button>
       {saveDialogOpen && (
         <SaveDialog

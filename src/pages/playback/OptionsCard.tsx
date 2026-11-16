@@ -16,7 +16,7 @@ export function OptionsCard({ config, onChange, onReset }: OptionsCardProps) {
       title="OPTIONS"
       titleButtons={
         <Button variant="icon" subtle danger onClick={onReset} title="Reset">
-          <ArrowCounterClockwiseIcon weight="duotone" />
+          <ArrowCounterClockwiseIcon weight="fill" />
         </Button>
       }
       className="options-card"

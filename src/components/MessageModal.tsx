@@ -39,9 +39,9 @@ export function MessageModal({ title, body, buttons, onClose, width = 420, heigh
               onClick={b.onClick}
               disabled={b.disabled}
             >
-              {b.leadingIcon && <b.leadingIcon weight="duotone" />}
+              {b.leadingIcon && <b.leadingIcon weight="fill" />}
               {b.label}
-              {b.trailingIcon && <b.trailingIcon weight="duotone" />}
+              {b.trailingIcon && <b.trailingIcon weight="fill" />}
             </Button>
           ))}
         </>

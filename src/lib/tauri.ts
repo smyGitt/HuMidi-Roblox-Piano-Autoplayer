@@ -328,6 +328,10 @@ export async function exportThemeFile(path: string, theme: CustomThemeColors): P
   return invoke("export_theme_file", { path, theme });
 }
 
+export async function writeTextFile(path: string, contents: string): Promise<void> {
+  return invoke("write_text_file", { path, contents });
+}
+
 export async function importThemeFile(path: string): Promise<CustomThemeColors> {
   return invoke("import_theme_file", { path });
 }

@@ -220,3 +220,23 @@ fn load_save_for_edit_refuses_a_request_without_its_filepath_without_calling_it_
     let error = harness.invoke("load_save_for_edit", json!({})).unwrap_err();
     assert!(error.to_string().contains("filepath"), "{error}");
 }
+
+#[test]
+fn write_text_file_is_registered_and_takes_path_and_contents_the_way_the_frontend_sends_them() {
+    let harness = Harness::new();
+    let path = harness._dir.path().join("sheet.txt");
+    harness
+        .invoke(
+            "write_text_file",
+            json!({ "path": path.to_string_lossy(), "contents": "t y u" }),
+        )
+        .unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "t y u");
+}
+
+#[test]
+fn write_text_file_refuses_a_request_missing_its_arguments_without_calling_it_unknown() {
+    let harness = Harness::new();
+    let error = harness.invoke("write_text_file", json!({})).unwrap_err();
+    assert!(!is_not_found(&error), "{error}");
+}

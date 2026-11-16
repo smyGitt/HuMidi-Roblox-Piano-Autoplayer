@@ -1,10 +1,11 @@
 import {
-  PauseCircleIcon,
-  PlayCircleIcon,
-  ResizeIcon,
-  SkipBackCircleIcon,
-  SkipForwardCircleIcon,
-  StopCircleIcon,
+  ArrowsInSimpleIcon,
+  ArrowsOutSimpleIcon,
+  PauseIcon,
+  PlayIcon,
+  SkipBackIcon,
+  SkipForwardIcon,
+  StopIcon,
 } from "@phosphor-icons/react";
 import { Button } from "./Button";
 import { RangeInput } from "./Field";
@@ -100,8 +101,8 @@ export function TransportBar({
         </div>
 
         <div className="transport-bar__controls">
-        <Button variant="icon" subtle size="lg" onClick={onSeekStart} disabled={!playEnabled} title="To start">
-          <SkipBackCircleIcon weight="duotone" />
+        <Button variant="icon" subtle size="lg" className="transport-bar__skip" onClick={onSeekStart} disabled={!playEnabled} title="To start">
+          <SkipBackIcon weight="fill" />
         </Button>
         <Button
           variant="icon" subtle size="lg"
@@ -109,23 +110,23 @@ export function TransportBar({
           disabled={!playEnabled}
           title={isPlaying ? "Pause" : "Play"}
         >
-          {isPlaying ? <PauseCircleIcon weight="duotone" /> : <PlayCircleIcon weight="duotone" />}
+          {isPlaying ? <PauseIcon weight="fill" /> : <PlayIcon weight="fill" />}
         </Button>
         <Button variant="icon" subtle size="lg" onClick={onStop} disabled={status === "unloaded"} title="Stop">
-          <StopCircleIcon weight="duotone" />
+          <StopIcon weight="fill" />
         </Button>
-        <Button variant="icon" subtle size="lg" onClick={onSeekEnd} disabled={!playEnabled} title="To end">
-          <SkipForwardCircleIcon weight="duotone" />
+        <Button variant="icon" subtle size="lg" className="transport-bar__skip" onClick={onSeekEnd} disabled={!playEnabled} title="To end">
+          <SkipForwardIcon weight="fill" />
         </Button>
         </div>
 
         <div className="transport-bar__side transport-bar__side--end">
           <Button
-            variant="icon" size="md"
+            variant="icon" subtle size="md"
             onClick={onToggleCollapsed}
             title={isCollapsed ? "Expand" : "Collapse"}
           >
-            <ResizeIcon weight="duotone" style={isCollapsed ? { transform: "rotate(180deg)" } : undefined} />
+            {isCollapsed ? <ArrowsOutSimpleIcon weight="fill" /> : <ArrowsInSimpleIcon weight="fill" />}
           </Button>
         </div>
       </div>

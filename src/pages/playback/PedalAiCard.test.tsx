@@ -177,3 +177,26 @@ describe("PedalAiCard curve editor", () => {
     expect(onCurvesChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PedalAiCard threshold explanation", () => {
+  const TEXT = "The On and Off thresholds set how confident the model must be before the pedal goes down and before it lifts.";
+
+  it("is behind an info icon next to the title, before and after generating", () => {
+    for (const hasThresholds of [false, true]) {
+      const { unmount } = render(<PedalAiCard {...baseProps({ hasThresholds })} />);
+      expect(screen.queryByText(TEXT)).toBeNull();
+      const row = screen.getByText("PEDAL AI THRESHOLDS").closest(".card__title-row") as HTMLElement;
+      const tip = row.querySelector(".info-tip") as HTMLElement;
+      expect(tip).not.toBeNull();
+      expect(row.firstElementChild?.nextElementSibling).toBe(tip);
+      fireEvent.mouseEnter(tip);
+      expect(screen.getByRole("tooltip").textContent).toBe(TEXT);
+      unmount();
+    }
+  });
+
+  it("no longer has the hint line beside the Generate button", () => {
+    render(<PedalAiCard {...baseProps({ hasThresholds: false })} />);
+    expect(document.querySelector(".pedal-ai-card__hint")).toBeNull();
+  });
+});

@@ -170,3 +170,166 @@ describe("PlaybackTab opening the Load Save dialog", () => {
     await waitFor(() => expect(screen.getByText("Select a save to see its details.")).toBeTruthy());
   });
 });
+
+describe("PlaybackTab humanize explanations", () => {
+  const EXPLANATIONS = [
+    "turn all the human touches on or off at once",
+    "each hand gets its own slightly different timing",
+    "notes in a chord start just a hair apart, like a real hand",
+    "notes start a little early or late, like a real player",
+    "some notes get held a bit longer or shorter",
+    "the speed drifts a little faster and slower as the song goes",
+    "makes the speed changes go the opposite way",
+    "your hands slowly slip out of sync with each other",
+    "once in a while a note gets missed or played wrong",
+  ];
+
+  it("shows every explanation behind an info icon, none as a line of text", async () => {
+    render(tree());
+    fireEvent.click(screen.getByText("Humanize"));
+    await waitFor(() => expect(document.querySelector(".playback-tab__humanize-page")).not.toBeNull());
+    const page = document.querySelector(".playback-tab__humanize-page") as HTMLElement;
+    for (const text of EXPLANATIONS) expect(screen.queryByText(text)).toBeNull();
+    const tips = [...page.querySelectorAll(".info-tip")] as HTMLElement[];
+    expect(tips).toHaveLength(EXPLANATIONS.length);
+    const shown: (string | null)[] = [];
+    for (const tip of tips) {
+      fireEvent.mouseEnter(tip);
+      shown.push(screen.getByRole("tooltip").textContent);
+      fireEvent.mouseLeave(tip);
+    }
+    expect(shown).toEqual(EXPLANATIONS);
+    expect(page.querySelector(".check-pair__desc")).toBeNull();
+    expect(page.querySelector(".toggle-switch__description")).toBeNull();
+  });
+
+  it("puts the Invert Sway icon right after its checkbox label, in its own row", async () => {
+    render(tree());
+    fireEvent.click(screen.getByText("Humanize"));
+    await waitFor(() => expect(screen.getByText("Invert Sway")).toBeTruthy());
+    const label = screen.getByText("Invert Sway").closest("label") as HTMLElement;
+    expect(label.parentElement?.className).toBe("control-row hum-row__indent");
+    expect(label.nextElementSibling?.className).toBe("info-tip");
+  });
+});
+
+describe("PlaybackTab generate pedal events button follows the pedal style", () => {
+  async function openPlaybackPage() {
+    render(tree());
+    fireEvent.click(screen.getByText("Playback"));
+    await waitFor(() => expect(screen.getByText("Generate pedal events")).toBeTruthy());
+  }
+
+  function generateButton(): HTMLButtonElement {
+    return screen.getByText("Generate pedal events") as HTMLButtonElement;
+  }
+
+  function chooseStyle(label: string) {
+    const select = screen.getByText("Pedal Style").closest(".control-row")!.querySelector("select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: label } });
+  }
+
+  it("is enabled for the default style once the notes are compiled", async () => {
+    engine.hasCompiledNotes = true;
+    await openPlaybackPage();
+    expect(generateButton().disabled).toBe(false);
+  });
+
+  it("is disabled when the pedal style is None", async () => {
+    engine.hasCompiledNotes = true;
+    await openPlaybackPage();
+    chooseStyle("None");
+    await waitFor(() => expect(generateButton().disabled).toBe(true));
+  });
+
+  it("is enabled again as soon as the style is anything but None", async () => {
+    engine.hasCompiledNotes = true;
+    await openPlaybackPage();
+    chooseStyle("None");
+    await waitFor(() => expect(generateButton().disabled).toBe(true));
+    for (const label of ["PedalAI", "Adaptive", "Rhythmic", "Harmonic"]) {
+      chooseStyle(label);
+      await waitFor(() => expect(generateButton().disabled).toBe(false));
+    }
+  });
+
+  it("stays disabled without compiled notes whatever the style", async () => {
+    engine.hasCompiledNotes = false;
+    await openPlaybackPage();
+    expect(generateButton().disabled).toBe(true);
+    chooseStyle("Rhythmic");
+    await waitFor(() => expect(generateButton().disabled).toBe(true));
+  });
+});
+
+describe("PlaybackTab humanize card reset buttons", () => {
+  async function openHumanize() {
+    render(tree());
+    fireEvent.click(screen.getByText("Humanize"));
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Vary Timing" })).toBeTruthy());
+  }
+
+  function switchNamed(name: string): HTMLElement {
+    return screen.getByRole("switch", { name });
+  }
+
+  function cardReset(title: string): HTMLElement {
+    const row = screen.getByText(title).closest(".card__title-row") as HTMLElement;
+    return row.querySelector("button[title='Reset']") as HTMLElement;
+  }
+
+  it("gives Timing & Feel and Hands & Imperfection a Reset button in the title row", async () => {
+    await openHumanize();
+    expect(cardReset("TIMING & FEEL")).not.toBeNull();
+    expect(cardReset("HANDS & IMPERFECTION")).not.toBeNull();
+  });
+
+  it("Timing & Feel reset turns its switches off and restores its sliders", async () => {
+    await openHumanize();
+    fireEvent.click(switchNamed("Vary Timing"));
+    fireEvent.click(switchNamed("Tempo Sway"));
+    await waitFor(() => expect(switchNamed("Vary Timing").getAttribute("aria-checked")).toBe("true"));
+    const spinbox = document.querySelectorAll(".slider-spinbox__spinbox")[0] as HTMLInputElement;
+    fireEvent.change(spinbox, { target: { value: "0.08" } });
+    await waitFor(() => expect(spinbox.value).toBe("0.08"));
+    fireEvent.click(cardReset("TIMING & FEEL"));
+    await waitFor(() => expect(switchNamed("Vary Timing").getAttribute("aria-checked")).toBe("false"));
+    expect(switchNamed("Tempo Sway").getAttribute("aria-checked")).toBe("false");
+    expect(spinbox.value).toBe("0.01");
+  });
+
+  it("Timing & Feel reset also clears Invert Sway", async () => {
+    await openHumanize();
+    fireEvent.click(switchNamed("Tempo Sway"));
+    const invert = screen.getByText("Invert Sway").closest("label")!.querySelector("input") as HTMLInputElement;
+    await waitFor(() => expect(invert.disabled).toBe(false));
+    fireEvent.click(invert);
+    await waitFor(() => expect(invert.checked).toBe(true));
+    fireEvent.click(cardReset("TIMING & FEEL"));
+    await waitFor(() => expect(invert.checked).toBe(false));
+  });
+
+  it("Hands & Imperfection reset turns its switches off and restores its sliders", async () => {
+    await openHumanize();
+    fireEvent.click(switchNamed("Hand Drift"));
+    fireEvent.click(switchNamed("Mistake Chance"));
+    await waitFor(() => expect(switchNamed("Hand Drift").getAttribute("aria-checked")).toBe("true"));
+    fireEvent.click(cardReset("HANDS & IMPERFECTION"));
+    await waitFor(() => expect(switchNamed("Hand Drift").getAttribute("aria-checked")).toBe("false"));
+    expect(switchNamed("Mistake Chance").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("each reset leaves the other card's settings alone", async () => {
+    await openHumanize();
+    fireEvent.click(switchNamed("Vary Timing"));
+    fireEvent.click(switchNamed("Hand Drift"));
+    await waitFor(() => expect(switchNamed("Hand Drift").getAttribute("aria-checked")).toBe("true"));
+    fireEvent.click(cardReset("TIMING & FEEL"));
+    await waitFor(() => expect(switchNamed("Vary Timing").getAttribute("aria-checked")).toBe("false"));
+    expect(switchNamed("Hand Drift").getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(switchNamed("Vary Timing"));
+    fireEvent.click(cardReset("HANDS & IMPERFECTION"));
+    await waitFor(() => expect(switchNamed("Hand Drift").getAttribute("aria-checked")).toBe("false"));
+    expect(switchNamed("Vary Timing").getAttribute("aria-checked")).toBe("true");
+  });
+});

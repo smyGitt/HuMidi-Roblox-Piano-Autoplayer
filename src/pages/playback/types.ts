@@ -28,8 +28,10 @@ export interface PlaybackConfig {
   pedal_before_humanize: boolean;
 }
 
+export const NO_PEDAL_STYLE = "none";
+
 export const PEDAL_MAPPING: Record<string, string> = {
-  None: "none",
+  None: NO_PEDAL_STYLE,
   PedalAI: "ai",
   Adaptive: "hybrid",
   Rhythmic: "rhythmic",

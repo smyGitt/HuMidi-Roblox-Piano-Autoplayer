@@ -65,7 +65,7 @@ export function Sidebar({ activePage, onNavigate, visualizerDisabled }: SidebarP
             disabled={id === "visualizer" && visualizerDisabled}
             onClick={() => onNavigate(id)}
           >
-            <NavIcon weight="duotone" />
+            <NavIcon weight="fill" />
             <span className="sidebar__nav-label">{label}</span>
           </Button>
         ))}
@@ -74,7 +74,7 @@ export function Sidebar({ activePage, onNavigate, visualizerDisabled }: SidebarP
       <div className="sidebar__spacer" />
 
       <Link variant="nav" href="https://discord.gg/bRaXP9gYZN" target="_blank" rel="noreferrer" title="Discord">
-        <DiscordLogoIcon weight="duotone" />
+        <DiscordLogoIcon weight="fill" />
         <span className="sidebar__nav-label">Discord</span>
       </Link>
     </aside>

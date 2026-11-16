@@ -1,14 +1,17 @@
+import { CopySimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Card } from "../../components/Card";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
 import { useLog, type LogLevel, type SnapshotKey } from "../../state/LogContext";
 import { Button } from "../../components/Button";
 import { Select } from "../../components/Field";
+import { SidePanel } from "../../components/SidePanel";
 import { usePersistedState } from "../../state/usePersistedState";
 import { parseBoolean, parseOneOf } from "../../state/persistedParsers";
 
 const LEVELS: LogLevel[] = ["INFO", "DEBUG", "WARN", "OK"];
 const FILTER_OPTIONS = ["All", ...LEVELS];
+const LINE_BREAK = "\n";
 
 const SNAPSHOT_ROWS: { key: SnapshotKey; label: string }[] = [
   { key: "file", label: "File" },
@@ -42,23 +45,54 @@ export function DebugTab() {
     return c;
   }, [entries]);
 
+  function exportLog() {
+    const blob = new Blob([entries.map((e) => e.line).join(LINE_BREAK)], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `humidi_log_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="debug-tab">
-      <div className="debug-tab__body">
-        <Card title="" className="debug-tab__console-card">
-          <div ref={consoleRef} className="debug-tab__console">
-            {filtered.length === 0 ? (
-              <span className="page-placeholder__hint">No log entries.</span>
-            ) : (
-              filtered.map((e, i) => (
-                <div key={i} className={`debug-tab__line debug-tab__line--${e.level.toLowerCase()}`}>
-                  {e.line}
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+      <div className="debug-tab__main">
+        <div className="debug-tab__body">
+          <Card
+            title=""
+            className="debug-tab__console-card"
+            footer={
+              <>
+                <Button onClick={clear}>Clear</Button>
+                <Button
+                  size="sm"
+                  onClick={() => navigator.clipboard.writeText(filtered.map((e) => e.line).join(LINE_BREAK))}
+                  aria-label="Copy Log"
+                  title="Copy Log"
+                >
+                  <CopySimpleIcon weight="fill" />
+                </Button>
+                <Button onClick={exportLog}>Export Log</Button>
+              </>
+            }
+          >
+            <div ref={consoleRef} className="debug-tab__console">
+              {filtered.length === 0 ? (
+                <span className="page-placeholder__hint">No log entries.</span>
+              ) : (
+                filtered.map((e, i) => (
+                  <div key={i} className={`debug-tab__line debug-tab__line--${e.level.toLowerCase()}`}>
+                    {e.line}
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
+      <SidePanel>
         <div className="debug-tab__sidebar">
           <Card title="Filter">
             <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
@@ -91,29 +125,7 @@ export function DebugTab() {
             </div>
           </Card>
         </div>
-      </div>
-
-      <div className="debug-tab__footer">
-        <Button onClick={clear}>
-          Clear
-        </Button>
-        <Button onClick={() => navigator.clipboard.writeText(filtered.map((e) => e.line).join("\n"))}
-        >
-          Copy Log
-        </Button>
-        <Button onClick={() => {
-            const blob = new Blob([entries.map((e) => e.line).join("\n")], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `humidi_log_${Date.now()}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          Export Log
-        </Button>
-      </div>
+      </SidePanel>
     </div>
   );
 }

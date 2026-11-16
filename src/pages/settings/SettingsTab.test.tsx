@@ -168,13 +168,10 @@ describe("SettingsTab > Display page", () => {
     await waitFor(() => expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ max_visible_saves: 35 }));
   });
 
-  it("the Window card, next to Opacity, says transparency on Linux is not supported", () => {
+  it("the Window card has no notes about Wayland or transparency", () => {
     renderSettings();
-    const note = screen.getByText("Transparency on Linux is currently not supported.");
-    const card = note.closest(".card") as HTMLElement;
-    expect(card.querySelector(".card__title")?.textContent).toBe("Window");
-    expect(card.contains(screen.getByText("Opacity"))).toBe(true);
-    expect(note.querySelector("input, button, [role='switch']")).toBeNull();
+    expect(screen.queryByText("Always on top is not supported on Wayland.")).toBeNull();
+    expect(screen.queryByText("Transparency on Linux is currently not supported.")).toBeNull();
   });
 
   it("Max visible saves is inside a Saved Songs card", () => {
@@ -268,18 +265,21 @@ describe("SettingsTab > Hotkey page > Linux keyboard access", () => {
     expect(card.querySelector(".card__title")?.textContent).toBe(KEYBOARD_CARD_TITLE);
   });
 
-  it("warns, in plain text right under the switch, that HuMidi can then see every key pressed", () => {
+  it("puts the explanation behind an info icon right after the switch, in the same card", () => {
     openHotkeyPage();
     const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    expect(screen.queryByText(KEYBOARD_WARNING)).toBeNull();
+    expect(toggle.nextElementSibling?.className).toBe("info-tip");
+    fireEvent.mouseEnter(toggle.nextElementSibling as HTMLElement);
     const warning = screen.getByText(KEYBOARD_WARNING);
-    expect(warning).toBeVisible();
     expect(toggle.closest(".card")?.contains(warning)).toBe(true);
-    expect(toggle.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(warning.querySelector("input, button, [role='switch']")).toBeNull();
+    expect(document.querySelector(".settings-tab__note")).toBeNull();
   });
 
   it("explains the switch in at most two sentences, using only letters, spaces, periods and commas", () => {
     openHotkeyPage();
+    const toggle = screen.getByText(KEYBOARD_SWITCH_LABEL).closest("[role='switch']") as HTMLElement;
+    fireEvent.mouseEnter(toggle.nextElementSibling as HTMLElement);
     const text = screen.getByText(KEYBOARD_WARNING).textContent ?? "";
     expect(text.match(/[.!?]/g)?.length).toBeLessThanOrEqual(2);
     expect(text).toMatch(/^[A-Za-z ,.]+$/);
@@ -346,5 +346,98 @@ describe("SettingsTab > Hotkey page and remembered page", () => {
     });
     expect(tauriMocks.saveAppConfig).toHaveBeenCalledWith({ ui_settings_page: "Privacy" });
     vi.useRealTimers();
+  });
+});
+
+vi.mock("./settingsPlatforms", async () => {
+  const actual = await vi.importActual<typeof import("./settingsPlatforms")>("./settingsPlatforms");
+  const everywhere = Object.fromEntries(
+    actual.SETTING_IDS.map((id) => [id, { windows: true, linux: id === "alwaysOnTop" ? "partial" : true }]),
+  );
+  return { ...actual, SETTING_PLATFORMS: everywhere };
+});
+
+describe("SettingsTab > platform icons", () => {
+  const PAGES = [
+    { page: "Display", controls: 10 },
+    { page: "Files", controls: 3 },
+    { page: "Hotkey", controls: 3 },
+    { page: "System", controls: 4 },
+    { page: "Privacy", controls: 1 },
+  ];
+
+  for (const { page, controls } of PAGES) {
+    it(`${page} shows the logos on each of its ${controls} controls`, async () => {
+      renderSettings();
+      fireEvent.click(screen.getByText(page));
+      await waitFor(() => expect(screen.getAllByLabelText("Works on Windows")).toHaveLength(controls));
+      const partial = page === "Display" ? 1 : 0;
+      expect(screen.queryAllByLabelText("Works on Linux")).toHaveLength(controls - partial);
+      expect(screen.queryAllByLabelText("Partly works on Linux")).toHaveLength(partial);
+    });
+  }
+
+  it("the logos are the last thing in the row, on the right of the control", () => {
+    renderSettings();
+    const row = screen.getByText("Always on Top").closest(".control-row") as HTMLElement;
+    const first = row.lastElementChild as HTMLElement;
+    expect(first.className).toBe("platform-icons");
+    expect(first.querySelector("[aria-label='Works on Windows']")).not.toBeNull();
+  });
+
+  it("every control row ends with the logos", async () => {
+    renderSettings();
+    for (const page of ["Display", "Files", "Hotkey", "System", "Privacy"]) {
+      fireEvent.click(screen.getByText(page));
+      await waitFor(() => expect(document.querySelectorAll(".platform-icons").length).toBeGreaterThan(0));
+      for (const slot of document.querySelectorAll(".platform-icons")) {
+        expect(slot.parentElement?.lastElementChild).toBe(slot);
+      }
+    }
+  });
+});
+
+describe("SettingsTab > explanations behind info icons", () => {
+  function tipText(row: HTMLElement): string | null {
+    const tip = row.querySelector(".info-tip") as HTMLElement;
+    expect(tip).not.toBeNull();
+    fireEvent.mouseEnter(tip);
+    const text = screen.getByRole("tooltip").textContent;
+    fireEvent.mouseLeave(tip);
+    return text;
+  }
+
+  it("Privacy: Redact file paths has its explanation behind an icon beside the switch", () => {
+    renderSettings();
+    fireEvent.click(screen.getByText("Privacy"));
+    const row = screen.getByText("Redact file paths").closest(".control-row") as HTMLElement;
+    expect(tipText(row)).toBe("Collapses absolute file paths in the Debug log to just their filename.");
+    expect(document.querySelectorAll(".page-placeholder__hint")).toHaveLength(0);
+    expect(document.querySelector(".toggle-switch__description")).toBeNull();
+  });
+
+  it("Files: each folder card has its explanation behind an icon next to the card title", () => {
+    renderSettings();
+    fireEvent.click(screen.getByText("Files"));
+    const expected: [string, string][] = [
+      ["Save Directory", 'Where "Save Playback" writes practice-run files.'],
+      ["MIDI Directory", "Default directory the MIDI file picker opens to."],
+      ["Themes File", "JSON file where custom themes are stored."],
+    ];
+    for (const [title, text] of expected) {
+      const row = screen.getByText(title).closest(".card__title-row") as HTMLElement;
+      expect(tipText(row)).toBe(text);
+    }
+    expect(document.querySelectorAll(".page-placeholder__hint")).toHaveLength(0);
+  });
+
+  it("System: Pedal Prompt Threshold and Reset have their explanations behind icons", () => {
+    renderSettings();
+    fireEvent.click(screen.getByText("System"));
+    const threshold = screen.getByText("Pedal Prompt Threshold").closest(".control-row__label") as HTMLElement;
+    expect(tipText(threshold)).toMatch(/^Minimum number of embedded MIDI sustain-pedal events/);
+    const reset = screen.getByText("Reset All Settings").closest(".control-row") as HTMLElement;
+    expect(tipText(reset)).toMatch(/^Restore all playback and humanization settings to their defaults/);
+    expect(document.querySelectorAll(".page-placeholder__hint")).toHaveLength(0);
   });
 });

@@ -4107,3 +4107,43 @@ mod test_source_is_active {
         assert!(!source_is_active(&state, HookSource::Rdev, Platform::Linux, THREE_KEYBOARDS));
     }
 }
+
+mod test_write_text_file_logic {
+    use super::*;
+
+    #[test]
+    fn test_writes_the_text_to_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sheet.txt");
+        write_text_file_logic(&path, "t y u\n[tu] p").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "t y u\n[tu] p");
+    }
+
+    #[test]
+    fn test_replaces_an_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sheet.txt");
+        std::fs::write(&path, "old and much longer text").unwrap();
+        write_text_file_logic(&path, "new").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+    }
+
+    #[test]
+    fn test_keeps_unicode_and_empty_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sheet.txt");
+        write_text_file_logic(&path, "칠갑산 ♪").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "칠갑산 ♪");
+        write_text_file_logic(&path, "").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
+    }
+
+    #[test]
+    fn test_reports_an_error_when_the_folder_does_not_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("missing").join("sheet.txt");
+        let error = write_text_file_logic(&path, "x").unwrap_err();
+        assert!(!error.is_empty());
+        assert!(!path.exists());
+    }
+}

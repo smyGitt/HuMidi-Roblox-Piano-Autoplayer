@@ -1,8 +1,8 @@
 import { Card } from "../../components/Card";
 import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
+import { InfoTip } from "../../components/InfoTip";
 import { Button } from "../../components/Button";
-import { Label } from "../../components/Label";
 
 interface HumanizeMasterRowProps {
   humanizeAll: boolean;
@@ -28,21 +28,21 @@ export function HumanizeMasterRow({
       title="GENERAL SETTINGS"
       titleButtons={
         <Button variant="icon" subtle danger onClick={onReset} title="Reset">
-          <ArrowCounterClockwiseIcon weight="duotone" />
+          <ArrowCounterClockwiseIcon weight="fill" />
         </Button>
       }
     >
-      <div className="check-pair">
+      <div className="control-row">
         <ToggleSwitch checked={humanizeAll} onChange={onHumanizeAllChange} label="Humanize all" />
-        <Label className="check-pair__desc">turn all the human touches on or off at once</Label>
+        <InfoTip text="turn all the human touches on or off at once" />
       </div>
-      <div className="check-pair">
+      <div className="control-row">
         <ToggleSwitch checked={simulateHands} onChange={onSimulateHandsChange} label="Simulate Hands" />
-        <Label className="check-pair__desc">each hand gets its own slightly different timing</Label>
+        <InfoTip text="each hand gets its own slightly different timing" />
       </div>
-      <div className="check-pair">
+      <div className="control-row">
         <ToggleSwitch checked={chordRoll} onChange={onChordRollChange} label="Chord Roll" />
-        <Label className="check-pair__desc">notes in a chord start just a hair apart, like a real hand</Label>
+        <InfoTip text="notes in a chord start just a hair apart, like a real hand" />
       </div>
     </Card>
   );

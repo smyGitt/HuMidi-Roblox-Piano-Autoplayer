@@ -25,10 +25,10 @@ export function SavedSongsPanel({ saves, onRefresh, onOpenAll, onSaveClick }: Sa
       titleButtons={
         <>
           <Button variant="icon" subtle onClick={onRefresh} title="Refresh">
-            <ArrowsClockwiseIcon weight="duotone" />
+            <ArrowsClockwiseIcon weight="fill" />
           </Button>
           <Button variant="icon" subtle onClick={onOpenAll} title="All saves">
-            <LayoutIcon weight="duotone" />
+            <LayoutIcon weight="fill" />
           </Button>
         </>
       }

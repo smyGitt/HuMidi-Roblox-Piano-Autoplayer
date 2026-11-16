@@ -330,7 +330,7 @@ export function ThresholdChart({ confidence, curves, onCurvesChange, showValues 
           title="Reset zoom"
           onClick={() => setView(fullView(duration))}
         >
-          <ArrowsInIcon weight="duotone" />
+          <ArrowsInIcon weight="fill" />
         </Button>
       )}
     </div>
